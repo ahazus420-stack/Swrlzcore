@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       source_zip:
-        description: "Optional source ZIP path. Leave blank to use latest/request."
+        description: "Optional source ZIP path. Leave blank to use current request."
         required: false
         default: ""
       sha_file:
@@ -71,7 +71,17 @@ jobs:
           set -euo pipefail
           mkdir -p "$SWRLZ_SOURCES_DIR" "$SWRLZ_BUILD_REQUESTS_DIR" "$SWRLZ_BUILD_WORK_DIR" "$SWRLZ_RELEASES_DIR" "$SWRLZ_UPDATES_DIR"
 
-          REQUEST_FILE="$(find "$SWRLZ_BUILD_REQUESTS_DIR" -maxdepth 1 -type f \( -name '*.trigger' -o -name '*.request' \) 2>/dev/null | sort -V | tail -n 1 || true)"
+          REQUEST_FILE=""
+          for candidate in "$SWRLZ_BUILD_REQUESTS_DIR/000_CURRENT.request" "$SWRLZ_BUILD_REQUESTS_DIR/CURRENT.request"; do
+            if [[ -f "$candidate" ]]; then
+              REQUEST_FILE="$candidate"
+              break
+            fi
+          done
+          if [[ -z "${REQUEST_FILE:-}" ]]; then
+            REQUEST_FILE="$(find "$SWRLZ_BUILD_REQUESTS_DIR" -maxdepth 1 -type f \( -name '*.trigger' -o -name '*.request' \) 2>/dev/null | sort -V | tail -n 1 || true)"
+          fi
+
           R_SOURCE=""
           R_SHA=""
           R_RELEASE=""
@@ -84,6 +94,8 @@ jobs:
             R_RELEASE="$(grep -E '^release_name=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
             R_COMMIT="$(grep -E '^commit_release_artifacts=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
             if [[ -z "${R_COMMIT:-}" ]]; then R_COMMIT="true"; fi
+          else
+            echo "No request file found. Manual inputs or auto-pick will be used."
           fi
 
           ZIP="${INPUT_SOURCE_ZIP:-${R_SOURCE:-}}"
@@ -116,14 +128,21 @@ jobs:
           SAFE_RELEASE="$(echo "$RELEASE" | tr -cs 'A-Za-z0-9._-' '_' | sed 's/^_*//;s/_*$//')"
           EXTRACT_DIR="$GITHUB_WORKSPACE/$SWRLZ_BUILD_WORK_DIR/$SAFE_RELEASE/extracted"
 
-          echo "source_zip=$ZIP" >> "$GITHUB_OUTPUT"
-          echo "source_zip_base=$ZIP_BASE" >> "$GITHUB_OUTPUT"
-          echo "sha_file=$SHA" >> "$GITHUB_OUTPUT"
-          echo "release_name=$RELEASE" >> "$GITHUB_OUTPUT"
-          echo "safe_release=$SAFE_RELEASE" >> "$GITHUB_OUTPUT"
-          echo "extract_dir=$EXTRACT_DIR" >> "$GITHUB_OUTPUT"
-          echo "request_file=$REQUEST_FILE" >> "$GITHUB_OUTPUT"
-          echo "commit_release_artifacts=$COMMIT_RELEASE_ARTIFACTS" >> "$GITHUB_OUTPUT"
+          {
+            echo "source_zip=$ZIP"
+            echo "source_zip_base=$ZIP_BASE"
+            echo "sha_file=$SHA"
+            echo "release_name=$RELEASE"
+            echo "safe_release=$SAFE_RELEASE"
+            echo "extract_dir=$EXTRACT_DIR"
+            echo "request_file=$REQUEST_FILE"
+            echo "commit_release_artifacts=$COMMIT_RELEASE_ARTIFACTS"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Resolved release: $RELEASE"
+          echo "Resolved safe release: $SAFE_RELEASE"
+          echo "Resolved request file: ${REQUEST_FILE:-<none>}"
+          echo "Resolved source ZIP: $ZIP"
 
       - name: Verify and extract source
         id: extract
@@ -171,9 +190,10 @@ jobs:
           fi
 
       - name: Apply 2.7.6 Network Discovery Patch
-        if: ${{ contains(steps.resolve.outputs.safe_release, '2.7.6_NETWORK_DISCOVERY') }}
+        if: ${{ contains(steps.resolve.outputs.safe_release, '2.7.6') }}
         env:
           PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
+          SAFE_RELEASE: ${{ steps.resolve.outputs.safe_release }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -181,6 +201,8 @@ jobs:
           import json, os, re
 
           root = Path(os.environ["PROJECT_DIR"])
+          safe_release = os.environ.get("SAFE_RELEASE", "")
+          is_codefix1 = "CODEFIX1_FORGE_IDENTITY_INSTALL_CONTINUITY" in safe_release
           allowed = {".kt",".kts",".java",".xml",".gradle",".properties",".md",".txt",".json",".yml",".yaml",".py",".js",".ts"}
           changed = []
 
@@ -195,13 +217,23 @@ jobs:
                   path.write_text(new, encoding="utf-8")
                   changed.append(str(path.relative_to(root)))
 
+          version_name = "v0.2.7.6-codefix1-forge-identity" if is_codefix1 else "v0.2.7.6-network-discovery"
+          version_code = "20" if is_codefix1 else "19"
+          patch_label = "2.7.6-CODEFIX1-FORGE-IDENTITY-INSTALL-CONTINUITY" if is_codefix1 else "2.7.6-NETWORK-DISCOVERY"
+          build_line = "Network Discovery / forge identity continuity / permission onboarding / stable signing readiness" if is_codefix1 else "Network Discovery / discovery signature / local node scan / saved server verify / Admin Registry bridge"
+          source_line = "SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip + " + safe_release + " visible forge patch"
+
           replacements = {
-              "v0.2.7.5-admin-registry": "v0.2.7.6-network-discovery",
-              "Patch: 2.7.5-ADMIN-REGISTRY": "Patch: 2.7.6-NETWORK-DISCOVERY",
+              "v0.2.7.5-admin-registry": version_name,
+              "v0.2.7.6-network-discovery": version_name,
+              "Patch: 2.7.5-ADMIN-REGISTRY": "Patch: " + patch_label,
+              "Patch: 2.7.6-NETWORK-DISCOVERY": "Patch: " + patch_label,
               "Roadmap: 2.7.5": "Roadmap: 2.7.6",
-              "Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop": "Network Discovery / discovery signature / local node scan / saved server verify / Admin Registry bridge",
-              "SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip": "SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip + 2.7.6_NETWORK_DISCOVERY forge patch",
-              "2.7.5-ADMIN-REGISTRY": "2.7.6-NETWORK-DISCOVERY",
+              "Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop": build_line,
+              "Network Discovery / discovery signature / local node scan / saved server verify / Admin Registry bridge": build_line,
+              "SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip": source_line,
+              "2.7.5-ADMIN-REGISTRY": patch_label,
+              "2.7.6-NETWORK-DISCOVERY": patch_label,
               "2.7.5 Admin Registry": "2.7.6 Network Discovery",
           }
 
@@ -214,10 +246,14 @@ jobs:
               old = text
               for a, b in replacements.items():
                   text = text.replace(a, b)
-              text = re.sub(r"\bversionCode\s+18\b", "versionCode 19", text)
-              text = re.sub(r"\bversionCode\s*=\s*18\b", "versionCode = 19", text)
-              text = re.sub(r'versionName\s+"v0\.2\.7\.5-admin-registry"', 'versionName "v0.2.7.6-network-discovery"', text)
-              text = re.sub(r'versionName\s*=\s*"v0\.2\.7\.5-admin-registry"', 'versionName = "v0.2.7.6-network-discovery"', text)
+              text = re.sub(r"\bversionCode\s+18\b", "versionCode " + version_code, text)
+              text = re.sub(r"\bversionCode\s+19\b", "versionCode " + version_code, text)
+              text = re.sub(r"\bversionCode\s*=\s*18\b", "versionCode = " + version_code, text)
+              text = re.sub(r"\bversionCode\s*=\s*19\b", "versionCode = " + version_code, text)
+              text = re.sub(r'versionName\s+"v0\.2\.7\.5-admin-registry"', 'versionName "' + version_name + '"', text)
+              text = re.sub(r'versionName\s+"v0\.2\.7\.6-network-discovery"', 'versionName "' + version_name + '"', text)
+              text = re.sub(r'versionName\s*=\s*"v0\.2\.7\.5-admin-registry"', 'versionName = "' + version_name + '"', text)
+              text = re.sub(r'versionName\s*=\s*"v0\.2\.7\.6-network-discovery"', 'versionName = "' + version_name + '"', text)
               write_if_changed(path, old, text)
 
           kt_files = list(root.rglob("*.kt"))
@@ -309,28 +345,55 @@ jobs:
           sig_path = sig_dir / "discovery_signature_0_7_3.json"
           write_if_changed(sig_path, read_text(sig_path) if sig_path.exists() else "", json.dumps(signature, indent=2) + "\n")
 
-          receipt = """# SWRLZ-Core 2.7.6 Network Discovery Forge Receipt
+          permission_guide = """# SWRLZ Restricted Settings / Permission Onboarding Guide
+
+          Android may hide Allow restricted settings for sideloaded APKs until the user first visits the app settings/permissions flow.
+
+          SWRLZ cannot bypass Android restricted settings, auto-enable them, or skip phone authentication.
+
+          First-run guide:
+          1. Open Android App Info for SWRLZ.
+          2. Visit permissions or the restricted settings area once if the three-dot option is hidden.
+          3. Return to App Info.
+          4. Tap the three-dot menu if available.
+          5. Tap Allow restricted settings.
+          6. Authenticate with phone security.
+          7. Return to SWRLZ.
+          8. Open Accessibility / Notifications / Overlay settings.
+          9. Verify readiness inside SWRLZ.
+          """
+          write_if_changed(root / "SWRLZ_PERMISSION_ONBOARDING_GUIDE.md", read_text(root / "SWRLZ_PERMISSION_ONBOARDING_GUIDE.md") if (root / "SWRLZ_PERMISSION_ONBOARDING_GUIDE.md").exists() else "", permission_guide)
+
+          receipt = f"""# SWRLZ-Core 2.7.6 Forge Patch Receipt
+
+          RELEASE:
+          {safe_release}
+
+          BUILD IDENTITY:
+          - versionName target: {version_name}
+          - versionCode target: {version_code}
+          - patch target: {patch_label}
 
           PROVEN BY FORGE PATCH:
-          - Build identity moved to 2.7.6 Network Discovery.
-          - versionName target: v0.2.7.6-network-discovery.
-          - versionCode target: 19.
-          - Kotlin local-first discovery helper added when MainActivity package is found.
-          - Android network permissions ensured.
-          - Server discovery signature JSON added.
+          - Current request priority is handled by workflow resolver.
+          - Network Discovery helper is added when MainActivity package is found.
+          - Android network permissions are ensured.
+          - Server discovery signature JSON is added.
+          - Permission onboarding guide is included.
+          - Stable signing is reported by workflow after build.
 
           TRUTHFUL SOURCE LINE:
-          This build is produced from SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip plus the visible 2.7.6_NETWORK_DISCOVERY forge patch.
+          This build is produced from {source_line}
           """
-          receipt_path = root / "SWRLZ_2.7.6_NETWORK_DISCOVERY_PATCH_RECEIPT.md"
+          receipt_path = root / "SWRLZ_2.7.6_FORGE_PATCH_RECEIPT.md"
           write_if_changed(receipt_path, read_text(receipt_path) if receipt_path.exists() else "", receipt)
 
           if not changed:
-              raise SystemExit("2.7.6 Network Discovery patch failed: no files changed.")
-          print("2.7.6 Network Discovery patched files:")
+              raise SystemExit("2.7.6 forge patch failed: no files changed.")
+          print("2.7.6 patched files:")
           print("\n".join(changed))
           PY
-          grep -RInE '2\.7\.6-NETWORK-DISCOVERY|v0\.2\.7\.6-network-discovery|SwrlzNetworkDiscovery|/discovery/signature|LNS-0\.7\.3-DISCOVERY-SIGNATURE' "$PROJECT_DIR" || true
+          grep -RInE '2\.7\.6|v0\.2\.7\.6|SwrlzNetworkDiscovery|/discovery/signature|LNS-0\.7\.3|restricted settings|Permission Onboarding' "$PROJECT_DIR" || true
 
       - name: Build Android debug APK
         id: build
@@ -351,6 +414,52 @@ jobs:
           echo "output_dir=$OUT_DIR" >> "$GITHUB_OUTPUT"
           find "$OUT_DIR" -maxdepth 1 -type f -print -exec ls -lh {} \;
 
+      - name: Stable dev signing status and optional APK re-sign
+        id: signing
+        env:
+          OUT_DIR: ${{ steps.build.outputs.output_dir }}
+          SWRLZ_DEV_KEYSTORE_BASE64: ${{ secrets.SWRLZ_DEV_KEYSTORE_BASE64 }}
+          SWRLZ_DEV_KEYSTORE_PASSWORD: ${{ secrets.SWRLZ_DEV_KEYSTORE_PASSWORD }}
+          SWRLZ_DEV_KEY_ALIAS: ${{ secrets.SWRLZ_DEV_KEY_ALIAS }}
+          SWRLZ_DEV_KEY_PASSWORD: ${{ secrets.SWRLZ_DEV_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          SIGNING_MODE="debug-runner-default"
+          if [[ -n "${SWRLZ_DEV_KEYSTORE_BASE64:-}" && -n "${SWRLZ_DEV_KEYSTORE_PASSWORD:-}" && -n "${SWRLZ_DEV_KEY_ALIAS:-}" && -n "${SWRLZ_DEV_KEY_PASSWORD:-}" ]]; then
+            echo "Stable SWRLZ dev signing secrets detected."
+            KEYSTORE="$RUNNER_TEMP/swrlz-dev-signing.jks"
+            echo "$SWRLZ_DEV_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
+            APKSIGNER="$(find "${ANDROID_HOME:-$HOME}" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1 || true)"
+            ZIPALIGN="$(find "${ANDROID_HOME:-$HOME}" -type f -name zipalign 2>/dev/null | sort -V | tail -n 1 || true)"
+            if [[ -z "${APKSIGNER:-}" || -z "${ZIPALIGN:-}" ]]; then
+              echo "Stable signing requested, but apksigner/zipalign was not found." >&2
+              exit 1
+            fi
+            for APK in "$OUT_DIR"/*.apk; do
+              [[ -f "$APK" ]] || continue
+              BASE="${APK%.apk}"
+              ALIGNED="${BASE}_aligned.apk"
+              SIGNED="${BASE}_stable-signed.apk"
+              "$ZIPALIGN" -f -p 4 "$APK" "$ALIGNED"
+              "$APKSIGNER" sign \
+                --ks "$KEYSTORE" \
+                --ks-pass "pass:$SWRLZ_DEV_KEYSTORE_PASSWORD" \
+                --ks-key-alias "$SWRLZ_DEV_KEY_ALIAS" \
+                --key-pass "pass:$SWRLZ_DEV_KEY_PASSWORD" \
+                --out "$SIGNED" \
+                "$ALIGNED"
+              "$APKSIGNER" verify "$SIGNED"
+              mv "$SIGNED" "$APK"
+              rm -f "$ALIGNED"
+            done
+            SIGNING_MODE="stable-dev-signing-active"
+          else
+            echo "Stable SWRLZ dev signing secrets not configured; using runner/debug signing."
+          fi
+          echo "$SIGNING_MODE" > "$OUT_DIR/SWRLZ_SIGNING_MODE.txt"
+          echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
+          cat "$OUT_DIR/SWRLZ_SIGNING_MODE.txt"
+
       - name: Create GitHub Actions build summary
         env:
           OUT_DIR: ${{ steps.build.outputs.output_dir }}
@@ -359,6 +468,7 @@ jobs:
           SHA_FILE: ${{ steps.resolve.outputs.sha_file }}
           SAFE_RELEASE: ${{ steps.resolve.outputs.safe_release }}
           REQUEST_FILE: ${{ steps.resolve.outputs.request_file }}
+          SIGNING_MODE: ${{ steps.signing.outputs.signing_mode }}
         run: |
           set -euo pipefail
           SUMMARY_FILE="$OUT_DIR/GITHUB_ACTIONS_BUILD_SUMMARY.md"
@@ -370,6 +480,7 @@ jobs:
             echo "- Source ZIP: $SOURCE_ZIP"
             echo "- SHA file: ${SHA_FILE:-<none>}"
             echo "- Build request file: ${REQUEST_FILE:-<none>}"
+            echo "- Signing mode: ${SIGNING_MODE:-unknown}"
             echo "- Workflow: $GITHUB_WORKFLOW"
             echo "- Run ID: $GITHUB_RUN_ID"
             echo "- Commit: $GITHUB_SHA"
@@ -398,6 +509,7 @@ jobs:
           RELEASE_NAME: ${{ steps.resolve.outputs.release_name }}
           SAFE_RELEASE: ${{ steps.resolve.outputs.safe_release }}
           SOURCE_ZIP: ${{ steps.resolve.outputs.source_zip_base }}
+          SIGNING_MODE: ${{ steps.signing.outputs.signing_mode }}
         run: |
           set -euo pipefail
           REL_DIR="$SWRLZ_RELEASES_DIR/${SAFE_RELEASE}_APK"
@@ -423,6 +535,7 @@ jobs:
             "apk_sha256": "$APK_SHA",
             "bundle_file": "${BUNDLE_FILE:-}",
             "bundle_sha256": "$BUNDLE_SHA",
+            "signing_mode": "${SIGNING_MODE:-unknown}",
             "update_modes": {
               "apk_install_update": true,
               "hot_patch_assets": true,
