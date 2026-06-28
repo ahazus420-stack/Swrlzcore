@@ -290,6 +290,306 @@ jobs:
           echo "CODEFIX1 verification grep:"
           grep -RInE 'Patch: 2\.7\.5-ADMIN-REGISTRY|Roadmap: 2\.7\.5|Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop|SWRLZ_CORE_2\.7\.5_ADMIN_REGISTRY_SOURCE\.zip' "$PROJECT_DIR" || true
 
+      - name: Apply 2.7.6 Network Discovery Patch
+        if: ${{ contains(steps.resolve.outputs.safe_release, '2.7.6_NETWORK_DISCOVERY') }}
+        env:
+          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
+        run: |
+          set -euo pipefail
+          echo "Applying visible 2.7.6 Network Discovery forge patch inside extracted build workspace only."
+          echo "Target client identity: v0.2.7.6-network-discovery / versionCode 19"
+          echo "Target server lane: 0.7.3-DISCOVERY-SIGNATURE"
+          echo "Discovery endpoint: GET /discovery/signature"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+          import re
+
+          root = Path(os.environ['PROJECT_DIR'])
+          allowed_suffixes = {
+              '.kt', '.kts', '.java', '.xml', '.gradle', '.properties', '.md', '.txt', '.json', '.yml', '.yaml', '.py', '.js', '.ts'
+          }
+          changed = []
+
+          def read_text(path):
+              try:
+                  return path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  return None
+
+          def write_if_changed(path, original, updated):
+              if updated != original:
+                  path.write_text(updated, encoding='utf-8')
+                  changed.append(str(path.relative_to(root)))
+
+          replacements = {
+              'v0.2.7.5-admin-registry': 'v0.2.7.6-network-discovery',
+              'Patch: 2.7.5-ADMIN-REGISTRY': 'Patch: 2.7.6-NETWORK-DISCOVERY',
+              'Roadmap: 2.7.5': 'Roadmap: 2.7.6',
+              'Build line: Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop': 'Build line: Network Discovery / discovery signature / local node scan / saved server verify / Admin Registry bridge',
+              'Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop': 'Network Discovery / discovery signature / local node scan / saved server verify / Admin Registry bridge',
+              'SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip': 'SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip + 2.7.6_NETWORK_DISCOVERY forge patch',
+              '2.7.5-ADMIN-REGISTRY': '2.7.6-NETWORK-DISCOVERY',
+              '2.7.5 Admin Registry': '2.7.6 Network Discovery',
+          }
+
+          for path in root.rglob('*'):
+              if not path.is_file() or path.suffix not in allowed_suffixes:
+                  continue
+              text = read_text(path)
+              if text is None:
+                  continue
+              original = text
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
+              text = re.sub(r'\bversionCode\s+18\b', 'versionCode 19', text)
+              text = re.sub(r'\bversionCode\s*=\s*18\b', 'versionCode = 19', text)
+              text = re.sub(r'versionName\s+"v0\.2\.7\.5-admin-registry"', 'versionName "v0.2.7.6-network-discovery"', text)
+              text = re.sub(r'versionName\s*=\s*"v0\.2\.7\.5-admin-registry"', 'versionName = "v0.2.7.6-network-discovery"', text)
+              write_if_changed(path, original, text)
+
+          kt_files = list(root.rglob('*.kt'))
+          main_activity = next((p for p in kt_files if p.name == 'MainActivity.kt'), None)
+          if main_activity is None:
+              main_activity = next((p for p in kt_files if 'MainActivity' in p.name), None)
+
+          if main_activity is not None:
+              main_text = read_text(main_activity) or ''
+              match = re.search(r'^\s*package\s+([A-Za-z0-9_.]+)', main_text, re.MULTILINE)
+              package_name = match.group(1) if match else 'sh.swurlz.core'
+              util_path = main_activity.parent / 'SwrlzNetworkDiscovery.kt'
+              util_source = '''package __PACKAGE__
+
+import java.net.HttpURLConnection
+import java.net.URL
+
+/**
+ * SWRLZ-Core 2.7.6 Network Discovery helper.
+ * Local-first utility for probing trusted SWRLZ node candidates.
+ * No paid runtime dependency. No silent install behavior.
+ */
+data class SwrlzDiscoveryResult(
+    val baseUrl: String,
+    val ok: Boolean,
+    val status: String,
+    val rawSignature: String? = null
+)
+
+object SwrlzNetworkDiscovery {
+    const val SIGNATURE_PATH: String = "/discovery/signature"
+    const val EXPECTED_SERVER: String = "swrlz-local-node"
+    const val EXPECTED_SERVER_PATCH: String = "LNS-0.7.3-DISCOVERY-SIGNATURE"
+
+    fun normalizeBaseUrl(input: String): String {
+        val trimmed = input.trim().trimEnd('/')
+        return when {
+            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+            trimmed.isNotBlank() -> "http://" + trimmed
+            else -> ""
+        }
+    }
+
+    fun candidateUrls(savedUrl: String? = null, lastKnownUrl: String? = null): List<String> {
+        val candidates = mutableListOf<String>()
+        if (!savedUrl.isNullOrBlank()) candidates += savedUrl
+        if (!lastKnownUrl.isNullOrBlank()) candidates += lastKnownUrl
+        candidates += "http://127.0.0.1:8787"
+        candidates += "http://localhost:8787"
+        candidates += "http://10.0.2.2:8787"
+        candidates += "http://192.168.0.1:8787"
+        candidates += "http://192.168.1.1:8787"
+        candidates += "http://192.168.4.1:8787"
+        return candidates.map { normalizeBaseUrl(it) }.filter { it.isNotBlank() }.distinct()
+    }
+
+    fun probe(baseUrl: String, timeoutMs: Int = 1500): SwrlzDiscoveryResult {
+        val normalized = normalizeBaseUrl(baseUrl)
+        if (normalized.isBlank()) {
+            return SwrlzDiscoveryResult(baseUrl, false, "EMPTY_URL", null)
+        }
+        val signatureUrl = normalized + SIGNATURE_PATH
+        var connection: HttpURLConnection? = null
+        return try {
+            connection = URL(signatureUrl).openConnection() as HttpURLConnection
+            connection.connectTimeout = timeoutMs
+            connection.readTimeout = timeoutMs
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("Accept", "application/json")
+            val code = connection.responseCode
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+            val ok = code in 200..299 && looksLikeSwrlzSignature(body)
+            SwrlzDiscoveryResult(normalized, ok, "HTTP_" + code, body)
+        } catch (error: Exception) {
+            SwrlzDiscoveryResult(normalized, false, "ERROR_" + error.javaClass.simpleName + ":" + (error.message ?: "unknown"), null)
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    fun firstValid(candidates: List<String>, timeoutMs: Int = 1500): SwrlzDiscoveryResult? {
+        for (candidate in candidates) {
+            val result = probe(candidate, timeoutMs)
+            if (result.ok) return result
+        }
+        return null
+    }
+
+    private fun looksLikeSwrlzSignature(payload: String): Boolean {
+        val lower = payload.lowercase()
+        return lower.contains("swrlz-local-node") && lower.contains("discovery-signature") && lower.contains("\"ok\"")
+    }
+}
+'''.replace('__PACKAGE__', package_name)
+              previous = read_text(util_path) if util_path.exists() else ''
+              write_if_changed(util_path, previous, util_source)
+          else:
+              print('No MainActivity.kt found; skipped Kotlin discovery helper creation.')
+
+          for manifest in root.rglob('AndroidManifest.xml'):
+              text = read_text(manifest)
+              if text is None:
+                  continue
+              original = text
+              permissions = []
+              if 'android.permission.INTERNET' not in text:
+                  permissions.append('    <uses-permission android:name="android.permission.INTERNET" />')
+              if 'android.permission.ACCESS_NETWORK_STATE' not in text:
+                  permissions.append('    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />')
+              if permissions and '<application' in text:
+                  text = text.replace('<application', '\n'.join(permissions) + '\n\n    <application', 1)
+              write_if_changed(manifest, original, text)
+
+          signature = {
+              'ok': True,
+              'server': 'swrlz-local-node',
+              'version': '0.7.3-discovery-signature',
+              'patch': 'LNS-0.7.3-DISCOVERY-SIGNATURE',
+              'port': 8787,
+          }
+          sig_dir = root / 'server'
+          sig_dir.mkdir(exist_ok=True)
+          sig_path = sig_dir / 'discovery_signature_0_7_3.json'
+          old_sig = read_text(sig_path) if sig_path.exists() else ''
+          new_sig = json.dumps(signature, indent=2) + '\n'
+          write_if_changed(sig_path, old_sig, new_sig)
+
+          flask_patch = '''
+
+# SWRLZ Local Node Server 0.7.3 Discovery Signature
+# Visible forge patch: exposes GET /discovery/signature when this Flask app uses global `app`.
+try:
+    _swrlz_flask_app = app
+except NameError:
+    _swrlz_flask_app = None
+
+if _swrlz_flask_app is not None and hasattr(_swrlz_flask_app, "route"):
+    @_swrlz_flask_app.route("/discovery/signature", methods=["GET"])
+    def swrlz_discovery_signature():
+        payload = {
+            "ok": True,
+            "server": "swrlz-local-node",
+            "version": "0.7.3-discovery-signature",
+            "patch": "LNS-0.7.3-DISCOVERY-SIGNATURE",
+            "port": 8787,
+        }
+        try:
+            from flask import jsonify
+            return jsonify(payload)
+        except Exception:
+            return payload
+'''
+          fastapi_patch = '''
+
+# SWRLZ Local Node Server 0.7.3 Discovery Signature
+# Visible forge patch: exposes GET /discovery/signature when this FastAPI app uses global `app`.
+try:
+    _swrlz_fastapi_app = app
+except NameError:
+    _swrlz_fastapi_app = None
+
+if _swrlz_fastapi_app is not None and hasattr(_swrlz_fastapi_app, "get"):
+    @_swrlz_fastapi_app.get("/discovery/signature")
+    def swrlz_discovery_signature():
+        return {
+            "ok": True,
+            "server": "swrlz-local-node",
+            "version": "0.7.3-discovery-signature",
+            "patch": "LNS-0.7.3-DISCOVERY-SIGNATURE",
+            "port": 8787,
+        }
+'''
+          for py in root.rglob('*.py'):
+              text = read_text(py)
+              if text is None or '/discovery/signature' in text:
+                  continue
+              original = text
+              if 'Flask(' in text:
+                  text += flask_patch
+              elif 'FastAPI(' in text:
+                  text += fastapi_patch
+              write_if_changed(py, original, text)
+
+          js_patch = '''
+
+// SWRLZ Local Node Server 0.7.3 Discovery Signature
+if (typeof app !== 'undefined' && app && typeof app.get === 'function') {
+  app.get('/discovery/signature', (_req, res) => res.json({
+    ok: true,
+    server: 'swrlz-local-node',
+    version: '0.7.3-discovery-signature',
+    patch: 'LNS-0.7.3-DISCOVERY-SIGNATURE',
+    port: 8787
+  }));
+}
+'''
+          for js in list(root.rglob('*.js')) + list(root.rglob('*.ts')):
+              text = read_text(js)
+              if text is None or '/discovery/signature' in text:
+                  continue
+              original = text
+              if 'express(' in text or 'app.get(' in text:
+                  text += js_patch
+              write_if_changed(js, original, text)
+
+          receipt = '''# SWRLZ-Core 2.7.6 Network Discovery Forge Receipt
+
+PROVEN BY FORGE PATCH:
+- Build identity moved to 2.7.6 Network Discovery.
+- versionName target: v0.2.7.6-network-discovery.
+- versionCode target: 19.
+- Kotlin local-first discovery helper added when MainActivity package is found.
+- Android network permissions ensured.
+- Server discovery signature JSON added.
+- Flask/FastAPI/Express discovery endpoint patch attempted when matching server app files are present.
+
+TRUTHFUL SOURCE LINE:
+This build is produced from SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip plus the visible 2.7.6_NETWORK_DISCOVERY forge patch.
+
+ACCEPTANCE TEST:
+- Build through GitHub Actions forge.
+- Install APK.
+- Verify Home identity.
+- Verify /discovery/signature on Local Node Server 0.7.3.
+- Verify Admin Registry / Radar still work after saving node URL.
+'''
+          receipt_path = root / 'SWRLZ_2.7.6_NETWORK_DISCOVERY_PATCH_RECEIPT.md'
+          old_receipt = read_text(receipt_path) if receipt_path.exists() else ''
+          write_if_changed(receipt_path, old_receipt, receipt)
+
+          if not changed:
+              raise SystemExit('2.7.6 Network Discovery patch failed: no files changed.')
+
+          print('2.7.6 Network Discovery patched files:')
+          for item in changed:
+              print(f'  - {item}')
+          PY
+
+          echo "2.7.6 verification grep:"
+          grep -RInE '2\.7\.6-NETWORK-DISCOVERY|v0\.2\.7\.6-network-discovery|SwrlzNetworkDiscovery|/discovery/signature|LNS-0\.7\.3-DISCOVERY-SIGNATURE' "$PROJECT_DIR" || true
+
       - name: Build Android debug APK
         id: build
         env:
