@@ -4,24 +4,26 @@ on:
   workflow_dispatch:
     inputs:
       source_zip:
-        description: "Optional source ZIP path. Leave blank to auto-pick newest SWRLZ_CORE_*_SOURCE*.zip."
+        description: "Optional source ZIP path, usually SOURCES/<file>. Leave blank to auto-pick newest."
         required: false
         default: ""
       sha_file:
-        description: "Optional SHA256 file path. Leave blank to auto-match the source ZIP."
+        description: "Optional SHA256 file path, usually SOURCES/<file>. Leave blank to auto-match the source ZIP."
         required: false
         default: ""
       release_name:
-        description: "Optional release label for the artifact/folder. Leave blank to infer from ZIP name."
+        description: "Optional release label. Leave blank to infer from ZIP name."
         required: false
         default: ""
       commit_release_artifacts:
-        description: "Commit APK_DOWNLOAD output into RELEASES/<release>_APK after successful build."
+        description: "Commit APK output into RELEASES/<release>_APK and write UPDATES manifest files."
         required: false
         type: boolean
         default: false
   push:
     paths:
+      - "SOURCES/SWRLZ_CORE_*_SOURCE*.zip"
+      - "SOURCES/SWRLZ_CORE_*_SHA256*.txt"
       - "SWRLZ_CORE_*_SOURCE*.zip"
       - "SWRLZ_CORE_*_SHA256*.txt"
       - ".github/workflows/build-swrlz-apk.yml"
@@ -32,6 +34,12 @@ permissions:
 defaults:
   run:
     shell: bash
+
+env:
+  SWRLZ_SOURCES_DIR: SOURCES
+  SWRLZ_BUILD_WORK_DIR: BUILD_WORK
+  SWRLZ_RELEASES_DIR: RELEASES
+  SWRLZ_UPDATES_DIR: UPDATES
 
 jobs:
   build-swrlz-apk:
@@ -51,6 +59,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Prepare forge folders
+        run: |
+          set -euo pipefail
+          mkdir -p "$SWRLZ_SOURCES_DIR" "$SWRLZ_BUILD_WORK_DIR" "$SWRLZ_RELEASES_DIR" "$SWRLZ_UPDATES_DIR"
+          echo "SWRLZ forge folders:"
+          printf '  - %s\n' "$SWRLZ_SOURCES_DIR" "$SWRLZ_BUILD_WORK_DIR" "$SWRLZ_RELEASES_DIR" "$SWRLZ_UPDATES_DIR"
+
       - name: Resolve source ZIP and SHA file
         id: resolve
         env:
@@ -61,18 +76,19 @@ jobs:
           set -euo pipefail
 
           echo "Workspace: $PWD"
-          echo "Repository files:"
-          find . -maxdepth 3 -type f | sort | sed 's#^./##' | head -n 200
+          echo "Top-level forge folders:"
+          find . -maxdepth 2 -type f | sort | sed 's#^./##' | head -n 200
 
           if [[ -n "${INPUT_SOURCE_ZIP:-}" ]]; then
             ZIP="$INPUT_SOURCE_ZIP"
           else
-            ZIP="$(find . -maxdepth 4 -type f -iname 'SWRLZ_CORE_*_SOURCE*.zip' ! -iname '*APK_DOWNLOAD*' | sort -V | tail -n 1)"
+            # Preferred clean location: SOURCES/. Root lookup remains as legacy fallback.
+            ZIP="$(find "$SWRLZ_SOURCES_DIR" . -maxdepth 4 -type f -iname 'SWRLZ_CORE_*_SOURCE*.zip' ! -iname '*APK_DOWNLOAD*' 2>/dev/null | sort -V | tail -n 1)"
           fi
 
           if [[ -z "${ZIP:-}" || ! -f "$ZIP" ]]; then
             echo "Could not resolve source ZIP." >&2
-            find . -maxdepth 4 -type f -iname '*.zip' | sort >&2 || true
+            find "$SWRLZ_SOURCES_DIR" . -maxdepth 4 -type f -iname '*.zip' 2>/dev/null | sort >&2 || true
             exit 1
           fi
 
@@ -82,7 +98,7 @@ jobs:
           if [[ -n "${INPUT_SHA_FILE:-}" ]]; then
             SHA_FILE="$INPUT_SHA_FILE"
           else
-            SHA_FILE="$(find . -maxdepth 4 -type f -iname "${KEY}*SHA256*.txt" | sort -V | tail -n 1 || true)"
+            SHA_FILE="$(find "$SWRLZ_SOURCES_DIR" . -maxdepth 4 -type f -iname "${KEY}*SHA256*.txt" 2>/dev/null | sort -V | tail -n 1 || true)"
           fi
 
           if [[ -n "${SHA_FILE:-}" && ! -f "$SHA_FILE" ]]; then
@@ -100,14 +116,22 @@ jobs:
             RELEASE_NAME="${RELEASE_NAME%_SOURCE-3}"
           fi
 
+          SAFE_RELEASE="$(echo "$RELEASE_NAME" | tr -cs 'A-Za-z0-9._-' '_' | sed 's/^_*//;s/_*$//')"
+          WORK_ROOT="$GITHUB_WORKSPACE/$SWRLZ_BUILD_WORK_DIR/$SAFE_RELEASE"
+          EXTRACT_DIR="$WORK_ROOT/extracted"
+
           echo "source_zip=$ZIP" >> "$GITHUB_OUTPUT"
           echo "source_zip_base=$ZIP_BASE" >> "$GITHUB_OUTPUT"
           echo "sha_file=$SHA_FILE" >> "$GITHUB_OUTPUT"
           echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
+          echo "safe_release=$SAFE_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "work_root=$WORK_ROOT" >> "$GITHUB_OUTPUT"
+          echo "extract_dir=$EXTRACT_DIR" >> "$GITHUB_OUTPUT"
 
           echo "Resolved source ZIP: $ZIP"
           echo "Resolved SHA file: ${SHA_FILE:-<none>}"
           echo "Release name: $RELEASE_NAME"
+          echo "Build work root: $WORK_ROOT"
 
       - name: Verify source ZIP SHA256
         env:
@@ -125,8 +149,7 @@ jobs:
           echo "SHA file content:"
           cat "$SHA_FILE"
 
-          # Many SWRLZ SHA files reference the original ZIP name, while GitHub uploads may append -1/-2.
-          # Copy the selected ZIP to the filename expected by sha256sum -c when necessary.
+          # SWRLZ SHA files often reference original ZIP names while GitHub uploads may append -1/-2.
           EXPECTED_NAME="$(awk 'NF >= 2 {print $2; exit}' "$SHA_FILE")"
           if [[ -n "${EXPECTED_NAME:-}" && ! -f "$EXPECTED_NAME" ]]; then
             echo "Creating SHA compatibility copy: $ZIP -> $EXPECTED_NAME"
@@ -135,34 +158,34 @@ jobs:
 
           sha256sum -c "$SHA_FILE"
 
-      - name: Extract source ZIP
+      - name: Extract source ZIP into BUILD_WORK
         id: extract
         env:
           ZIP: ${{ steps.resolve.outputs.source_zip }}
+          EXTRACT_DIR: ${{ steps.resolve.outputs.extract_dir }}
         run: |
           set -euo pipefail
 
-          EXTRACT_DIR="$RUNNER_TEMP/swrlz-source"
           rm -rf "$EXTRACT_DIR"
           mkdir -p "$EXTRACT_DIR"
 
           unzip -o "$ZIP" -d "$EXTRACT_DIR"
 
-          BUILD_SCRIPT="$(find "$EXTRACT_DIR" -maxdepth 5 -type f -path '*/scripts/install_android_sdk_and_build.sh' | sort | head -n 1)"
+          BUILD_SCRIPT="$(find "$EXTRACT_DIR" -maxdepth 6 -type f -path '*/scripts/install_android_sdk_and_build.sh' | sort | head -n 1)"
           if [[ -z "${BUILD_SCRIPT:-}" || ! -f "$BUILD_SCRIPT" ]]; then
             echo "Could not find scripts/install_android_sdk_and_build.sh in extracted source." >&2
-            find "$EXTRACT_DIR" -maxdepth 5 -type f | sort | head -n 300 >&2
+            find "$EXTRACT_DIR" -maxdepth 6 -type f | sort | head -n 300 >&2
             exit 1
           fi
 
           PROJECT_DIR="$(dirname "$(dirname "$BUILD_SCRIPT")")"
           chmod +x "$BUILD_SCRIPT"
 
-          echo "extract_dir=$EXTRACT_DIR" >> "$GITHUB_OUTPUT"
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
           echo "Project dir: $PROJECT_DIR"
-          find "$PROJECT_DIR" -maxdepth 2 -type f | sort | head -n 80
+          echo "Build work tree:"
+          find "$EXTRACT_DIR" -maxdepth 3 -type f | sort | head -n 120
 
       - name: Build Android debug APK
         id: build
@@ -184,7 +207,7 @@ jobs:
           OUT_DIR="$PROJECT_DIR/APK_DOWNLOAD"
           if [[ ! -d "$OUT_DIR" ]]; then
             echo "APK_DOWNLOAD folder not found. Searching for APK outputs..."
-            find "$PROJECT_DIR" -type f -iname '*.apk' -o -iname '*.aab'
+            find "$PROJECT_DIR" -type f \( -iname '*.apk' -o -iname '*.aab' \)
             exit 1
           fi
 
@@ -199,6 +222,7 @@ jobs:
           RELEASE_NAME: ${{ steps.resolve.outputs.release_name }}
           SOURCE_ZIP: ${{ steps.resolve.outputs.source_zip_base }}
           SHA_FILE: ${{ steps.resolve.outputs.sha_file }}
+          SAFE_RELEASE: ${{ steps.resolve.outputs.safe_release }}
         run: |
           set -euo pipefail
 
@@ -207,6 +231,7 @@ jobs:
             echo "# SWRLZ GitHub Actions Build Summary"
             echo
             echo "- Release: $RELEASE_NAME"
+            echo "- Safe release folder: $SAFE_RELEASE"
             echo "- Source ZIP: $SOURCE_ZIP"
             echo "- SHA file: ${SHA_FILE:-<none>}"
             echo "- Workflow: $GITHUB_WORKFLOW"
@@ -228,30 +253,60 @@ jobs:
       - name: Upload APK_DOWNLOAD artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.resolve.outputs.release_name }}_APK_DOWNLOAD
+          name: ${{ steps.resolve.outputs.safe_release }}_APK_DOWNLOAD
           path: ${{ steps.build.outputs.output_dir }}/*
           if-no-files-found: error
           retention-days: 30
 
-      - name: Optionally commit release artifacts
+      - name: Optionally commit release artifacts and update manifests
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.commit_release_artifacts == 'true' }}
         env:
           OUT_DIR: ${{ steps.build.outputs.output_dir }}
           RELEASE_NAME: ${{ steps.resolve.outputs.release_name }}
+          SAFE_RELEASE: ${{ steps.resolve.outputs.safe_release }}
+          SOURCE_ZIP: ${{ steps.resolve.outputs.source_zip_base }}
         run: |
           set -euo pipefail
 
-          SAFE_RELEASE="$(echo "$RELEASE_NAME" | tr -cs 'A-Za-z0-9._-' '_' | sed 's/^_*//;s/_*$//')"
-          REL_DIR="RELEASES/${SAFE_RELEASE}_APK"
-
-          mkdir -p "$REL_DIR"
+          REL_DIR="$SWRLZ_RELEASES_DIR/${SAFE_RELEASE}_APK"
+          mkdir -p "$REL_DIR" "$SWRLZ_UPDATES_DIR"
           cp -a "$OUT_DIR"/. "$REL_DIR"/
+
+          APK_FILE="$(find "$REL_DIR" -maxdepth 1 -type f -iname '*debug.apk' | sort | head -n 1 || true)"
+          BUNDLE_FILE="$(find "$REL_DIR" -maxdepth 1 -type f -iname '*APK_DOWNLOAD*.zip' | sort | head -n 1 || true)"
+          APK_SHA=""
+          BUNDLE_SHA=""
+          if [[ -n "${APK_FILE:-}" ]]; then APK_SHA="$(sha256sum "$APK_FILE" | awk '{print $1}')"; fi
+          if [[ -n "${BUNDLE_FILE:-}" ]]; then BUNDLE_SHA="$(sha256sum "$BUNDLE_FILE" | awk '{print $1}')"; fi
+
+          MANIFEST_FILE="$SWRLZ_UPDATES_DIR/${SAFE_RELEASE}_manifest.json"
+          LATEST_FILE="$SWRLZ_UPDATES_DIR/latest_client.json"
+          cat > "$MANIFEST_FILE" <<JSON
+          {
+            "schema": 1,
+            "release": "$RELEASE_NAME",
+            "source_zip": "$SOURCE_ZIP",
+            "built_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "repo_commit": "$GITHUB_SHA",
+            "artifact_folder": "$REL_DIR",
+            "apk_file": "${APK_FILE:-}",
+            "apk_sha256": "$APK_SHA",
+            "bundle_file": "${BUNDLE_FILE:-}",
+            "bundle_sha256": "$BUNDLE_SHA",
+            "update_modes": {
+              "apk_install_update": true,
+              "hot_patch_assets": true,
+              "silent_self_install": false
+            }
+          }
+          JSON
+          cp "$MANIFEST_FILE" "$LATEST_FILE"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add "$REL_DIR"
-          git commit -m "build: add ${RELEASE_NAME} APK artifacts" || {
+          git add "$REL_DIR" "$MANIFEST_FILE" "$LATEST_FILE"
+          git commit -m "build: add ${RELEASE_NAME} APK artifacts and update manifest" || {
             echo "No release artifact changes to commit."
             exit 0
           }
