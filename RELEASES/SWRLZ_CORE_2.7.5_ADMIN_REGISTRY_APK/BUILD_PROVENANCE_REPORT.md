@@ -1,6 +1,6 @@
 # SWRLZ-CORE Build Provenance Report
 
-- Generated: 2026-06-28T17:44:29Z
+- Generated: 2026-06-28T18:39:24Z
 - Status: succeeded
 - Stage: bundle-created
 - Gradle exit code: 0
@@ -8,7 +8,7 @@
 - Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/android
 - Output dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD
 - Build log: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/build_android_debug.log
-- Source commit: 27835251d5026b546ef8b902cbba9da1cb428c8d
+- Source commit: 804b3dc95807421188cf4b06211411f784889b8a
 
 ## SWRLZ Build Identity
 
@@ -111,13 +111,13 @@ cd '/home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGI
 
 - APK path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk
 - APK size bytes: 19945944
-- APK SHA-256: 8a3d1d8429428f1f5f6898c22d0dae3ad499d7127a5c87691137764a57d291f4
+- APK SHA-256: 920eaa95e68c4edd27ad4a684f2eb79c35eaeb9ab796ef873da3a3a7b87415b0
 
 ## Download bundle
 
 - Bundle path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_APK_DOWNLOAD.zip
-- Bundle size bytes: 19364997
-- Bundle SHA-256: f9a3eb2af604f06f056e106641d98a1a7d33b02775b01067886f34f671f9869b
+- Bundle size bytes: 19367449
+- Bundle SHA-256: f3a3ba5950b3d4bd9fd1076ff44c247e9341b2897da589506c542c3353b22006
 
 ## Last 80 lines of build log
 
@@ -153,10 +153,10 @@ Daemon will be stopped at the end of the build
 > Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
-> Task :app:mergeDebugResources
+> Task :app:parseDebugLocalResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
-> Task :app:parseDebugLocalResources
+> Task :app:mergeDebugResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:processDebugManifestForPackage
@@ -196,10 +196,10 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m 23s
+BUILD SUCCESSFUL in 3m 35s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-28T17:44:27Z
+Finished: 2026-06-28T18:39:21Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk
 ```
