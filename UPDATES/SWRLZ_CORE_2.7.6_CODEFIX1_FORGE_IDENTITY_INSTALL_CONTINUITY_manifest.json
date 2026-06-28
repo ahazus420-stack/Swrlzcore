@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "release": "SWRLZ_CORE_2.7.6_CODEFIX1_FORGE_IDENTITY_INSTALL_CONTINUITY",
+  "source_zip": "SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip",
+  "built_at_utc": "2026-06-28T22:36:19Z",
+  "repo_commit": "0e6b5b28f6ab7b4b7140a2495dcf8476ea7bec91",
+  "artifact_folder": "RELEASES/SWRLZ_CORE_2.7.6_CODEFIX1_FORGE_IDENTITY_INSTALL_CONTINUITY_APK",
+  "apk_file": "RELEASES/SWRLZ_CORE_2.7.6_CODEFIX1_FORGE_IDENTITY_INSTALL_CONTINUITY_APK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk",
+  "apk_sha256": "8b09b3be73813bd105f7a4877265922e54ba65bcc7144a3cb54b43ca880198ad",
+  "bundle_file": "RELEASES/SWRLZ_CORE_2.7.6_CODEFIX1_FORGE_IDENTITY_INSTALL_CONTINUITY_APK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_APK_DOWNLOAD.zip",
+  "bundle_sha256": "5bf9af534dca9491a3ff20819cfff8bc8583ca780fbe21650a3219d6be0a5b02",
+  "signing_mode": "debug-runner-default",
+  "update_modes": {
+    "apk_install_update": true,
+    "hot_patch_assets": true,
+    "silent_self_install": false
+  }
+}

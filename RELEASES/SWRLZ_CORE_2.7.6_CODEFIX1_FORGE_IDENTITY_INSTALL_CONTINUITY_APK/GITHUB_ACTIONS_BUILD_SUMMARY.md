@@ -1,0 +1,34 @@
+# SWRLZ GitHub Actions Build Summary
+
+- Release: SWRLZ_CORE_2.7.6_CODEFIX1_FORGE_IDENTITY_INSTALL_CONTINUITY
+- Safe release folder: SWRLZ_CORE_2.7.6_CODEFIX1_FORGE_IDENTITY_INSTALL_CONTINUITY
+- Source ZIP: SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip
+- SHA file: SOURCES/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SHA256.txt
+- Build request file: BUILD_REQUESTS/000_CURRENT.request
+- Signing mode: debug-runner-default
+- Workflow: Build SWRLZ APK
+- Run ID: 28338229188
+- Commit: 0e6b5b28f6ab7b4b7140a2495dcf8476ea7bec91
+- Built at: 2026-06-28T22:36:17Z
+
+## Output files
+- `BUILD_PROVENANCE_REPORT.md.sha256` (257 bytes)
+- `BUILD_PROVENANCE_REPORT.md` (11869 bytes)
+- `GITHUB_ACTIONS_BUILD_SUMMARY.md` (557 bytes)
+- `SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_APK_DOWNLOAD.zip.sha256` (115 bytes)
+- `SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_APK_DOWNLOAD.zip` (19372085 bytes)
+- `SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk.sha256` (108 bytes)
+- `SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk` (19962328 bytes)
+- `SWRLZ_SIGNING_MODE.txt` (21 bytes)
+- `build_android_debug.log.sha256` (254 bytes)
+- `build_android_debug.log` (5017 bytes)
+- `install_android_sdk_and_build.log` (117621 bytes)
+
+## SHA256
+f89c7ad6d0200247c8a251fc51a5479087ac823e16fd2a5db7b3dfb34b58cf54  BUILD_PROVENANCE_REPORT.md
+8b09b3be73813bd105f7a4877265922e54ba65bcc7144a3cb54b43ca880198ad  SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk
+5bf9af534dca9491a3ff20819cfff8bc8583ca780fbe21650a3219d6be0a5b02  SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_APK_DOWNLOAD.zip
+c410c3c2d5c189937d1f8b14b093f31e1f560a802d4dff79db1cf137646cfea3  install_android_sdk_and_build.log
+d6b09a6d5cb2b43bdde4b0ee80728a72e7b7fe274587052fc17cd1b6142282bf  build_android_debug.log
+7fc9d4e485764548d27032836e43ad8e8c3f79b322a6b1b52aacf4eaadef7d46  GITHUB_ACTIONS_BUILD_SUMMARY.md
+7297c13bbc039ef67bbc58cfa8172ee87ca63c5bd51531d90685f26fa5c7f2d9  SWRLZ_SIGNING_MODE.txt
