@@ -35,6 +35,25 @@ Add a Network Discovery lane to the client codebase. The first forge slice adds 
 - network permissions check
 - updated Home Build Identity metadata
 
+## Device Ledger / Ghost Device architecture addendum
+
+Network Discovery must not treat every duplicate or outdated device profile as bad data.
+
+If a device profile was historically true but has been replaced by a newer profile after registration/build changes, it should become a Ghost Device / Legacy Anchor instead of being hard-deleted.
+
+The authoritative architecture rule lives at:
+
+`docs/architecture/DEVICE_LEDGER_GHOST_DEVICE_VAULT.md`
+
+Design effect for 2.7.6 and later:
+
+- active device dashboards stay clean
+- ghost/retired/legacy profiles are hidden from normal controls
+- debug/history views can inspect ghost profiles
+- ghost profiles can link to active devices
+- deletion requires strong confirmation
+- preserved logs support identity repair, duplicate detection, and build-history debugging
+
 ## Server target
 
 Expose:
@@ -65,6 +84,7 @@ Expected response:
 6. Use the app discovery lane / test helper to validate a SWRLZ node URL.
 7. Save the server URL.
 8. Open Admin Registry and Radar against the saved node.
+9. Confirm ghost/legacy device profiles are treated as archived lineage objects, not hard-deleted by default.
 
 ## Roadmap position
 
@@ -76,6 +96,7 @@ Current:
 
 - 2.7.6 Network Discovery
 - 0.7.3 Discovery Signature
+- Ghost Device Vault / Legacy Device Archive architecture rule
 
 Next:
 
