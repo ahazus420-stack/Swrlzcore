@@ -1,0 +1,77 @@
+SWRLZ-CORE Android Debug Bundle Build
+Started: 2026-06-28T11:34:19Z
+Project root: /workspaces/Swrlzcore/SWRLZ_CORE_2.7.4_COCKPIT_SHELL
+Android dir: /workspaces/Swrlzcore/SWRLZ_CORE_2.7.4_COCKPIT_SHELL/android
+SDK dir: /home/codespace/android-sdk
+Output dir: /workspaces/Swrlzcore/SWRLZ_CORE_2.7.4_COCKPIT_SHELL/APK_DOWNLOAD
+Gradle command: ./gradlew --no-daemon --stacktrace clean assembleDebug
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.7/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+WARNING: The option setting 'android.aapt2FromMavenOverride=/opt/aapt2-wrap/aapt2' is experimental.
+
+> Task :app:clean UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:processDebugResources
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugStartupProfile
+> Task :app:compileDebugKotlin
+> Task :app:mergeExtDexDebug
+> Task :app:mergeLibDexDebug
+> Task :app:mergeDebugJniLibFolders
+> Task :app:mergeDebugNativeLibs
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so.
+
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+
+> Task :app:compileDebugKotlin
+w: file:///workspaces/Swrlzcore/SWRLZ_CORE_2.7.4_COCKPIT_SHELL/android/app/src/main/java/sh/swurlz/core/service/SwurlzAccessibilityService.kt:71:55 '@Deprecated(...) static fun obtain(p0: AccessibilityNodeInfo!): AccessibilityNodeInfo!' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:dexBuilderDebug
+> Task :app:processDebugJavaRes
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 3m 45s
+39 actionable tasks: 38 executed, 1 up-to-date
+
+Build succeeded.
+Finished: 2026-06-28T11:38:05Z
+APK: /workspaces/Swrlzcore/SWRLZ_CORE_2.7.4_COCKPIT_SHELL/APK_DOWNLOAD/SWRLZ_CORE_2.7.4_COCKPIT_SHELL_debug.apk
+Bundle: /workspaces/Swrlzcore/SWRLZ_CORE_2.7.4_COCKPIT_SHELL/APK_DOWNLOAD/SWRLZ_CORE_2.7.4_COCKPIT_SHELL_APK_DOWNLOAD.zip
+Bundle checksum: /workspaces/Swrlzcore/SWRLZ_CORE_2.7.4_COCKPIT_SHELL/APK_DOWNLOAD/SWRLZ_CORE_2.7.4_COCKPIT_SHELL_APK_DOWNLOAD.zip.sha256
+Provenance report: /workspaces/Swrlzcore/SWRLZ_CORE_2.7.4_COCKPIT_SHELL/APK_DOWNLOAD/BUILD_PROVENANCE_REPORT.md
