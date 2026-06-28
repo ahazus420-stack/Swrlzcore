@@ -1,6 +1,6 @@
 # SWRLZ-CORE Build Provenance Report
 
-- Generated: 2026-06-28T17:44:29Z
+- Generated: 2026-06-28T18:39:03Z
 - Status: succeeded
 - Stage: bundle-created
 - Gradle exit code: 0
@@ -8,7 +8,7 @@
 - Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/android
 - Output dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD
 - Build log: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/build_android_debug.log
-- Source commit: 27835251d5026b546ef8b902cbba9da1cb428c8d
+- Source commit: 2e4e77a8c1bac2a80abe595c5d7662d664c13956
 
 ## SWRLZ Build Identity
 
@@ -111,13 +111,13 @@ cd '/home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGI
 
 - APK path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk
 - APK size bytes: 19945944
-- APK SHA-256: 8a3d1d8429428f1f5f6898c22d0dae3ad499d7127a5c87691137764a57d291f4
+- APK SHA-256: 7631f564640edf0653147ae62032ed30922d47b1fe0fb2ec65196a8c67e976b2
 
 ## Download bundle
 
 - Bundle path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_APK_DOWNLOAD.zip
-- Bundle size bytes: 19364997
-- Bundle SHA-256: f9a3eb2af604f06f056e106641d98a1a7d33b02775b01067886f34f671f9869b
+- Bundle size bytes: 19367273
+- Bundle SHA-256: 836a91315a9036563f41aa8884354148b62038504e9125c9922bd3d36268d3e7
 
 ## Last 80 lines of build log
 
@@ -159,8 +159,8 @@ Daemon will be stopped at the end of the build
 > Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
-> Task :app:processDebugManifestForPackage
 > Task :app:javaPreCompileDebug
+> Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
@@ -196,10 +196,10 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m 23s
+BUILD SUCCESSFUL in 3m 49s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-28T17:44:27Z
+Finished: 2026-06-28T18:39:00Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk
 ```

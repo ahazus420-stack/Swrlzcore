@@ -1,5 +1,5 @@
 SWRLZ-CORE Android Debug Bundle Build
-Started: 2026-06-28T17:41:03Z
+Started: 2026-06-28T18:35:11Z
 Project root: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY
 Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/android
 SDK dir: /usr/local/lib/android/sdk
@@ -37,8 +37,8 @@ Daemon will be stopped at the end of the build
 > Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
-> Task :app:processDebugManifestForPackage
 > Task :app:javaPreCompileDebug
+> Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
@@ -74,11 +74,11 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m 23s
+BUILD SUCCESSFUL in 3m 49s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-28T17:44:27Z
+Finished: 2026-06-28T18:39:00Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk
 Bundle: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_APK_DOWNLOAD.zip
 Bundle checksum: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_APK_DOWNLOAD.zip.sha256
