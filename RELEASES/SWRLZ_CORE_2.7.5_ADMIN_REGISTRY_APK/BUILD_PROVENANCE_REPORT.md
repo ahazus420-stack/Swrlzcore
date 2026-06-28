@@ -1,6 +1,6 @@
 # SWRLZ-CORE Build Provenance Report
 
-- Generated: 2026-06-28T17:34:17Z
+- Generated: 2026-06-28T17:44:29Z
 - Status: succeeded
 - Stage: bundle-created
 - Gradle exit code: 0
@@ -8,7 +8,7 @@
 - Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/android
 - Output dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD
 - Build log: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/build_android_debug.log
-- Source commit: b027b29a197a84ab0bee7246fa7299a6d9e5e0b2
+- Source commit: 27835251d5026b546ef8b902cbba9da1cb428c8d
 
 ## SWRLZ Build Identity
 
@@ -111,13 +111,13 @@ cd '/home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGI
 
 - APK path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk
 - APK size bytes: 19945944
-- APK SHA-256: 41dbb9674e57b97031f66cf75643396e46ddd57bc2d9627cb66cbb223dd389f9
+- APK SHA-256: 8a3d1d8429428f1f5f6898c22d0dae3ad499d7127a5c87691137764a57d291f4
 
 ## Download bundle
 
 - Bundle path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_APK_DOWNLOAD.zip
-- Bundle size bytes: 19367292
-- Bundle SHA-256: 8ea1f07c85a05bbfa4b9f3695c5b5e274d7b7ccada33d634c579188b80e77b6b
+- Bundle size bytes: 19364997
+- Bundle SHA-256: f9a3eb2af604f06f056e106641d98a1a7d33b02775b01067886f34f671f9869b
 
 ## Last 80 lines of build log
 
@@ -196,10 +196,10 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m 54s
+BUILD SUCCESSFUL in 3m 23s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-28T17:34:15Z
+Finished: 2026-06-28T17:44:27Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/extracted/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY/APK_DOWNLOAD/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_debug.apk
 ```
