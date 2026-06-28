@@ -233,6 +233,63 @@ jobs:
             cat "$file"
           done
 
+      - name: Apply 2.7.5 CODEFIX1 Build Identity Sync
+        if: ${{ contains(steps.resolve.outputs.safe_release, 'CODEFIX1_BUILD_IDENTITY_SYNC') }}
+        env:
+          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
+        run: |
+          set -euo pipefail
+          echo "Applying visible CODEFIX1 metadata sync inside extracted build workspace only."
+          echo "Target Home Build Identity values:"
+          echo "  Patch: 2.7.5-ADMIN-REGISTRY"
+          echo "  Roadmap: 2.7.5"
+          echo "  Build line: Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop"
+          echo "  Source: SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path(__import__('os').environ['PROJECT_DIR'])
+          replacements = {
+              'Patch: 2.7.4-COCKPIT-SHELL': 'Patch: 2.7.5-ADMIN-REGISTRY',
+              'Roadmap: 2.7.4': 'Roadmap: 2.7.5',
+              'Build line: Cockpit Shell / More drawer / Guided Pairing Ladder / Device Roster': 'Build line: Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop',
+              'Build line: Clean nav / More drawer / Guided Pairing Ladder / Device Roster': 'Build line: Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop',
+              'Cockpit Shell / More drawer / Guided Pairing Ladder / Device Roster': 'Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop',
+              'Clean nav / More drawer / Guided Pairing Ladder / Device Roster': 'Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop',
+              'SWRLZ_CORE_2.7.4_COCKPIT_SHELL_SOURCE.zip': 'SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip',
+              '2.7.4-COCKPIT-SHELL': '2.7.5-ADMIN-REGISTRY',
+              '2.7.4 Cockpit Shell': '2.7.5 Admin Registry',
+          }
+          allowed_suffixes = {
+              '.kt', '.kts', '.java', '.xml', '.gradle', '.properties', '.md', '.txt', '.json', '.yml', '.yaml'
+          }
+          changed = []
+          for path in root.rglob('*'):
+              if not path.is_file() or path.suffix not in allowed_suffixes:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              original = text
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
+              if text != original:
+                  path.write_text(text, encoding='utf-8')
+                  changed.append(str(path.relative_to(root)))
+
+          if not changed:
+              raise SystemExit('CODEFIX1 failed: no stale 2.7.4 Cockpit Shell identity strings were patched.')
+
+          print('CODEFIX1 patched files:')
+          for item in changed:
+              print(f'  - {item}')
+          PY
+
+          echo "CODEFIX1 verification grep:"
+          grep -RInE 'Patch: 2\.7\.5-ADMIN-REGISTRY|Roadmap: 2\.7\.5|Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop|SWRLZ_CORE_2\.7\.5_ADMIN_REGISTRY_SOURCE\.zip' "$PROJECT_DIR" || true
+
       - name: Build Android debug APK
         id: build
         env:
