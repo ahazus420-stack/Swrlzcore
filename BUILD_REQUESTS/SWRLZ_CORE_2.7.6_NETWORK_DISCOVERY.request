@@ -1,0 +1,4 @@
+source_zip=SOURCES/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip
+sha_file=SOURCES/SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SHA256.txt
+release_name=SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY
+commit_release_artifacts=true
