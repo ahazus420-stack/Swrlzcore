@@ -1,4 +1,4 @@
-source_zip=SOURCES/OLD_PATCHES/SRC_2.7.6_CF3_SCAN_TRIM.zip
-sha_file=SOURCES/OLD_PATCHES/SHA_2.7.6_CF3_SCAN_TRIM.txt
-release_name=APK_2.7.6_CF3_SCAN_TRIM
+source_zip=SOURCES/SRC_2.7.6_CF4_SIGN_RECONNECT.zip
+sha_file=SOURCES/SHA_2.7.6_CF4_SIGN_RECONNECT.txt
+release_name=APK_2.7.6_CF4_SIGN_RECONNECT
 commit_release_artifacts=true
