@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "release": "APK_2.7.6_CF4_SIGN_RECONNECT",
+  "source_zip": "SRC_2.7.6_CF4_SIGN_RECONNECT.zip",
+  "built_at_utc": "2026-06-29T21:09:57Z",
+  "repo_commit": "4416bacad45c61af4726ba2d4b460006758d25a5",
+  "artifact_folder": "RELEASES/APK_2.7.6_CF4_SIGN_RECONNECT_APK",
+  "apk_file": "RELEASES/APK_2.7.6_CF4_SIGN_RECONNECT_APK/APK_2.7.6_CF4_SIGN_RECONNECT_debug.apk",
+  "apk_sha256": "e4d481cfff8b1abe6183b762194bcdc49db2091bc2055454cda86cf8b26af389",
+  "bundle_file": "",
+  "bundle_sha256": "",
+  "signing_mode": "debug-runner-default",
+  "update_modes": {
+    "apk_install_update": true,
+    "hot_patch_assets": true,
+    "silent_self_install": false
+  }
+}
