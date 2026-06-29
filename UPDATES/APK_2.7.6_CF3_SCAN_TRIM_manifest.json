@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "release": "APK_2.7.6_CF3_SCAN_TRIM",
+  "source_zip": "SRC_2.7.6_CF3_SCAN_TRIM.zip",
+  "built_at_utc": "2026-06-29T17:31:03Z",
+  "repo_commit": "76dd2904c843010875781e6aac2caa9dd9274c60",
+  "artifact_folder": "RELEASES/APK_2.7.6_CF3_SCAN_TRIM_APK",
+  "apk_file": "RELEASES/APK_2.7.6_CF3_SCAN_TRIM_APK/APK_2.7.6_CF3_SCAN_TRIM_debug.apk",
+  "apk_sha256": "1f95e6fa7bc0a41051bfda93d8e9652bdcf312c5d0974725d3e138a92a414a0c",
+  "bundle_file": "RELEASES/APK_2.7.6_CF3_SCAN_TRIM_APK/APK_2.7.6_CF3_SCAN_TRIM_APK_DOWNLOAD.zip",
+  "bundle_sha256": "f8a2302fb53aa6eae67035cf545ac80620544cbfd161d63b4c9e4d14a6674908",
+  "signing_mode": "debug-runner-default",
+  "update_modes": {
+    "apk_install_update": true,
+    "hot_patch_assets": true,
+    "silent_self_install": false
+  }
+}
