@@ -1,6 +1,6 @@
 # SWRLZ-CORE Build Provenance Report
 
-- Generated: 2026-06-29T01:05:57Z
+- Generated: 2026-06-29T01:40:37Z
 - Status: succeeded
 - Stage: bundle-created
 - Gradle exit code: 0
@@ -8,7 +8,7 @@
 - Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/android
 - Output dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD
 - Build log: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/build_android_debug.log
-- Source commit: 28f6bffb04dcdfed42d54aa8dd6433a611ab24d5
+- Source commit: 126e0e04b08d99add06250462468dbf50fb57f5e
 
 ## SWRLZ Build Identity
 
@@ -111,13 +111,13 @@ cd '/home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DI
 
 - APK path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_debug.apk
 - APK size bytes: 19945944
-- APK SHA-256: 3c03c12407ad050e8615b8273b97fc5032ec3e2a3b09df1469be16cc9acd85bf
+- APK SHA-256: bce20d5c88a24b00346d21a62f56339cee22b144e76221bce4ef7b2a87dba3f0
 
 ## Download bundle
 
 - Bundle path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_APK_DOWNLOAD.zip
-- Bundle size bytes: 19359943
-- Bundle SHA-256: 3bfde80be410e4fe00885000269a54a21518f0823ae1f2748955a4b0bfef9f4d
+- Bundle size bytes: 19360175
+- Bundle SHA-256: d351223f013e0c8274f0b0879ea09b33918e950acf4313719f6f4d8f1df6506d
 
 ## Last 80 lines of build log
 
@@ -196,10 +196,10 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m 6s
+BUILD SUCCESSFUL in 3m 31s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-29T01:05:55Z
+Finished: 2026-06-29T01:40:35Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_debug.apk
 ```
