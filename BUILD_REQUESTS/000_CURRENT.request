@@ -1,4 +1,4 @@
 source_zip=SOURCES/SRC_2.7.6_CF2_SUBNET_SWEEP.zip
 sha_file=SOURCES/SHA_2.7.6_CF2_SUBNET_SWEEP.txt
-release_name=SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP
+release_name=SWRLZ_2.7.6_CF2_SUBNET_SWEEP
 commit_release_artifacts=true
