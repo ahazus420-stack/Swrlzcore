@@ -1,6 +1,6 @@
 # SWRLZ-CORE Build Provenance Report
 
-- Generated: 2026-06-29T01:40:37Z
+- Generated: 2026-06-29T02:17:55Z
 - Status: succeeded
 - Stage: bundle-created
 - Gradle exit code: 0
@@ -8,7 +8,7 @@
 - Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/android
 - Output dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD
 - Build log: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/build_android_debug.log
-- Source commit: 126e0e04b08d99add06250462468dbf50fb57f5e
+- Source commit: 82232372c8488f23d6a570bca1d4a64343d3fa65
 
 ## SWRLZ Build Identity
 
@@ -111,13 +111,13 @@ cd '/home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DI
 
 - APK path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_debug.apk
 - APK size bytes: 19945944
-- APK SHA-256: bce20d5c88a24b00346d21a62f56339cee22b144e76221bce4ef7b2a87dba3f0
+- APK SHA-256: 24f95d18a2e85feed9055928ec5df7de7b28e8958ed2af90bfa618390e2b83b5
 
 ## Download bundle
 
 - Bundle path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_APK_DOWNLOAD.zip
-- Bundle size bytes: 19360175
-- Bundle SHA-256: d351223f013e0c8274f0b0879ea09b33918e950acf4313719f6f4d8f1df6506d
+- Bundle size bytes: 19359532
+- Bundle SHA-256: adfb34dfb08cc8471f042ad7d590164b3835edaf4aef9d442f4576aa047c39f2
 
 ## Last 80 lines of build log
 
@@ -153,9 +153,9 @@ Daemon will be stopped at the end of the build
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
 > Task :app:mergeDebugResources
+> Task :app:parseDebugLocalResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
-> Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:processDebugManifestForPackage
@@ -196,10 +196,10 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m 31s
+BUILD SUCCESSFUL in 2m 53s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-29T01:40:35Z
+Finished: 2026-06-29T02:17:53Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_debug.apk
 ```
