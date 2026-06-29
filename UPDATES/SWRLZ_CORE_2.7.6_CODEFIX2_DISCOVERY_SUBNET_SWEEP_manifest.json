@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "release": "SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP",
+  "source_zip": "SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP_SOURCE.zip",
+  "built_at_utc": "2026-06-29T02:52:02Z",
+  "repo_commit": "746261be3471dc1466208f0f21abe25145e474c0",
+  "artifact_folder": "RELEASES/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP_APK",
+  "apk_file": "RELEASES/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP_APK/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP_debug.apk",
+  "apk_sha256": "ff7770396ea81d4379a01ee3bcc60855ea3ef726c817f2b9747e90665441d939",
+  "bundle_file": "RELEASES/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP_APK/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP_APK_DOWNLOAD.zip",
+  "bundle_sha256": "8304c3016664bb5efd5c77306b0034010585820771ff0ea95dc9e25135356a8e",
+  "signing_mode": "debug-runner-default",
+  "update_modes": {
+    "apk_install_update": true,
+    "hot_patch_assets": true,
+    "silent_self_install": false
+  }
+}
