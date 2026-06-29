@@ -1,0 +1,86 @@
+SWRLZ-CORE Android Debug Bundle Build
+Started: 2026-06-29T01:02:48Z
+Project root: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY
+Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/android
+SDK dir: /usr/local/lib/android/sdk
+Output dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD
+Gradle command: ./gradlew --no-daemon --stacktrace clean assembleDebug
+
+Downloading https://services.gradle.org/distributions/gradle-8.7-bin.zip
+............10%.............20%.............30%.............40%............50%.............60%.............70%.............80%.............90%............100%
+
+Welcome to Gradle 8.7!
+
+Here are the highlights of this release:
+ - Compiling and testing with Java 22
+ - Cacheable Groovy script compilation
+ - New methods in lazy collection properties
+
+For more details see https://docs.gradle.org/8.7/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.7/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:clean UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:processDebugResources
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugStartupProfile
+> Task :app:compileDebugKotlin
+> Task :app:mergeExtDexDebug
+
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/android/app/src/main/java/sh/swurlz/core/SwrlzNetworkDiscovery.kt:16:85 '@Deprecated(...) @DeprecatedSinceKotlin(...) @InlineOnly() fun String.toLowerCase(): String' is deprecated. Use lowercase() instead.
+w: file:///home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/android/app/src/main/java/sh/swurlz/core/service/SwurlzAccessibilityService.kt:71:55 '@Deprecated(...) static fun obtain(p0: AccessibilityNodeInfo!): AccessibilityNodeInfo!' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:processDebugJavaRes
+> Task :app:mergeLibDexDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJniLibFolders
+> Task :app:mergeDebugNativeLibs
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so.
+
+> Task :app:mergeDebugJavaResource
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 3m 6s
+39 actionable tasks: 38 executed, 1 up-to-date
+
+Build succeeded.
+Finished: 2026-06-29T01:05:55Z
+APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_debug.apk
+Bundle: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_APK_DOWNLOAD.zip
+Bundle checksum: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_APK_DOWNLOAD.zip.sha256
+Provenance report: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_REAL_SOURCE/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/BUILD_PROVENANCE_REPORT.md
