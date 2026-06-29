@@ -1,5 +1,5 @@
 SWRLZ-CORE Android Debug Bundle Build
-Started: 2026-06-29T17:27:56Z
+Started: 2026-06-29T20:55:12Z
 Project root: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM
 Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM/android
 SDK dir: /usr/local/lib/android/sdk
@@ -32,10 +32,10 @@ Daemon will be stopped at the end of the build
 > Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
-> Task :app:parseDebugLocalResources
+> Task :app:mergeDebugResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
-> Task :app:mergeDebugResources
+> Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:processDebugManifestForPackage
@@ -76,11 +76,11 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m
+BUILD SUCCESSFUL in 3m 40s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-29T17:30:57Z
+Finished: 2026-06-29T20:58:52Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM/APK_DOWNLOAD/APK_2.7.6_CF3_SCAN_TRIM_debug.apk
 Bundle: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM/APK_DOWNLOAD/BUNDLE_2.7.6_CF3_SCAN_TRIM_APK_DOWNLOAD.zip
 Bundle checksum: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM/APK_DOWNLOAD/BUNDLE_2.7.6_CF3_SCAN_TRIM_APK_DOWNLOAD.zip.sha256

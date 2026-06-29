@@ -1,6 +1,6 @@
 # SWRLZ-CORE Build Provenance Report
 
-- Generated: 2026-06-29T17:30:59Z
+- Generated: 2026-06-29T20:58:55Z
 - Status: succeeded
 - Stage: bundle-created
 - Gradle exit code: 0
@@ -8,7 +8,7 @@
 - Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM/android
 - Output dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM/APK_DOWNLOAD
 - Build log: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM/APK_DOWNLOAD/build_android_debug.log
-- Source commit: 76dd2904c843010875781e6aac2caa9dd9274c60
+- Source commit: a433799b2510baca2b73e3e246766158fb5b5b3c
 
 ## SWRLZ Build Identity
 
@@ -111,13 +111,13 @@ cd '/home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/ext
 
 - APK path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM/APK_DOWNLOAD/APK_2.7.6_CF3_SCAN_TRIM_debug.apk
 - APK size bytes: 19962332
-- APK SHA-256: 1f95e6fa7bc0a41051bfda93d8e9652bdcf312c5d0974725d3e138a92a414a0c
+- APK SHA-256: e33f0f0e1bc3c66a0fe19d9de088035e7333ed1146e9857f4966937f855ccb93
 
 ## Download bundle
 
 - Bundle path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM/APK_DOWNLOAD/BUNDLE_2.7.6_CF3_SCAN_TRIM_APK_DOWNLOAD.zip
-- Bundle size bytes: 19368689
-- Bundle SHA-256: f8a2302fb53aa6eae67035cf545ac80620544cbfd161d63b4c9e4d14a6674908
+- Bundle size bytes: 19368620
+- Bundle SHA-256: 1bfd3490bf0c3ea3f86d3ccbbc7d43ca3a746eba1f2a9375da8f252336033f1a
 
 ## Last 80 lines of build log
 
@@ -152,10 +152,10 @@ Daemon will be stopped at the end of the build
 > Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
-> Task :app:parseDebugLocalResources
+> Task :app:mergeDebugResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
-> Task :app:mergeDebugResources
+> Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:processDebugManifestForPackage
@@ -196,10 +196,10 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m
+BUILD SUCCESSFUL in 3m 40s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-29T17:30:57Z
+Finished: 2026-06-29T20:58:52Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF3_SCAN_TRIM/extracted/SRC_2.7.6_CF3_SCAN_TRIM/APK_DOWNLOAD/APK_2.7.6_CF3_SCAN_TRIM_debug.apk
 ```
