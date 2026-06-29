@@ -1,0 +1,236 @@
+name: Locate SWRLZ Stale UI Source
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "BUILD_REQUESTS/000_CURRENT.request"
+      - ".github/workflows/locate-stale-ui-source.yml"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  SWRLZ_SOURCES_DIR: SOURCES
+  SWRLZ_BUILD_REQUESTS_DIR: BUILD_REQUESTS
+  SWRLZ_BUILD_WORK_DIR: BUILD_WORK
+
+jobs:
+  locate-stale-ui-source:
+    name: Locate stale UI identity source
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Resolve current request
+        id: resolve
+        run: |
+          set -euo pipefail
+          REQUEST_FILE="$SWRLZ_BUILD_REQUESTS_DIR/000_CURRENT.request"
+          if [[ ! -f "$REQUEST_FILE" ]]; then
+            echo "Missing $REQUEST_FILE" >&2
+            exit 1
+          fi
+          cat "$REQUEST_FILE"
+          ZIP="$(grep -E '^source_zip=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2-)"
+          SHA_FILE="$(grep -E '^sha_file=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2-)"
+          RELEASE="$(grep -E '^release_name=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2-)"
+          SAFE_RELEASE="$(echo "$RELEASE" | tr -cs 'A-Za-z0-9._-' '_' | sed 's/^_*//;s/_*$//')"
+          EXTRACT_DIR="$GITHUB_WORKSPACE/$SWRLZ_BUILD_WORK_DIR/${SAFE_RELEASE}_locator/extracted"
+          OUT_DIR="$GITHUB_WORKSPACE/$SWRLZ_BUILD_WORK_DIR/${SAFE_RELEASE}_locator/report"
+          mkdir -p "$OUT_DIR"
+          echo "source_zip=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "sha_file=$SHA_FILE" >> "$GITHUB_OUTPUT"
+          echo "release_name=$RELEASE" >> "$GITHUB_OUTPUT"
+          echo "safe_release=$SAFE_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "extract_dir=$EXTRACT_DIR" >> "$GITHUB_OUTPUT"
+          echo "out_dir=$OUT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Verify and extract source
+        id: extract
+        env:
+          ZIP: ${{ steps.resolve.outputs.source_zip }}
+          SHA_FILE: ${{ steps.resolve.outputs.sha_file }}
+          EXTRACT_DIR: ${{ steps.resolve.outputs.extract_dir }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${SHA_FILE:-}" && -f "$SHA_FILE" ]]; then
+            EXPECTED_NAME="$(awk 'NF >= 2 {print $2; exit}' "$SHA_FILE")"
+            if [[ -n "${EXPECTED_NAME:-}" && ! -f "$EXPECTED_NAME" ]]; then cp "$ZIP" "$EXPECTED_NAME"; fi
+            sha256sum -c "$SHA_FILE"
+          else
+            sha256sum "$ZIP"
+          fi
+          rm -rf "$EXTRACT_DIR"
+          mkdir -p "$EXTRACT_DIR"
+          unzip -o "$ZIP" -d "$EXTRACT_DIR"
+          BUILD_SCRIPT="$(find "$EXTRACT_DIR" -maxdepth 6 -type f -path '*/scripts/install_android_sdk_and_build.sh' | sort | head -n 1)"
+          if [[ -z "${BUILD_SCRIPT:-}" || ! -f "$BUILD_SCRIPT" ]]; then
+            echo "Could not find scripts/install_android_sdk_and_build.sh" >&2
+            find "$EXTRACT_DIR" -maxdepth 6 -type f | sort | head -n 300 >&2
+            exit 1
+          fi
+          PROJECT_DIR="$(dirname "$(dirname "$BUILD_SCRIPT")")"
+          chmod +x "$BUILD_SCRIPT"
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Scan extracted source for stale UI identity
+        env:
+          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
+          OUT_DIR: ${{ steps.resolve.outputs.out_dir }}
+          RELEASE_NAME: ${{ steps.resolve.outputs.release_name }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          root = Path(os.environ['PROJECT_DIR'])
+          out = Path(os.environ['OUT_DIR'])
+          patterns = [
+              '2.7.4-COCKPIT-SHELL',
+              'v0.2.7.5-admin-registry',
+              'SWRLZ_CORE_2.7.4_COCKPIT_SHELL_SOURCE.zip',
+              'Cockpit Shell',
+              'Roadmap:',
+              'Build line:',
+              'NETWORK DISCOVERY',
+              'swrlz-network-discovery',
+          ]
+          rows = []
+          for path in root.rglob('*'):
+              if not path.is_file():
+                  continue
+              if any(part in {'.git', '.gradle', 'build', 'APK_DOWNLOAD'} for part in path.parts):
+                  continue
+              if path.stat().st_size > 5_000_000:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except Exception:
+                  continue
+              for pattern in patterns:
+                  if pattern in text:
+                      lines = [str(i+1) for i, line in enumerate(text.splitlines()) if pattern in line][:10]
+                      rows.append((str(path.relative_to(root)), pattern, ','.join(lines)))
+          report = out / 'SWRLZ_STALE_UI_SOURCE_TREE_SCAN.txt'
+          with report.open('w', encoding='utf-8') as f:
+              f.write('SWRLZ SOURCE TREE STALE UI SCAN\n')
+              f.write(f'Release request: {os.environ["RELEASE_NAME"]}\n\n')
+              if not rows:
+                  f.write('No UTF-8 source-tree matches found.\n')
+              else:
+                  for file, pattern, lines in rows:
+                      f.write(f'{file}\n  pattern: {pattern}\n  lines: {lines}\n\n')
+          print(report.read_text(encoding='utf-8'))
+          PY
+
+      - name: Normalize Android build properties
+        env:
+          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
+        run: |
+          set -euo pipefail
+          MATCHES="$(grep -RIl '^android\.aapt2FromMavenOverride=' "$PROJECT_DIR" 2>/dev/null || true)"
+          if [[ -n "${MATCHES:-}" ]]; then
+            echo "$MATCHES" | while IFS= read -r file; do
+              sed -i.bak '/^android\.aapt2FromMavenOverride=/d' "$file"
+              echo "Removed stale AAPT2 override from $file"
+            done
+          fi
+
+      - name: Build APK for payload inspection
+        id: build
+        env:
+          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
+        run: |
+          set -euo pipefail
+          cd "$PROJECT_DIR"
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          bash scripts/install_android_sdk_and_build.sh
+          OUT_APK_DIR="$PROJECT_DIR/APK_DOWNLOAD"
+          if [[ ! -d "$OUT_APK_DIR" ]]; then
+            echo "APK_DOWNLOAD missing" >&2
+            find "$PROJECT_DIR" -type f \( -iname '*.apk' -o -iname '*.aab' \)
+            exit 1
+          fi
+          echo "apk_dir=$OUT_APK_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Scan built APK payload for stale UI identity
+        env:
+          APK_DIR: ${{ steps.build.outputs.apk_dir }}
+          OUT_DIR: ${{ steps.resolve.outputs.out_dir }}
+          RELEASE_NAME: ${{ steps.resolve.outputs.release_name }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, zipfile
+          apk_dir = Path(os.environ['APK_DIR'])
+          out = Path(os.environ['OUT_DIR'])
+          apks = sorted(apk_dir.glob('*.apk'))
+          if not apks:
+              raise SystemExit('No APK found to scan')
+          apk = apks[0]
+          patterns = [
+              '2.7.4-COCKPIT-SHELL',
+              'v0.2.7.5-admin-registry',
+              'SWRLZ_CORE_2.7.4_COCKPIT_SHELL_SOURCE.zip',
+              'Cockpit Shell',
+              'Roadmap:',
+              'Build line:',
+              'NETWORK DISCOVERY',
+              'swrlz-network-discovery',
+          ]
+          byte_patterns = []
+          for p in patterns:
+              byte_patterns.append((p, p.encode('utf-8')))
+              byte_patterns.append((p + ' [utf16le]', p.encode('utf-16le')))
+          rows = []
+          with zipfile.ZipFile(apk, 'r') as z:
+              for info in z.infolist():
+                  if info.file_size > 10_000_000:
+                      continue
+                  data = z.read(info.filename)
+                  for label, needle in byte_patterns:
+                      if needle in data:
+                          rows.append((info.filename, label, info.file_size))
+          report = out / 'SWRLZ_STALE_UI_APK_PAYLOAD_SCAN.txt'
+          with report.open('w', encoding='utf-8') as f:
+              f.write('SWRLZ APK PAYLOAD STALE UI SCAN\n')
+              f.write(f'Release request: {os.environ["RELEASE_NAME"]}\n')
+              f.write(f'APK scanned: {apk.name}\n\n')
+              if not rows:
+                  f.write('No APK payload byte matches found for stale identity patterns.\n')
+              else:
+                  for name, pattern, size in rows:
+                      f.write(f'{name}\n  pattern: {pattern}\n  size: {size}\n\n')
+          (out / 'SWRLZ_STALE_UI_SOURCE_LOCATOR_REPORT.txt').write_text(
+              (out / 'SWRLZ_STALE_UI_SOURCE_TREE_SCAN.txt').read_text(encoding='utf-8') + '\n\n' + report.read_text(encoding='utf-8'),
+              encoding='utf-8'
+          )
+          print((out / 'SWRLZ_STALE_UI_SOURCE_LOCATOR_REPORT.txt').read_text(encoding='utf-8'))
+          PY
+          cp -a "$APK_DIR"/. "$OUT_DIR"/
+
+      - name: Upload stale UI locator artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.resolve.outputs.safe_release }}_STALE_UI_LOCATOR_REPORT
+          path: ${{ steps.resolve.outputs.out_dir }}/*
+          if-no-files-found: error
+          retention-days: 30
