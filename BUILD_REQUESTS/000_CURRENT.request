@@ -1,4 +1,4 @@
-source_zip=SOURCES/SRC_2.7.6_CF2_SUBNET_SWEEP.zip
-sha_file=SOURCES/SHA_2.7.6_CF2_SUBNET_SWEEP.txt
-release_name=SWRLZ_2.7.6_CF2_SUBNET_SWEEP
+source_zip=SOURCES/SRC_2.7.6_CF3_SCAN_TRIM.zip
+sha_file=SOURCES/SHA_2.7.6_CF3_SCAN_TRIM.txt
+release_name=APK_2.7.6_CF3_SCAN_TRIM
 commit_release_artifacts=true
