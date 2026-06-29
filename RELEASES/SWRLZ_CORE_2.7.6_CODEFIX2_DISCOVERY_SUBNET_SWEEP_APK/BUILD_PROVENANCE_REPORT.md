@@ -1,6 +1,6 @@
 # SWRLZ-CORE Build Provenance Report
 
-- Generated: 2026-06-29T15:41:54Z
+- Generated: 2026-06-29T15:58:35Z
 - Status: succeeded
 - Stage: bundle-created
 - Gradle exit code: 0
@@ -8,7 +8,7 @@
 - Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/android
 - Output dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD
 - Build log: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/build_android_debug.log
-- Source commit: 4ffa272c199d41a44362ee715389161d4f68d89a
+- Source commit: 5f2cc9d08e644a652a2dcdcf9154dba80bf9fb46
 
 ## SWRLZ Build Identity
 
@@ -98,7 +98,7 @@ Installed packages:
 
 ```text
 ?? ../../
-?? ../../../../SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP_SOURCE.zip
+?? ../../../../SRC_2.7.6_CF2_SUBNET_SWEEP.zip
 ```
 
 ## Build command
@@ -111,13 +111,13 @@ cd '/home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_CODEFIX2_D
 
 - APK path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_debug.apk
 - APK size bytes: 19945956
-- APK SHA-256: 271113190e29329e30fd82938acce8bed2828e6e404e4ccb2c001c62c60c7df7
+- APK SHA-256: 9b291a5cf914bb73a391881fb036b67a2dfd3c349af5cd995aec6f4eb23acbc0
 
 ## Download bundle
 
 - Bundle path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_APK_DOWNLOAD.zip
-- Bundle size bytes: 19368017
-- Bundle SHA-256: 7616e60d9338dbed963ac24e5719efe7e71553d5c004a6bf6ee3514673fe5608
+- Bundle size bytes: 19366315
+- Bundle SHA-256: 21256564461aace0eef9c6eb06f318e97f760e0262e1562ac945de7a2bcfb44e
 
 ## Last 80 lines of build log
 
@@ -196,10 +196,10 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m 32s
+BUILD SUCCESSFUL in 3m 33s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-29T15:41:51Z
+Finished: 2026-06-29T15:58:32Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SWRLZ_CORE_2.7.6_CODEFIX2_DISCOVERY_SUBNET_SWEEP/extracted/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY/APK_DOWNLOAD/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY_debug.apk
 ```
