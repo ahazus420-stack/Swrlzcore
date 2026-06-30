@@ -22,10 +22,10 @@ on:
         default: false
   push:
     paths:
-      - "BUILD_REQUESTS/*.trigger"
-      - "BUILD_REQUESTS/*.request"
-      - "SOURCES/SWRLZ_CORE_*_SOURCE*.zip"
-      - "SOURCES/SWRLZ_CORE_*_SHA256*.txt"
+      # Checkmate rule: staged source uploads and archive cleanup do not build APKs.
+      # The build trigger is the active request file only.
+      - "BUILD_REQUESTS/000_CURRENT.request"
+      - "BUILD_REQUESTS/CURRENT.request"
       - ".github/workflows/build-swrlz-apk.yml"
 
 permissions:
@@ -44,7 +44,7 @@ env:
 
 jobs:
   build-swrlz-apk:
-    name: Build SWRLZ APK from source ZIP
+    name: Build SWRLZ APK from active request
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -60,7 +60,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Resolve source request
+      - name: Resolve active source request
         id: resolve
         env:
           INPUT_SOURCE_ZIP: ${{ github.event.inputs.source_zip }}
@@ -78,16 +78,13 @@ jobs:
               break
             fi
           done
-          if [[ -z "${REQUEST_FILE:-}" ]]; then
-            REQUEST_FILE="$(find "$SWRLZ_BUILD_REQUESTS_DIR" -maxdepth 1 -type f \( -name '*.trigger' -o -name '*.request' \) 2>/dev/null | sort -V | tail -n 1 || true)"
-          fi
 
           R_SOURCE=""
           R_SHA=""
           R_RELEASE=""
           R_COMMIT="false"
           if [[ -n "${REQUEST_FILE:-}" && -f "$REQUEST_FILE" ]]; then
-            echo "Using build request: $REQUEST_FILE"
+            echo "Using active build request: $REQUEST_FILE"
             cat "$REQUEST_FILE"
             R_SOURCE="$(grep -E '^source_zip=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
             R_SHA="$(grep -E '^sha_file=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
@@ -95,36 +92,28 @@ jobs:
             R_COMMIT="$(grep -E '^commit_release_artifacts=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
             if [[ -z "${R_COMMIT:-}" ]]; then R_COMMIT="true"; fi
           else
-            echo "No request file found. Manual inputs or auto-pick will be used."
+            echo "No active request file found. Manual workflow inputs are required."
           fi
 
           ZIP="${INPUT_SOURCE_ZIP:-${R_SOURCE:-}}"
-          if [[ -z "${ZIP:-}" ]]; then
-            ZIP="$(find "$SWRLZ_SOURCES_DIR" . -maxdepth 4 -type f -iname 'SWRLZ_CORE_*_SOURCE*.zip' ! -iname '*APK_DOWNLOAD*' 2>/dev/null | sort -V | tail -n 1)"
-          fi
-          if [[ -z "${ZIP:-}" || ! -f "$ZIP" ]]; then
-            echo "Could not resolve source ZIP." >&2
-            find "$SWRLZ_SOURCES_DIR" . -maxdepth 4 -type f -iname '*.zip' 2>/dev/null | sort >&2 || true
-            exit 1
-          fi
-
-          ZIP_BASE="$(basename "$ZIP")"
-          KEY="${ZIP_BASE%%_SOURCE*}"
           SHA="${INPUT_SHA_FILE:-${R_SHA:-}}"
-          if [[ -z "${SHA:-}" ]]; then
-            SHA="$(find "$SWRLZ_SOURCES_DIR" . -maxdepth 4 -type f -iname "${KEY}*SHA256*.txt" 2>/dev/null | sort -V | tail -n 1 || true)"
+          RELEASE="${INPUT_RELEASE_NAME:-${R_RELEASE:-}}"
+          COMMIT_RELEASE_ARTIFACTS="${INPUT_COMMIT_RELEASE_ARTIFACTS:-${R_COMMIT:-false}}"
+
+          if [[ -z "${ZIP:-}" || ! -f "$ZIP" ]]; then
+            echo "Could not resolve source ZIP: ${ZIP:-<empty>}" >&2
+            find "$SWRLZ_SOURCES_DIR" -maxdepth 4 -type f -iname '*.zip' 2>/dev/null | sort >&2 || true
+            exit 1
           fi
           if [[ -n "${SHA:-}" && ! -f "$SHA" ]]; then
             echo "Specified SHA file not found: $SHA" >&2
             exit 1
           fi
-
-          RELEASE="${INPUT_RELEASE_NAME:-${R_RELEASE:-}}"
           if [[ -z "${RELEASE:-}" ]]; then
-            RELEASE="${ZIP_BASE%.zip}"
-            RELEASE="${RELEASE%_SOURCE}"
+            RELEASE="$(basename "$ZIP" .zip)"
           fi
-          COMMIT_RELEASE_ARTIFACTS="${INPUT_COMMIT_RELEASE_ARTIFACTS:-${R_COMMIT:-false}}"
+
+          ZIP_BASE="$(basename "$ZIP")"
           SAFE_RELEASE="$(echo "$RELEASE" | tr -cs 'A-Za-z0-9._-' '_' | sed 's/^_*//;s/_*$//')"
           EXTRACT_DIR="$GITHUB_WORKSPACE/$SWRLZ_BUILD_WORK_DIR/$SAFE_RELEASE/extracted"
 
@@ -140,9 +129,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           echo "Resolved release: $RELEASE"
-          echo "Resolved safe release: $SAFE_RELEASE"
-          echo "Resolved request file: ${REQUEST_FILE:-<none>}"
           echo "Resolved source ZIP: $ZIP"
+          echo "Resolved SHA file: ${SHA:-<none>}"
 
       - name: Verify and extract source
         id: extract
@@ -166,10 +154,10 @@ jobs:
           rm -rf "$EXTRACT_DIR"
           mkdir -p "$EXTRACT_DIR"
           unzip -o "$ZIP" -d "$EXTRACT_DIR"
-          BUILD_SCRIPT="$(find "$EXTRACT_DIR" -maxdepth 6 -type f -path '*/scripts/install_android_sdk_and_build.sh' | sort | head -n 1)"
+          BUILD_SCRIPT="$(find "$EXTRACT_DIR" -maxdepth 8 -type f -path '*/scripts/install_android_sdk_and_build.sh' | sort | head -n 1)"
           if [[ -z "${BUILD_SCRIPT:-}" || ! -f "$BUILD_SCRIPT" ]]; then
             echo "Could not find scripts/install_android_sdk_and_build.sh" >&2
-            find "$EXTRACT_DIR" -maxdepth 6 -type f | sort | head -n 300 >&2
+            find "$EXTRACT_DIR" -maxdepth 8 -type f | sort | head -n 300 >&2
             exit 1
           fi
           PROJECT_DIR="$(dirname "$(dirname "$BUILD_SCRIPT")")"
@@ -189,240 +177,6 @@ jobs:
             done
           fi
 
-      - name: Apply 2.7.6 UI identity and discovery patch
-        if: ${{ contains(steps.resolve.outputs.safe_release, '2.7.6') }}
-        env:
-          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
-          SAFE_RELEASE: ${{ steps.resolve.outputs.safe_release }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import json, os, re
-
-          root = Path(os.environ["PROJECT_DIR"])
-          safe_release = os.environ.get("SAFE_RELEASE", "")
-          is_codefix2 = "CODEFIX2_UI_IDENTITY_NETWORK_DISCOVERY" in safe_release
-          is_codefix1 = "CODEFIX1_FORGE_IDENTITY_INSTALL_CONTINUITY" in safe_release
-          changed = []
-
-          if is_codefix2:
-              version_name = "v0.2.7.6-codefix2-ui-identity"
-              version_code = "21"
-              patch_label = "2.7.6-CODEFIX2-UI-IDENTITY-NETWORK-DISCOVERY"
-              build_line = "Network Discovery / UI identity sync / output filename truth / permission onboarding / Admin Registry bridge"
-          elif is_codefix1:
-              version_name = "v0.2.7.6-codefix1-forge-identity"
-              version_code = "20"
-              patch_label = "2.7.6-CODEFIX1-FORGE-IDENTITY-INSTALL-CONTINUITY"
-              build_line = "Network Discovery / forge identity continuity / permission onboarding / stable signing readiness"
-          else:
-              version_name = "v0.2.7.6-network-discovery"
-              version_code = "19"
-              patch_label = "2.7.6-NETWORK-DISCOVERY"
-              build_line = "Network Discovery / discovery signature / local node scan / saved server verify / Admin Registry bridge"
-          source_line = "SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip + " + safe_release + " visible forge patch"
-
-          skip_parts = {".git", ".gradle", "build", "BUILD_WORK", "APK_DOWNLOAD"}
-          def should_skip(path: Path) -> bool:
-              return any(part in skip_parts for part in path.parts)
-
-          def read_text(path):
-              if should_skip(path):
-                  return None
-              try:
-                  return path.read_text(encoding="utf-8")
-              except Exception:
-                  return None
-
-          def write_if_changed(path, old, new):
-              if old is not None and new != old:
-                  path.write_text(new, encoding="utf-8")
-                  changed.append(str(path.relative_to(root)))
-
-          def sync_identity(text: str) -> str:
-              replacements = {
-                  "v0.2.7.5-admin-registry": version_name,
-                  "v0.2.7.6-network-discovery": version_name,
-                  "v0.2.7.6-codefix1-forge-identity": version_name,
-                  "2.7.4-COCKPIT-SHELL": patch_label,
-                  "2.7.5-ADMIN-REGISTRY": patch_label,
-                  "2.7.6-NETWORK-DISCOVERY": patch_label,
-                  "2.7.6-CODEFIX1-FORGE-IDENTITY-INSTALL-CONTINUITY": patch_label,
-                  "Patch: 2.7.4-COCKPIT-SHELL": "Patch: " + patch_label,
-                  "Patch: 2.7.5-ADMIN-REGISTRY": "Patch: " + patch_label,
-                  "Patch: 2.7.6-NETWORK-DISCOVERY": "Patch: " + patch_label,
-                  "Patch: 2.7.6-CODEFIX1-FORGE-IDENTITY-INSTALL-CONTINUITY": "Patch: " + patch_label,
-                  "Roadmap: 2.7.4": "Roadmap: 2.7.6",
-                  "Roadmap: 2.7.5": "Roadmap: 2.7.6",
-                  "Roadmap: 2.7.6": "Roadmap: 2.7.6",
-                  "SWRLZ_CORE_2.7.4_COCKPIT_SHELL_SOURCE.zip": source_line,
-                  "SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip": source_line,
-                  "SWRLZ_CORE_2.7.5_ADMIN_REGISTRY_SOURCE.zip + SWRLZ_CORE_2.7.6_CODEFIX1_FORGE_IDENTITY_INSTALL_CONTINUITY visible forge patch": source_line,
-                  "Cockpit Shell / More drawer / guided pairing ladder / device roster / queue lifecycle polish / Theme Armor preserved": build_line,
-                  "Cockpit Shell / More drawer / Guided Pairing Ladder / Device Roster": build_line,
-                  "Clean nav / More drawer / Guided Pairing Ladder / Device Roster": build_line,
-                  "Admin Registry / Device Ledger controls / ghost cleanup / queue inspector / forge-ready update loop": build_line,
-                  "Network Discovery / forge identity continuity / permission onboarding / stable signing readiness": build_line,
-                  "Network Discovery / discovery signature / local node scan / saved server verify / Admin Registry bridge": build_line,
-              }
-              for old, new in replacements.items():
-                  text = text.replace(old, new)
-              text = re.sub(r"v0\.2\.7\.[456][A-Za-z0-9_.-]*", version_name, text)
-              text = re.sub(r"\bversionCode\s+(18|19|20)\b", "versionCode " + version_code, text)
-              text = re.sub(r"\bversionCode\s*=\s*(18|19|20)\b", "versionCode = " + version_code, text)
-              text = re.sub(r'versionName\s+"v0\.2\.7\.[^"]+"', 'versionName "' + version_name + '"', text)
-              text = re.sub(r'versionName\s*=\s*"v0\.2\.7\.[^"]+"', 'versionName = "' + version_name + '"', text)
-              return text
-
-          for path in root.rglob("*"):
-              if not path.is_file():
-                  continue
-              text = read_text(path)
-              if text is None:
-                  continue
-              write_if_changed(path, text, sync_identity(text))
-
-          # Add Kotlin discovery helper where possible.
-          kt_files = list(root.rglob("*.kt"))
-          main_activity = next((p for p in kt_files if p.name == "MainActivity.kt"), None) or next((p for p in kt_files if "MainActivity" in p.name), None)
-          if main_activity:
-              main_text = read_text(main_activity) or ""
-              match = re.search(r"^\s*package\s+([A-Za-z0-9_.]+)", main_text, re.MULTILINE)
-              package_name = match.group(1) if match else "sh.swurlz.core"
-              helper = "\n".join([
-                  f"package {package_name}", "",
-                  "import java.net.HttpURLConnection",
-                  "import java.net.URL", "",
-                  "data class SwrlzDiscoveryResult(val baseUrl: String, val ok: Boolean, val status: String, val rawSignature: String? = null)", "",
-                  "object SwrlzNetworkDiscovery {",
-                  "    const val SIGNATURE_PATH: String = \"/discovery/signature\"",
-                  "    const val EXPECTED_SERVER: String = \"swrlz-local-node\"",
-                  "    const val EXPECTED_SERVER_PATCH: String = \"LNS-0.7.3-DISCOVERY-SIGNATURE\"",
-                  "    fun normalizeBaseUrl(input: String): String { val t = input.trim().trimEnd('/'); return if (t.startsWith(\"http://\") || t.startsWith(\"https://\")) t else if (t.isNotBlank()) \"http://\" + t else \"\" }",
-                  "    fun candidateUrls(savedUrl: String? = null, lastKnownUrl: String? = null): List<String> = listOfNotNull(savedUrl, lastKnownUrl, \"http://127.0.0.1:8787\", \"http://localhost:8787\", \"http://10.0.2.2:8787\", \"http://192.168.0.1:8787\", \"http://192.168.1.1:8787\", \"http://192.168.4.1:8787\").map { normalizeBaseUrl(it) }.filter { it.isNotBlank() }.distinct()",
-                  "    fun probe(baseUrl: String, timeoutMs: Int = 1500): SwrlzDiscoveryResult { val n = normalizeBaseUrl(baseUrl); if (n.isBlank()) return SwrlzDiscoveryResult(baseUrl, false, \"EMPTY_URL\", null); var c: HttpURLConnection? = null; return try { c = URL(n + SIGNATURE_PATH).openConnection() as HttpURLConnection; c.connectTimeout = timeoutMs; c.readTimeout = timeoutMs; c.requestMethod = \"GET\"; c.setRequestProperty(\"Accept\", \"application/json\"); val code = c.responseCode; val s = if (code in 200..299) c.inputStream else c.errorStream; val body = s?.bufferedReader()?.use { it.readText() } ?: \"\"; SwrlzDiscoveryResult(n, code in 200..299 && looksLikeSwrlzSignature(body), \"HTTP_\" + code, body) } catch (e: Exception) { SwrlzDiscoveryResult(n, false, \"ERROR_\" + e.javaClass.simpleName + \":\" + (e.message ?: \"unknown\"), null) } finally { c?.disconnect() } }",
-                  "    fun firstValid(candidates: List<String>, timeoutMs: Int = 1500): SwrlzDiscoveryResult? { for (x in candidates) { val r = probe(x, timeoutMs); if (r.ok) return r }; return null }",
-                  "    private fun looksLikeSwrlzSignature(payload: String): Boolean { val l = payload.toLowerCase(); return l.contains(\"swrlz-local-node\") && l.contains(\"discovery-signature\") && l.contains(\"\\\"ok\\\"\") }",
-                  "}", ""
-              ])
-              util_path = main_activity.parent / "SwrlzNetworkDiscovery.kt"
-              write_if_changed(util_path, read_text(util_path) if util_path.exists() else "", helper)
-
-          for manifest in root.rglob("AndroidManifest.xml"):
-              text = read_text(manifest)
-              if text is None:
-                  continue
-              old = text
-              perms = []
-              if "android.permission.INTERNET" not in text:
-                  perms.append('    <uses-permission android:name="android.permission.INTERNET" />')
-              if "android.permission.ACCESS_NETWORK_STATE" not in text:
-                  perms.append('    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />')
-              if perms and "<application" in text:
-                  text = text.replace("<application", "\n".join(perms) + "\n\n    <application", 1)
-              write_if_changed(manifest, old, text)
-
-          # Add visible network discovery panel to webview/HTML assets.
-          panel = f'''
-          <section id="swrlz-network-discovery" style="border:2px solid #34e8ff;margin:22px 0;padding:18px;background:#05080b;color:#f7fbff;font-family:monospace;">
-            <h2 style="letter-spacing:.12em;color:#34e8ff;">▸ NETWORK DISCOVERY</h2>
-            <p><strong>Patch:</strong> {patch_label}</p>
-            <p><strong>Purpose:</strong> find and verify a local SWRLZ node using <code>/discovery/signature</code>.</p>
-            <label for="swrlzDiscoveryUrl">Node URL</label>
-            <input id="swrlzDiscoveryUrl" value="http://127.0.0.1:8787" style="width:100%;margin:8px 0;padding:10px;background:#000;color:#fff;border:1px solid #34e8ff;" />
-            <button onclick="swrlzProbeNode && swrlzProbeNode()" style="padding:10px 14px;border:1px solid #34e8ff;background:#000;color:#34e8ff;font-weight:bold;">TEST /discovery/signature</button>
-            <pre id="swrlzDiscoveryResult" style="white-space:pre-wrap;margin-top:12px;color:#7CFF8A;">Standing by.</pre>
-          </section>
-          <script>
-          async function swrlzProbeNode() {{
-            const el = document.getElementById('swrlzDiscoveryResult');
-            const input = document.getElementById('swrlzDiscoveryUrl');
-            const base = (input && input.value ? input.value : 'http://127.0.0.1:8787').replace(/\/+$/, '');
-            el.textContent = 'Probing ' + base + '/discovery/signature ...';
-            try {{
-              const res = await fetch(base + '/discovery/signature');
-              const text = await res.text();
-              el.textContent = 'HTTP ' + res.status + '\n' + text;
-            }} catch (err) {{
-              el.textContent = 'Probe failed: ' + err;
-            }}
-          }}
-          </script>
-          '''
-          injected_html = False
-          for html in list(root.rglob("*.html")) + list(root.rglob("*.htm")):
-              text = read_text(html)
-              if text is None or "swrlz-network-discovery" in text:
-                  continue
-              old = text
-              if "</body>" in text.lower():
-                  text = re.sub(r"</body>", panel + "\n</body>", text, flags=re.IGNORECASE, count=1)
-              else:
-                  text = text + "\n" + panel
-              write_if_changed(html, old, text)
-              injected_html = True
-          if not injected_html:
-              asset_dir = root / "app" / "src" / "main" / "assets"
-              asset_dir.mkdir(parents=True, exist_ok=True)
-              panel_path = asset_dir / "swrlz_network_discovery_panel.html"
-              write_if_changed(panel_path, read_text(panel_path) if panel_path.exists() else "", "<!doctype html><html><body>" + panel + "</body></html>\n")
-
-          signature = {"ok": True, "server": "swrlz-local-node", "version": "0.7.3-discovery-signature", "patch": "LNS-0.7.3-DISCOVERY-SIGNATURE", "port": 8787}
-          sig_dir = root / "server"
-          sig_dir.mkdir(exist_ok=True)
-          sig_path = sig_dir / "discovery_signature_0_7_3.json"
-          write_if_changed(sig_path, read_text(sig_path) if sig_path.exists() else "", json.dumps(signature, indent=2) + "\n")
-
-          permission_guide = f"""# SWRLZ Restricted Settings / Permission Onboarding Guide
-
-          Android may hide Allow restricted settings for sideloaded APKs until the user first visits the app settings/permissions flow.
-          SWRLZ cannot bypass Android restricted settings, auto-enable them, or skip phone authentication.
-
-          First-run guide:
-          1. Open Android App Info for SWRLZ.
-          2. Visit permissions or the restricted settings area once if the three-dot option is hidden.
-          3. Return to App Info.
-          4. Tap the three-dot menu if available.
-          5. Tap Allow restricted settings.
-          6. Authenticate with phone security.
-          7. Return to SWRLZ.
-          8. Open Accessibility / Notifications / Overlay settings.
-          9. Verify readiness inside SWRLZ.
-
-          Current patch: {patch_label}
-          """
-          guide_path = root / "SWRLZ_PERMISSION_ONBOARDING_GUIDE.md"
-          write_if_changed(guide_path, read_text(guide_path) if guide_path.exists() else "", permission_guide)
-
-          receipt = f"""# SWRLZ-Core 2.7.6 Forge Patch Receipt
-
-          RELEASE: {safe_release}
-
-          BUILD IDENTITY:
-          - versionName target: {version_name}
-          - versionCode target: {version_code}
-          - patch target: {patch_label}
-          - build line: {build_line}
-          - source line: {source_line}
-
-          PROVEN BY FORGE PATCH:
-          - All decoded UTF-8 files are identity-patched, including HTML/web assets and scripts.
-          - Network Discovery helper is added when MainActivity package is found.
-          - A visible Network Discovery web panel is injected or emitted as an asset.
-          - Android network permissions are ensured.
-          - Output filenames are normalized by the workflow after build.
-          """
-          receipt_path = root / "SWRLZ_2.7.6_FORGE_PATCH_RECEIPT.md"
-          write_if_changed(receipt_path, read_text(receipt_path) if receipt_path.exists() else "", receipt)
-
-          if not changed:
-              raise SystemExit("2.7.6 forge patch failed: no files changed.")
-          print("2.7.6 patched files:")
-          print("\n".join(changed))
-          PY
-          grep -RInE '2\.7\.6|v0\.2\.7\.6|swrlz-network-discovery|NETWORK DISCOVERY|SwrlzNetworkDiscovery|/discovery/signature|restricted settings|Permission Onboarding' "$PROJECT_DIR" || true
-
       - name: Build Android debug APK
         id: build
         env:
@@ -435,22 +189,25 @@ jobs:
           export PATH="$JAVA_HOME/bin:$PATH"
           java -version
           bash scripts/install_android_sdk_and_build.sh
+
           OUT_DIR="$PROJECT_DIR/APK_DOWNLOAD"
           if [[ ! -d "$OUT_DIR" ]]; then
             find "$PROJECT_DIR" -type f \( -iname '*.apk' -o -iname '*.aab' \)
             exit 1
           fi
-          echo "Normalizing output filenames to $SAFE_RELEASE"
+
           APK_SRC="$(find "$OUT_DIR" -maxdepth 1 -type f -iname '*.apk' | sort | head -n 1 || true)"
           if [[ -n "${APK_SRC:-}" ]]; then
             APK_DEST="$OUT_DIR/${SAFE_RELEASE}_debug.apk"
             if [[ "$APK_SRC" != "$APK_DEST" ]]; then mv "$APK_SRC" "$APK_DEST"; fi
           fi
+
           ZIP_SRC="$(find "$OUT_DIR" -maxdepth 1 -type f -iname '*APK_DOWNLOAD*.zip' | sort | head -n 1 || true)"
           if [[ -n "${ZIP_SRC:-}" ]]; then
             ZIP_DEST="$OUT_DIR/${SAFE_RELEASE}_APK_DOWNLOAD.zip"
             if [[ "$ZIP_SRC" != "$ZIP_DEST" ]]; then mv "$ZIP_SRC" "$ZIP_DEST"; fi
           fi
+
           echo "output_dir=$OUT_DIR" >> "$GITHUB_OUTPUT"
           find "$OUT_DIR" -maxdepth 1 -type f -print -exec ls -lh {} \;
 
@@ -483,7 +240,6 @@ jobs:
               "$ZIPALIGN" -f -p 4 "$APK" "$ALIGNED"
               "$APKSIGNER" sign --ks "$KEYSTORE" --ks-pass "pass:$SWRLZ_DEV_KEYSTORE_PASSWORD" --ks-key-alias "$SWRLZ_DEV_KEY_ALIAS" --key-pass "pass:$SWRLZ_DEV_KEY_PASSWORD" --out "$SIGNED" "$ALIGNED"
               "$APKSIGNER" verify "$SIGNED"
-              mv "$SIGNED" "$APK"
               rm -f "$ALIGNED"
             done
             SIGNING_MODE="stable-dev-signing-active"
@@ -492,7 +248,6 @@ jobs:
           fi
           echo "$SIGNING_MODE" > "$OUT_DIR/SWRLZ_SIGNING_MODE.txt"
           echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
-          cat "$OUT_DIR/SWRLZ_SIGNING_MODE.txt"
 
       - name: Create GitHub Actions build summary
         env:
@@ -549,12 +304,14 @@ jobs:
           REL_DIR="$SWRLZ_RELEASES_DIR/${SAFE_RELEASE}_APK"
           mkdir -p "$REL_DIR" "$SWRLZ_UPDATES_DIR"
           cp -a "$OUT_DIR"/. "$REL_DIR"/
-          APK_FILE="$(find "$REL_DIR" -maxdepth 1 -type f -iname "${SAFE_RELEASE}_debug.apk" | sort | head -n 1 || true)"
-          BUNDLE_FILE="$(find "$REL_DIR" -maxdepth 1 -type f -iname "${SAFE_RELEASE}_APK_DOWNLOAD.zip" | sort | head -n 1 || true)"
+
+          APK_FILE="$(find "$REL_DIR" -maxdepth 1 -type f \( -iname "${SAFE_RELEASE}_debug.apk" -o -iname "${SAFE_RELEASE}_debug_stable-signed.apk" -o -iname 'APK_*_DEBUG.apk' -o -iname '*_debug.apk' \) | sort | head -n 1 || true)"
+          BUNDLE_FILE="$(find "$REL_DIR" -maxdepth 1 -type f \( -iname "${SAFE_RELEASE}_APK_DOWNLOAD.zip" -o -iname 'BUNDLE_*.zip' -o -iname '*APK_DOWNLOAD*.zip' \) | sort | head -n 1 || true)"
           APK_SHA=""
           BUNDLE_SHA=""
           if [[ -n "${APK_FILE:-}" ]]; then APK_SHA="$(sha256sum "$APK_FILE" | awk '{print $1}')"; fi
           if [[ -n "${BUNDLE_FILE:-}" ]]; then BUNDLE_SHA="$(sha256sum "$BUNDLE_FILE" | awk '{print $1}')"; fi
+
           MANIFEST_FILE="$SWRLZ_UPDATES_DIR/${SAFE_RELEASE}_manifest.json"
           LATEST_FILE="$SWRLZ_UPDATES_DIR/latest_client.json"
           cat > "$MANIFEST_FILE" <<JSON
@@ -578,11 +335,22 @@ jobs:
           }
           JSON
           cp "$MANIFEST_FILE" "$LATEST_FILE"
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$REL_DIR" "$MANIFEST_FILE" "$LATEST_FILE"
-          git commit -m "build: add ${RELEASE_NAME} APK artifacts and update manifest" || exit 0
-          git push || {
-            git pull --rebase --autostash origin "${GITHUB_REF_NAME:-main}"
-            git push
-          }
+
+          if git diff --cached --quiet; then
+            echo "No release artifact changes to commit."
+            exit 0
+          fi
+
+          if ! git commit -m "build: add ${RELEASE_NAME} APK artifacts and update manifest"; then
+            echo "::warning::Release artifact commit failed after APK artifact upload. Build artifact remains valid."
+            exit 0
+          fi
+
+          if ! git push; then
+            echo "::warning::Release artifact push failed after APK artifact upload. Build artifact remains valid."
+            exit 0
+          fi
