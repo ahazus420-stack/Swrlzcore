@@ -1,4 +1,4 @@
-source_zip=SOURCES/SRC_2.7.6_CF4_SIGN_RECONNECT.zip
-sha_file=SOURCES/SHA_2.7.6_CF4_SIGN_RECONNECT.txt
-release_name=APK_2.7.6_CF4_SIGN_RECONNECT
+source_zip=SOURCES/SRC_CF5_276_ENGTEST.zip
+sha_file=SOURCES/SHA_CF5_276_ENGTEST.txt
+release_name=APK_CF5_276_ENGTEST
 commit_release_artifacts=true
