@@ -1,0 +1,3 @@
+CF5 archive notice:
+
+This folder should contain the real CF5 source ZIP, SHA, and report. If any placeholder was created accidentally, replace it with the original blob from top-level SOURCES before relying on it.
