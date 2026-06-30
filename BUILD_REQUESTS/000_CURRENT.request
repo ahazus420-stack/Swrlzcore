@@ -1,4 +1,4 @@
-source_zip=SOURCES/SRC_CF7_276_NETPULSE.zip
-sha_file=SOURCES/SHA_CF7_276_NETPULSE.txt
-release_name=APK_CF7_276_NETPULSE
+source_zip=SOURCES/SRC_CF8_276_RADARLIVE.zip
+sha_file=SOURCES/SHA_CF8_276_RADARLIVE.txt
+release_name=APK_CF8_276_RADARLIVE
 commit_release_artifacts=true
