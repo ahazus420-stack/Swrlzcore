@@ -1,4 +1,4 @@
-source_zip=SOURCES/OLD_PATCHES/SRC_CF5_276_ENGTEST.zip
-sha_file=SOURCES/OLD_PATCHES/SHA_CF5_276_ENGTEST.txt
-release_name=APK_CF5_276_ENGTEST
+source_zip=SOURCES/SRC_CF6_276_BOOTSYNC.zip
+sha_file=SOURCES/SHA_CF6_276_BOOTSYNC.txt
+release_name=APK_CF6_276_BOOTSYNC
 commit_release_artifacts=true
