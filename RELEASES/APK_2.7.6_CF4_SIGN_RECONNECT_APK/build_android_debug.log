@@ -1,5 +1,5 @@
 SWRLZ-CORE Android Debug Bundle Build
-Started: 2026-06-29T21:06:24Z
+Started: 2026-06-30T01:11:00Z
 Project root: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT
 Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT/android
 SDK dir: /usr/local/lib/android/sdk
@@ -38,8 +38,8 @@ Daemon will be stopped at the end of the build
 > Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
-> Task :app:processDebugManifestForPackage
 > Task :app:javaPreCompileDebug
+> Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
@@ -76,11 +76,11 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m 26s
+BUILD SUCCESSFUL in 3m 30s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-29T21:09:51Z
+Finished: 2026-06-30T01:14:31Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT/APK_DOWNLOAD/APK_2.7.6_CF4_SIGN_RECONNECT_DEBUG.apk
 Bundle: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT/APK_DOWNLOAD/BUNDLE_2.7.6_CF4_SIGN_RECONNECT.zip
 Bundle checksum: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT/APK_DOWNLOAD/BUNDLE_2.7.6_CF4_SIGN_RECONNECT.zip.sha256
