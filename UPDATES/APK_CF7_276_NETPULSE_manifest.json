@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "release": "APK_CF7_276_NETPULSE",
+  "source_zip": "SRC_CF7_276_NETPULSE.zip",
+  "built_at_utc": "2026-06-30T04:36:34Z",
+  "repo_commit": "91f480260bbeae15c3f27f26adaf891eca11ce99",
+  "artifact_folder": "RELEASES/APK_CF7_276_NETPULSE_APK",
+  "apk_file": "RELEASES/APK_CF7_276_NETPULSE_APK/APK_CF7_276_NETPULSE_debug.apk",
+  "apk_sha256": "3cd166919912ebeb7831d960a8852a698b3c352be4291009d736c7a957f3279a",
+  "bundle_file": "",
+  "bundle_sha256": "",
+  "signing_mode": "debug-runner-default",
+  "update_modes": {
+    "apk_install_update": true,
+    "hot_patch_assets": true,
+    "silent_self_install": false
+  }
+}
