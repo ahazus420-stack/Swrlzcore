@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "release": "APK_CF6_276_BOOTSYNC",
+  "source_zip": "SRC_CF6_276_BOOTSYNC.zip",
+  "built_at_utc": "2026-06-30T02:45:38Z",
+  "repo_commit": "b03e4f6e9c8a57b040d02840cd0e46d8f0c46e03",
+  "artifact_folder": "RELEASES/APK_CF6_276_BOOTSYNC_APK",
+  "apk_file": "RELEASES/APK_CF6_276_BOOTSYNC_APK/APK_CF6_276_BOOTSYNC_debug.apk",
+  "apk_sha256": "265db5550c7b24f69795b743b65499238375e3fdf396c58b54a6a178a8958237",
+  "bundle_file": "",
+  "bundle_sha256": "",
+  "signing_mode": "debug-runner-default",
+  "update_modes": {
+    "apk_install_update": true,
+    "hot_patch_assets": true,
+    "silent_self_install": false
+  }
+}
