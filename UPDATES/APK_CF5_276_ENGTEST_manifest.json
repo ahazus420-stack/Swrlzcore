@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "release": "APK_CF5_276_ENGTEST",
+  "source_zip": "SRC_CF5_276_ENGTEST.zip",
+  "built_at_utc": "2026-06-30T02:18:32Z",
+  "repo_commit": "df7558cd1075cf43a4c6c59dcc71ce9253693846",
+  "artifact_folder": "RELEASES/APK_CF5_276_ENGTEST_APK",
+  "apk_file": "RELEASES/APK_CF5_276_ENGTEST_APK/APK_CF5_276_ENGTEST_debug.apk",
+  "apk_sha256": "a509460bb949f462318a6a814814594d3be3d1200457b69213dc23d1dbf10d0f",
+  "bundle_file": "",
+  "bundle_sha256": "",
+  "signing_mode": "debug-runner-default",
+  "update_modes": {
+    "apk_install_update": true,
+    "hot_patch_assets": true,
+    "silent_self_install": false
+  }
+}
