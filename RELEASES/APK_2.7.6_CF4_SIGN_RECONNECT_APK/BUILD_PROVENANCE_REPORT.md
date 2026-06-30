@@ -1,6 +1,6 @@
 # SWRLZ-CORE Build Provenance Report
 
-- Generated: 2026-06-30T01:14:33Z
+- Generated: 2026-06-30T01:21:08Z
 - Status: succeeded
 - Stage: bundle-created
 - Gradle exit code: 0
@@ -8,7 +8,7 @@
 - Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT/android
 - Output dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT/APK_DOWNLOAD
 - Build log: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT/APK_DOWNLOAD/build_android_debug.log
-- Source commit: 4af256ed70de0e0684bb4805666f0a6c9256078b
+- Source commit: 4fb1ca27628dd741996777476e1c48e79b390d84
 
 ## SWRLZ Build Identity
 
@@ -111,13 +111,13 @@ cd '/home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNEC
 
 - APK path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT/APK_DOWNLOAD/APK_2.7.6_CF4_SIGN_RECONNECT_DEBUG.apk
 - APK size bytes: 19962328
-- APK SHA-256: 206e47fc813bc6a4b3572c882eba8ed4c1480761cdc8412a1088a1aa6a6501b3
+- APK SHA-256: eabcd19e9014f7f7cdf16faaf7ae3ad603c065f287b9dd590ad6d59590fa3989
 
 ## Download bundle
 
 - Bundle path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT/APK_DOWNLOAD/BUNDLE_2.7.6_CF4_SIGN_RECONNECT.zip
-- Bundle size bytes: 19376737
-- Bundle SHA-256: 63cb9a984c5666218f5feec0b23ba0a75ad539bc0e5d36d523e07b8d87a7b9e6
+- Bundle size bytes: 19376554
+- Bundle SHA-256: 370e8509dee34ba82e60dfe9bc1d7e71dd016378c6e5ce6ae1327b72789ee862
 
 ## Last 80 lines of build log
 
@@ -158,8 +158,8 @@ Daemon will be stopped at the end of the build
 > Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
-> Task :app:javaPreCompileDebug
 > Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
@@ -196,10 +196,10 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m 30s
+BUILD SUCCESSFUL in 3m 29s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-06-30T01:14:31Z
+Finished: 2026-06-30T01:21:06Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/APK_2.7.6_CF4_SIGN_RECONNECT/extracted/SRC_2.7.6_CF4_SIGN_RECONNECT/APK_DOWNLOAD/APK_2.7.6_CF4_SIGN_RECONNECT_DEBUG.apk
 ```
