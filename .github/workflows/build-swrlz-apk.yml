@@ -1,5 +1,9 @@
 name: Build SWRLZ APK
 
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  SWRLZ_API_TOKEN: ${{ secrets.SWRLZ_API_TOKEN }}
+
 on:
   workflow_dispatch:
     inputs:
