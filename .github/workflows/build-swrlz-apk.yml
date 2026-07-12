@@ -166,6 +166,35 @@ jobs:
           chmod +x "$BUILD_SCRIPT"
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
+      - name: Preflight validation
+        env:
+          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SWRLZ_API_TOKEN: ${{ secrets.SWRLZ_API_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          [[ -n "${OPENAI_API_KEY:-}" ]] || fail "OPENAI_API_KEY secret is missing or empty."
+          [[ -n "${SWRLZ_API_TOKEN:-}" ]] || fail "SWRLZ_API_TOKEN secret is missing or empty."
+          [[ -d "$PROJECT_DIR" ]] || fail "Project directory does not exist: $PROJECT_DIR"
+
+          BACKEND_ENV_DIR="$(find "$PROJECT_DIR" -maxdepth 3 -type d -name backend | sort | head -n 1 || true)"
+          [[ -n "${BACKEND_ENV_DIR:-}" ]] || fail "Could not find a backend directory under $PROJECT_DIR."
+          [[ -d "$BACKEND_ENV_DIR" ]] || fail "Backend directory is not accessible: $BACKEND_ENV_DIR"
+
+          BUILD_SCRIPT="$PROJECT_DIR/scripts/install_android_sdk_and_build.sh"
+          [[ -f "$BUILD_SCRIPT" ]] || fail "Missing build script: $BUILD_SCRIPT"
+          [[ -x "$BUILD_SCRIPT" ]] || chmod +x "$BUILD_SCRIPT"
+
+          echo "Preflight validation passed."
+          echo "project_dir=$PROJECT_DIR"
+          echo "backend_env_dir=$BACKEND_ENV_DIR"
+
       - name: Create backend .env
         env:
           PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
