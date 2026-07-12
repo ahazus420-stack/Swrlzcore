@@ -22,8 +22,6 @@ on:
         default: false
   push:
     paths:
-      # Checkmate rule: staged source uploads and archive cleanup do not build APKs.
-      # The build trigger is the active request file only.
       - "BUILD_REQUESTS/000_CURRENT.request"
       - "BUILD_REQUESTS/CURRENT.request"
       - ".github/workflows/build-swrlz-apk.yml"
@@ -75,10 +73,7 @@ jobs:
 
           REQUEST_FILE=""
           for candidate in "$SWRLZ_BUILD_REQUESTS_DIR/000_CURRENT.request" "$SWRLZ_BUILD_REQUESTS_DIR/CURRENT.request"; do
-            if [[ -f "$candidate" ]]; then
-              REQUEST_FILE="$candidate"
-              break
-            fi
+            if [[ -f "$candidate" ]]; then REQUEST_FILE="$candidate"; break; fi
           done
 
           R_SOURCE=""
@@ -92,7 +87,7 @@ jobs:
             R_SHA="$(grep -E '^sha_file=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
             R_RELEASE="$(grep -E '^release_name=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
             R_COMMIT="$(grep -E '^commit_release_artifacts=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
-            if [[ -z "${R_COMMIT:-}" ]]; then R_COMMIT="true"; fi
+            [[ -n "${R_COMMIT:-}" ]] || R_COMMIT="true"
           else
             echo "No active request file found. Manual workflow inputs are required."
           fi
@@ -102,18 +97,9 @@ jobs:
           RELEASE="${INPUT_RELEASE_NAME:-${R_RELEASE:-}}"
           COMMIT_RELEASE_ARTIFACTS="${INPUT_COMMIT_RELEASE_ARTIFACTS:-${R_COMMIT:-false}}"
 
-          if [[ -z "${ZIP:-}" || ! -f "$ZIP" ]]; then
-            echo "Could not resolve source ZIP: ${ZIP:-<empty>}" >&2
-            find "$SWRLZ_SOURCES_DIR" -maxdepth 4 -type f -iname '*.zip' 2>/dev/null | sort >&2 || true
-            exit 1
-          fi
-          if [[ -n "${SHA:-}" && ! -f "$SHA" ]]; then
-            echo "Specified SHA file not found: $SHA" >&2
-            exit 1
-          fi
-          if [[ -z "${RELEASE:-}" ]]; then
-            RELEASE="$(basename "$ZIP" .zip)"
-          fi
+          [[ -n "${ZIP:-}" && -f "$ZIP" ]] || { echo "Could not resolve source ZIP: ${ZIP:-<empty>}" >&2; find "$SWRLZ_SOURCES_DIR" -maxdepth 4 -type f -iname '*.zip' 2>/dev/null | sort >&2 || true; exit 1; }
+          if [[ -n "${SHA:-}" && ! -f "$SHA" ]]; then echo "Specified SHA file not found: $SHA" >&2; exit 1; fi
+          [[ -n "${RELEASE:-}" ]] || RELEASE="$(basename "$ZIP" .zip)"
 
           ZIP_BASE="$(basename "$ZIP")"
           SAFE_RELEASE="$(echo "$RELEASE" | tr -cs 'A-Za-z0-9._-' '_' | sed 's/^_*//;s/_*$//')"
@@ -130,10 +116,6 @@ jobs:
             echo "commit_release_artifacts=$COMMIT_RELEASE_ARTIFACTS"
           } >> "$GITHUB_OUTPUT"
 
-          echo "Resolved release: $RELEASE"
-          echo "Resolved source ZIP: $ZIP"
-          echo "Resolved SHA file: ${SHA:-<none>}"
-
       - name: Verify and extract source
         id: extract
         env:
@@ -145,9 +127,7 @@ jobs:
           if [[ -n "${SHA_FILE:-}" ]]; then
             cat "$SHA_FILE"
             EXPECTED_NAME="$(awk 'NF >= 2 {print $2; exit}' "$SHA_FILE")"
-            if [[ -n "${EXPECTED_NAME:-}" && ! -f "$EXPECTED_NAME" ]]; then
-              cp "$ZIP" "$EXPECTED_NAME"
-            fi
+            if [[ -n "${EXPECTED_NAME:-}" && ! -f "$EXPECTED_NAME" ]]; then cp "$ZIP" "$EXPECTED_NAME"; fi
             sha256sum -c "$SHA_FILE"
           else
             sha256sum "$ZIP"
@@ -173,27 +153,16 @@ jobs:
           SWRLZ_API_TOKEN: ${{ secrets.SWRLZ_API_TOKEN }}
         run: |
           set -euo pipefail
-
-          fail() {
-            echo "::error::$1"
-            exit 1
-          }
-
+          fail() { echo "::error::$1"; exit 1; }
           [[ -n "${OPENAI_API_KEY:-}" ]] || fail "OPENAI_API_KEY secret is missing or empty."
           [[ -n "${SWRLZ_API_TOKEN:-}" ]] || fail "SWRLZ_API_TOKEN secret is missing or empty."
           [[ -d "$PROJECT_DIR" ]] || fail "Project directory does not exist: $PROJECT_DIR"
-
           BACKEND_ENV_DIR="$(find "$PROJECT_DIR" -maxdepth 3 -type d -name backend | sort | head -n 1 || true)"
           [[ -n "${BACKEND_ENV_DIR:-}" ]] || fail "Could not find a backend directory under $PROJECT_DIR."
           [[ -d "$BACKEND_ENV_DIR" ]] || fail "Backend directory is not accessible: $BACKEND_ENV_DIR"
-
           BUILD_SCRIPT="$PROJECT_DIR/scripts/install_android_sdk_and_build.sh"
           [[ -f "$BUILD_SCRIPT" ]] || fail "Missing build script: $BUILD_SCRIPT"
           [[ -x "$BUILD_SCRIPT" ]] || chmod +x "$BUILD_SCRIPT"
-
-          echo "Preflight validation passed."
-          echo "project_dir=$PROJECT_DIR"
-          echo "backend_env_dir=$BACKEND_ENV_DIR"
 
       - name: Create backend .env
         env:
@@ -203,11 +172,7 @@ jobs:
         run: |
           set -euo pipefail
           BACKEND_ENV_DIR="$(find "$PROJECT_DIR" -maxdepth 3 -type d -name backend | sort | head -n 1 || true)"
-          if [[ -z "${BACKEND_ENV_DIR:-}" ]]; then
-            echo "Could not find backend directory under $PROJECT_DIR" >&2
-            find "$PROJECT_DIR" -maxdepth 4 -type d | sort >&2 || true
-            exit 1
-          fi
+          [[ -n "${BACKEND_ENV_DIR:-}" ]] || { echo "Could not find backend directory under $PROJECT_DIR" >&2; exit 1; }
           cat > "$BACKEND_ENV_DIR/.env" <<EOF
 SWRLZ_DATA_DIR=./data
 OPENAI_API_KEY=$OPENAI_API_KEY
@@ -215,7 +180,6 @@ OPENAI_MODEL=gpt-5.4-mini
 SWRLZ_API_TOKEN=$SWRLZ_API_TOKEN
 CORS_ORIGINS=*
 EOF
-          echo "Wrote backend .env to $BACKEND_ENV_DIR/.env"
 
       - name: Normalize Android build properties
         env:
@@ -226,7 +190,6 @@ EOF
           if [[ -n "${MATCHES:-}" ]]; then
             echo "$MATCHES" | while IFS= read -r file; do
               sed -i.bak '/^android\.aapt2FromMavenOverride=/d' "$file"
-              echo "Removed stale AAPT2 override from $file"
             done
           fi
 
@@ -244,21 +207,18 @@ EOF
           bash scripts/install_android_sdk_and_build.sh
 
           OUT_DIR="$PROJECT_DIR/APK_DOWNLOAD"
-          if [[ ! -d "$OUT_DIR" ]]; then
-            find "$PROJECT_DIR" -type f \( -iname '*.apk' -o -iname '*.aab' \)
-            exit 1
-          fi
+          [[ -d "$OUT_DIR" ]] || { find "$PROJECT_DIR" -type f \( -iname '*.apk' -o -iname '*.aab' \); exit 1; }
 
           APK_SRC="$(find "$OUT_DIR" -maxdepth 1 -type f -iname '*.apk' | sort | head -n 1 || true)"
           if [[ -n "${APK_SRC:-}" ]]; then
             APK_DEST="$OUT_DIR/${SAFE_RELEASE}_debug.apk"
-            if [[ "$APK_SRC" != "$APK_DEST" ]]; then mv "$APK_SRC" "$APK_DEST"; fi
+            [[ "$APK_SRC" == "$APK_DEST" ]] || mv "$APK_SRC" "$APK_DEST"
           fi
 
           ZIP_SRC="$(find "$OUT_DIR" -maxdepth 1 -type f -iname '*APK_DOWNLOAD*.zip' | sort | head -n 1 || true)"
           if [[ -n "${ZIP_SRC:-}" ]]; then
             ZIP_DEST="$OUT_DIR/${SAFE_RELEASE}_APK_DOWNLOAD.zip"
-            if [[ "$ZIP_SRC" != "$ZIP_DEST" ]]; then mv "$ZIP_SRC" "$ZIP_DEST"; fi
+            [[ "$ZIP_SRC" == "$ZIP_DEST" ]] || mv "$ZIP_SRC" "$ZIP_DEST"
           fi
 
           echo "output_dir=$OUT_DIR" >> "$GITHUB_OUTPUT"
@@ -276,15 +236,11 @@ EOF
           set -euo pipefail
           SIGNING_MODE="debug-runner-default"
           if [[ -n "${SWRLZ_DEV_KEYSTORE_BASE64:-}" && -n "${SWRLZ_DEV_KEYSTORE_PASSWORD:-}" && -n "${SWRLZ_DEV_KEY_ALIAS:-}" && -n "${SWRLZ_DEV_KEY_PASSWORD:-}" ]]; then
-            echo "Stable SWRLZ dev signing secrets detected."
             KEYSTORE="$RUNNER_TEMP/swrlz-dev-signing.jks"
             echo "$SWRLZ_DEV_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
             APKSIGNER="$(find "${ANDROID_HOME:-$HOME}" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1 || true)"
             ZIPALIGN="$(find "${ANDROID_HOME:-$HOME}" -type f -name zipalign 2>/dev/null | sort -V | tail -n 1 || true)"
-            if [[ -z "${APKSIGNER:-}" || -z "${ZIPALIGN:-}" ]]; then
-              echo "Stable signing requested, but apksigner/zipalign was not found." >&2
-              exit 1
-            fi
+            [[ -n "${APKSIGNER:-}" && -n "${ZIPALIGN:-}" ]] || { echo "Stable signing requested, but apksigner/zipalign was not found." >&2; exit 1; }
             for APK in "$OUT_DIR"/*.apk; do
               [[ -f "$APK" ]] || continue
               BASE="${APK%.apk}"
@@ -296,8 +252,6 @@ EOF
               rm -f "$ALIGNED"
             done
             SIGNING_MODE="stable-dev-signing-active"
-          else
-            echo "Stable SWRLZ dev signing secrets not configured; using runner/debug signing."
           fi
           echo "$SIGNING_MODE" > "$OUT_DIR/SWRLZ_SIGNING_MODE.txt"
           echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
@@ -362,8 +316,8 @@ EOF
           BUNDLE_FILE="$(find "$REL_DIR" -maxdepth 1 -type f \( -iname "${SAFE_RELEASE}_APK_DOWNLOAD.zip" -o -iname 'BUNDLE_*.zip' -o -iname '*APK_DOWNLOAD*.zip' \) | sort | head -n 1 || true)"
           APK_SHA=""
           BUNDLE_SHA=""
-          if [[ -n "${APK_FILE:-}" ]]; then APK_SHA="$(sha256sum "$APK_FILE" | awk '{print $1}')"; fi
-          if [[ -n "${BUNDLE_FILE:-}" ]]; then BUNDLE_SHA="$(sha256sum "$BUNDLE_FILE" | awk '{print $1}')"; fi
+          [[ -n "${APK_FILE:-}" ]] && APK_SHA="$(sha256sum "$APK_FILE" | awk '{print $1}')"
+          [[ -n "${BUNDLE_FILE:-}" ]] && BUNDLE_SHA="$(sha256sum "$BUNDLE_FILE" | awk '{print $1}')"
 
           MANIFEST_FILE="$SWRLZ_UPDATES_DIR/${SAFE_RELEASE}_manifest.json"
           LATEST_FILE="$SWRLZ_UPDATES_DIR/latest_client.json"
@@ -392,18 +346,6 @@ JSON
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$REL_DIR" "$MANIFEST_FILE" "$LATEST_FILE"
-
-          if git diff --cached --quiet; then
-            echo "No release artifact changes to commit."
-            exit 0
-          fi
-
-          if ! git commit -m "build: add ${RELEASE_NAME} APK artifacts and update manifest"; then
-            echo "::warning::Release artifact commit failed after APK artifact upload. Build artifact remains valid."
-            exit 0
-          fi
-
-          if ! git push; then
-            echo "::warning::Release artifact push failed after APK artifact upload. Build artifact remains valid."
-            exit 0
-          fi
+          git diff --cached --quiet && exit 0
+          git commit -m "build: add ${RELEASE_NAME} APK artifacts and update manifest" || { echo "::warning::Release artifact commit failed after APK artifact upload. Build artifact remains valid."; exit 0; }
+          git push || { echo "::warning::Release artifact push failed after APK artifact upload. Build artifact remains valid."; exit 0; }
