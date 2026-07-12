@@ -170,16 +170,23 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SWRLZ_API_TOKEN: ${{ secrets.SWRLZ_API_TOKEN }}
         run: |
+                  run: |
           set -euo pipefail
+
           BACKEND_ENV_DIR="$(find "$PROJECT_DIR" -maxdepth 3 -type d -name backend | sort | head -n 1 || true)"
-          [[ -n "${BACKEND_ENV_DIR:-}" ]] || { echo "Could not find backend directory under $PROJECT_DIR" >&2; exit 1; }
-          cat > "$BACKEND_ENV_DIR/.env" <<EOF
-SWRLZ_DATA_DIR=./data
-OPENAI_API_KEY=$OPENAI_API_KEY
-OPENAI_MODEL=gpt-5.4-mini
-SWRLZ_API_TOKEN=$SWRLZ_API_TOKEN
-CORS_ORIGINS=*
-EOF
+
+          [[ -n "${BACKEND_ENV_DIR:-}" ]] || {
+            echo "Could not find backend directory under $PROJECT_DIR" >&2
+            exit 1
+          }
+
+          ENV_FILE="$BACKEND_ENV_DIR/.env"
+
+          echo "SWRLZ_DATA_DIR=./data" > "$ENV_FILE"
+          echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> "$ENV_FILE"
+          echo "OPENAI_MODEL=gpt-5.4-mini" >> "$ENV_FILE"
+          echo "SWRLZ_API_TOKEN=$SWRLZ_API_TOKEN" >> "$ENV_FILE"
+          echo "CORS_ORIGINS=*" >> "$ENV_FILE"
 
       - name: Normalize Android build properties
         env:
