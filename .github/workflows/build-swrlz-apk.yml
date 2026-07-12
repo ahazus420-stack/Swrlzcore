@@ -1,9 +1,5 @@
 name: Build SWRLZ APK
 
-env:
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-  SWRLZ_API_TOKEN: ${{ secrets.SWRLZ_API_TOKEN }}
-
 on:
   workflow_dispatch:
     inputs:
@@ -40,6 +36,8 @@ defaults:
     shell: bash
 
 env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  SWRLZ_API_TOKEN: ${{ secrets.SWRLZ_API_TOKEN }}
   SWRLZ_SOURCES_DIR: SOURCES
   SWRLZ_BUILD_REQUESTS_DIR: BUILD_REQUESTS
   SWRLZ_BUILD_WORK_DIR: BUILD_WORK
@@ -167,6 +165,28 @@ jobs:
           PROJECT_DIR="$(dirname "$(dirname "$BUILD_SCRIPT")")"
           chmod +x "$BUILD_SCRIPT"
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Create backend .env
+        env:
+          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SWRLZ_API_TOKEN: ${{ secrets.SWRLZ_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          BACKEND_ENV_DIR="$(find "$PROJECT_DIR" -maxdepth 3 -type d -name backend | sort | head -n 1 || true)"
+          if [[ -z "${BACKEND_ENV_DIR:-}" ]]; then
+            echo "Could not find backend directory under $PROJECT_DIR" >&2
+            find "$PROJECT_DIR" -maxdepth 4 -type d | sort >&2 || true
+            exit 1
+          fi
+          cat > "$BACKEND_ENV_DIR/.env" <<EOF
+SWRLZ_DATA_DIR=./data
+OPENAI_API_KEY=$OPENAI_API_KEY
+OPENAI_MODEL=gpt-5.4-mini
+SWRLZ_API_TOKEN=$SWRLZ_API_TOKEN
+CORS_ORIGINS=*
+EOF
+          echo "Wrote backend .env to $BACKEND_ENV_DIR/.env"
 
       - name: Normalize Android build properties
         env:
@@ -319,25 +339,25 @@ jobs:
           MANIFEST_FILE="$SWRLZ_UPDATES_DIR/${SAFE_RELEASE}_manifest.json"
           LATEST_FILE="$SWRLZ_UPDATES_DIR/latest_client.json"
           cat > "$MANIFEST_FILE" <<JSON
-          {
-            "schema": 1,
-            "release": "$RELEASE_NAME",
-            "source_zip": "$SOURCE_ZIP",
-            "built_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "repo_commit": "$GITHUB_SHA",
-            "artifact_folder": "$REL_DIR",
-            "apk_file": "${APK_FILE:-}",
-            "apk_sha256": "$APK_SHA",
-            "bundle_file": "${BUNDLE_FILE:-}",
-            "bundle_sha256": "$BUNDLE_SHA",
-            "signing_mode": "${SIGNING_MODE:-unknown}",
-            "update_modes": {
-              "apk_install_update": true,
-              "hot_patch_assets": true,
-              "silent_self_install": false
-            }
-          }
-          JSON
+{
+  "schema": 1,
+  "release": "$RELEASE_NAME",
+  "source_zip": "$SOURCE_ZIP",
+  "built_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "repo_commit": "$GITHUB_SHA",
+  "artifact_folder": "$REL_DIR",
+  "apk_file": "${APK_FILE:-}",
+  "apk_sha256": "$APK_SHA",
+  "bundle_file": "${BUNDLE_FILE:-}",
+  "bundle_sha256": "$BUNDLE_SHA",
+  "signing_mode": "${SIGNING_MODE:-unknown}",
+  "update_modes": {
+    "apk_install_update": true,
+    "hot_patch_assets": true,
+    "silent_self_install": false
+  }
+}
+JSON
           cp "$MANIFEST_FILE" "$LATEST_FILE"
 
           git config user.name "github-actions[bot]"
