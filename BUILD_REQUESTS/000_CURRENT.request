@@ -1,0 +1,19 @@
+# BUILD REQUEST: 000_CURRENT.request
+# Purpose: Request an automated multi-target APK build for SWRLZ client/server
+
+# Parameters (edit as needed):
+# build_variant: debug or release
+# targets: comma-separated list of ABIs or flavor names
+
+build_variant=debug
+targets=universal
+
+# Output artifact: a ZIP containing built APK(s)
+# Usage:
+# - Place this file at repo root and trigger CI or run the workflow locally
+# - CI picks up this request and runs `build-swrlz-apk_multi_target_ready.yml`
+
+# Example command (local):
+# ./gradlew clean :app:assembleDebug
+
+# Generated artifact pattern (CI): SWRLZ_APK_<timestamp>.zip
