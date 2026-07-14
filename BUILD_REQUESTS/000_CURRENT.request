@@ -1,2 +1,2 @@
-target=SERVER
+target=CLIENT
 commit_release_artifacts=true
