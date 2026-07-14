@@ -1,12 +1,13 @@
-# SOURCES / OLD_PATCHES
+# CLIENT / OLD_PATCHES
 
-This folder stores archived source ZIPs that have already been superseded by newer source uploads.
+This folder is now the client lane archive area.
+
+Move old client source ZIPs, SHA files, reports, upload notes, and lineage receipts here once they are superseded by newer client uploads.
 
 ## Repo hygiene rule
 
-- Keep `SOURCES/` clean for the current active source ZIP, SHA file, and patch/report files.
-- Move older source ZIPs into `SOURCES/OLD_PATCHES/` before uploading a new current source ZIP.
-- Do not delete old source ZIPs by default; preserve them as build lineage receipts.
-- `BUILD_REQUESTS/000_CURRENT.request` may temporarily point to an archived ZIP if that archived ZIP is still the active build target, but new update work should upload the new ZIP into `SOURCES/` and then update the request.
+- Keep `SOURCES/CLIENT/` clean for the current active client source set.
+- Move older client source outputs into `SOURCES/CLIENT/OLD_PATCHES/`.
+- Do not delete old client outputs by default; preserve them as build lineage receipts.
 
 Core law: Integrate, do not overwrite.
