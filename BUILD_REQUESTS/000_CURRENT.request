@@ -1,1 +1,2 @@
 target=CLIENT
+commit_release_artifacts=true
