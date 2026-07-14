@@ -3,16 +3,8 @@ name: Build SWRLZ APK
 on:
   workflow_dispatch:
     inputs:
-      source_zip:
-        description: "Optional source ZIP path. Leave blank to use current request."
-        required: false
-        default: ""
-      sha_file:
-        description: "Optional SHA256 file path."
-        required: false
-        default: ""
-      release_name:
-        description: "Optional release label."
+      target:
+        description: "Build lane: CLIENT or SERVER. Leave blank to use BUILD_REQUESTS/000_CURRENT.request."
         required: false
         default: ""
       commit_release_artifacts:
@@ -25,6 +17,7 @@ on:
       - "BUILD_REQUESTS/000_CURRENT.request"
       - "BUILD_REQUESTS/CURRENT.request"
       - ".github/workflows/build-swrlz-apk.yml"
+      - "SOURCES/**"
 
 permissions:
   contents: write
@@ -44,7 +37,7 @@ env:
 
 jobs:
   build-swrlz-apk:
-    name: Build SWRLZ APK from active request
+    name: Build SWRLZ APK from active lane
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -60,12 +53,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Resolve active source request
+      - name: Resolve active build lane
         id: resolve
         env:
-          INPUT_SOURCE_ZIP: ${{ github.event.inputs.source_zip }}
-          INPUT_SHA_FILE: ${{ github.event.inputs.sha_file }}
-          INPUT_RELEASE_NAME: ${{ github.event.inputs.release_name }}
+          INPUT_TARGET: ${{ github.event.inputs.target }}
           INPUT_COMMIT_RELEASE_ARTIFACTS: ${{ github.event.inputs.commit_release_artifacts }}
         run: |
           set -euo pipefail
@@ -76,61 +67,130 @@ jobs:
             if [[ -f "$candidate" ]]; then REQUEST_FILE="$candidate"; break; fi
           done
 
-          R_SOURCE=""
-          R_SHA=""
-          R_RELEASE=""
+          R_TARGET=""
           R_COMMIT="false"
           if [[ -n "${REQUEST_FILE:-}" && -f "$REQUEST_FILE" ]]; then
             echo "Using active build request: $REQUEST_FILE"
             cat "$REQUEST_FILE"
-            R_SOURCE="$(grep -E '^source_zip=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
-            R_SHA="$(grep -E '^sha_file=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
-            R_RELEASE="$(grep -E '^release_name=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
+            R_TARGET="$(grep -E '^target=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
             R_COMMIT="$(grep -E '^commit_release_artifacts=' "$REQUEST_FILE" | tail -n 1 | cut -d= -f2- || true)"
             [[ -n "${R_COMMIT:-}" ]] || R_COMMIT="true"
-          else
-            echo "No active request file found. Manual workflow inputs are required."
           fi
 
-          ZIP="${INPUT_SOURCE_ZIP:-${R_SOURCE:-}}"
-          SHA="${INPUT_SHA_FILE:-${R_SHA:-}}"
-          RELEASE="${INPUT_RELEASE_NAME:-${R_RELEASE:-}}"
+          TARGET="${INPUT_TARGET:-${R_TARGET:-}}"
           COMMIT_RELEASE_ARTIFACTS="${INPUT_COMMIT_RELEASE_ARTIFACTS:-${R_COMMIT:-false}}"
 
-          [[ -n "${ZIP:-}" && -f "$ZIP" ]] || { echo "Could not resolve source ZIP: ${ZIP:-<empty>}" >&2; find "$SWRLZ_SOURCES_DIR" -maxdepth 4 -type f -iname '*.zip' 2>/dev/null | sort >&2 || true; exit 1; }
-          if [[ -n "${SHA:-}" && ! -f "$SHA" ]]; then echo "Specified SHA file not found: $SHA" >&2; exit 1; fi
-          [[ -n "${RELEASE:-}" ]] || RELEASE="$(basename "$ZIP" .zip)"
+          if [[ -z "${TARGET:-}" ]]; then
+            echo "Could not resolve target lane. Use target=CLIENT or target=SERVER." >&2
+            exit 1
+          fi
 
-          ZIP_BASE="$(basename "$ZIP")"
-          SAFE_RELEASE="$(echo "$RELEASE" | tr -cs 'A-Za-z0-9._-' '_' | sed 's/^_*//;s/_*$//')"
-          EXTRACT_DIR="$GITHUB_WORKSPACE/$SWRLZ_BUILD_WORK_DIR/$SAFE_RELEASE/extracted"
+          TARGET="$(echo "$TARGET" | tr '[:lower:]' '[:upper:]')"
+          case "$TARGET" in
+            CLIENT|SERVER) ;;
+            *) echo "Invalid target lane: $TARGET (expected CLIENT or SERVER)" >&2; exit 1 ;;
+          esac
+
+          LANE_DIR="$SWRLZ_SOURCES_DIR/$TARGET"
+          [[ -d "$LANE_DIR" ]] || { echo "Missing lane directory: $LANE_DIR" >&2; exit 1; }
 
           {
-            echo "source_zip=$ZIP"
-            echo "source_zip_base=$ZIP_BASE"
-            echo "sha_file=$SHA"
-            echo "release_name=$RELEASE"
-            echo "safe_release=$SAFE_RELEASE"
-            echo "extract_dir=$EXTRACT_DIR"
+            echo "target=$TARGET"
+            echo "lane_dir=$LANE_DIR"
             echo "request_file=$REQUEST_FILE"
             echo "commit_release_artifacts=$COMMIT_RELEASE_ARTIFACTS"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve newest versioned source pair
+        id: pair
+        env:
+          LANE_DIR: ${{ steps.resolve.outputs.lane_dir }}
+          TARGET: ${{ steps.resolve.outputs.target }}
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          mapfile -t ZIP_CANDIDATES < <(find "$LANE_DIR" -maxdepth 1 -type f -name "${TARGET}_CFv*.zip" | sort)
+          if [[ ${#ZIP_CANDIDATES[@]} -eq 0 ]]; then
+            echo "No source ZIPs found in $LANE_DIR matching ${TARGET}_CFv*.zip" >&2
+            exit 0
+          fi
+
+          version_from_name() {
+            local name="$1"
+            if [[ "$name" =~ ${TARGET}_CFv([0-9]+)\.([0-9]+)\.([0-9]+)\.zip$ ]]; then
+              printf '%s.%s.%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+            else
+              return 1
+            fi
+          }
+
+          semver_gt() {
+            local a b c x y z
+            IFS=. read -r a b c <<< "$1"
+            IFS=. read -r x y z <<< "$2"
+            if (( a > x )); then return 0; fi
+            if (( a < x )); then return 1; fi
+            if (( b > y )); then return 0; fi
+            if (( b < y )); then return 1; fi
+            (( c > z ))
+          }
+
+          BEST_ZIP=""
+          BEST_VER=""
+          for zip in "${ZIP_CANDIDATES[@]}"; do
+            base="$(basename "$zip")"
+            if ver="$(version_from_name "$base")"; then
+              if [[ -z "${BEST_VER:-}" ]] || semver_gt "$ver" "$BEST_VER"; then
+                BEST_VER="$ver"
+                BEST_ZIP="$zip"
+              fi
+            fi
+          done
+
+          if [[ -z "${BEST_ZIP:-}" ]]; then
+            echo "No versioned source ZIP matched ${TARGET}_CFvX.Y.Z.zip in $LANE_DIR" >&2
+            exit 0
+          fi
+
+          SHA_CANDIDATE="${BEST_ZIP%.zip}.sha256"
+          if [[ ! -f "$SHA_CANDIDATE" ]]; then
+            SHA_CANDIDATE="${BEST_ZIP%.zip}.txt"
+          fi
+          if [[ ! -f "$SHA_CANDIDATE" ]]; then
+            echo "Matching SHA file not found for $(basename "$BEST_ZIP")" >&2
+            exit 0
+          fi
+
+          EXTRACT_DIR="$GITHUB_WORKSPACE/$SWRLZ_BUILD_WORK_DIR/${TARGET}_CFv${BEST_VER}/extracted"
+          RELEASE_NAME="${TARGET}_CFv${BEST_VER}"
+
+          {
+            echo "source_zip=$BEST_ZIP"
+            echo "sha_file=$SHA_CANDIDATE"
+            echo "version=$BEST_VER"
+            echo "release_name=$RELEASE_NAME"
+            echo "extract_dir=$EXTRACT_DIR"
           } >> "$GITHUB_OUTPUT"
 
       - name: Verify and extract source
         id: extract
         env:
-          ZIP: ${{ steps.resolve.outputs.source_zip }}
-          SHA_FILE: ${{ steps.resolve.outputs.sha_file }}
-          EXTRACT_DIR: ${{ steps.resolve.outputs.extract_dir }}
+          ZIP: ${{ steps.pair.outputs.source_zip }}
+          SHA_FILE: ${{ steps.pair.outputs.sha_file }}
+          EXTRACT_DIR: ${{ steps.pair.outputs.extract_dir }}
         run: |
           set -euo pipefail
+          if [[ -z "${ZIP:-}" || -z "${SHA_FILE:-}" ]]; then
+            echo "No complete source pair available yet. Nothing to build." >&2
+            exit 0
+          fi
+
           if [[ -n "${SHA_FILE:-}" ]]; then
             cat "$SHA_FILE"
             EXPECTED_NAME="$(awk 'NF >= 2 {print $2; exit}' "$SHA_FILE")"
             if [[ -n "${EXPECTED_NAME:-}" && ! -f "$EXPECTED_NAME" ]]; then cp "$ZIP" "$EXPECTED_NAME"; fi
             sha256sum -c "$SHA_FILE"
-          else
-            sha256sum "$ZIP"
           fi
 
           rm -rf "$EXTRACT_DIR"
@@ -203,7 +263,7 @@ jobs:
         id: build
         env:
           PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
-          SAFE_RELEASE: ${{ steps.resolve.outputs.safe_release }}
+          SAFE_RELEASE: ${{ steps.pair.outputs.release_name }}
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
@@ -262,96 +322,55 @@ jobs:
           echo "$SIGNING_MODE" > "$OUT_DIR/SWRLZ_SIGNING_MODE.txt"
           echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
 
+      - name: Archive older source patches after successful build
+        env:
+          LANE_DIR: ${{ steps.resolve.outputs.lane_dir }}
+          TARGET: ${{ steps.resolve.outputs.target }}
+          CURRENT_ZIP: ${{ steps.pair.outputs.source_zip }}
+          CURRENT_SHA: ${{ steps.pair.outputs.sha_file }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CURRENT_ZIP:-}" || -z "${CURRENT_SHA:-}" ]]; then
+            echo "Nothing to archive." 
+            exit 0
+          fi
+          OLD_DIR="$LANE_DIR/OLD_PATCHES"
+          mkdir -p "$OLD_DIR"
+          shopt -s nullglob
+          for f in "$LANE_DIR"/${TARGET}_CFv*.zip "$LANE_DIR"/${TARGET}_CFv*.sha256 "$LANE_DIR"/${TARGET}_CFv*.txt; do
+            [[ -f "$f" ]] || continue
+            if [[ "$f" != "$CURRENT_ZIP" && "$f" != "$CURRENT_SHA" ]]; then
+              mv "$f" "$OLD_DIR/"
+            fi
+          done
+
       - name: Create GitHub Actions build summary
         env:
           OUT_DIR: ${{ steps.build.outputs.output_dir }}
-          RELEASE_NAME: ${{ steps.resolve.outputs.release_name }}
-          SOURCE_ZIP: ${{ steps.resolve.outputs.source_zip_base }}
-          SHA_FILE: ${{ steps.resolve.outputs.sha_file }}
-          SAFE_RELEASE: ${{ steps.resolve.outputs.safe_release }}
-          REQUEST_FILE: ${{ steps.resolve.outputs.request_file }}
-          SIGNING_MODE: ${{ steps.signing.outputs.signing_mode }}
+          RELEASE_NAME: ${{ steps.pair.outputs.release_name }}
+          SOURCE_ZIP: ${{ steps.pair.outputs.source_zip }}
+          SHA_FILE: ${{ steps.pair.outputs.sha_file }}
+          TARGET: ${{ steps.resolve.outputs.target }}
         run: |
           set -euo pipefail
-          SUMMARY_FILE="$OUT_DIR/GITHUB_ACTIONS_BUILD_SUMMARY.md"
+          SUMMARY="$GITHUB_WORKSPACE/$SWRLZ_UPDATES_DIR/${TARGET}_GITHUB_ACTIONS_BUILD_SUMMARY.md"
           {
-            echo "# SWRLZ GitHub Actions Build Summary"
+            echo "# SWRLZ Build Summary"
             echo
-            echo "- Release: $RELEASE_NAME"
-            echo "- Safe release folder: $SAFE_RELEASE"
-            echo "- Source ZIP: $SOURCE_ZIP"
-            echo "- SHA file: ${SHA_FILE:-<none>}"
-            echo "- Build request file: ${REQUEST_FILE:-<none>}"
-            echo "- Signing mode: ${SIGNING_MODE:-unknown}"
-            echo "- Workflow: $GITHUB_WORKFLOW"
-            echo "- Run ID: $GITHUB_RUN_ID"
-            echo "- Commit: $GITHUB_SHA"
-            echo "- Built at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Target: $TARGET"
+            echo "Release: ${RELEASE_NAME:-unknown}"
+            echo "Source ZIP: ${SOURCE_ZIP:-unknown}"
+            echo "SHA: ${SHA_FILE:-unknown}"
             echo
-            echo "## Output files"
-            find "$OUT_DIR" -maxdepth 1 -type f -printf '- `%f` (%s bytes)\n' | sort
-            echo
-            echo "## SHA256"
-            find "$OUT_DIR" -maxdepth 1 -type f ! -iname '*.sha256' -exec sha256sum {} \; | sed "s#$OUT_DIR/##"
-          } > "$SUMMARY_FILE"
-          cat "$SUMMARY_FILE" >> "$GITHUB_STEP_SUMMARY"
+            echo "## Outputs"
+            find "$OUT_DIR" -maxdepth 1 -type f -print | sort
+          } > "$SUMMARY"
 
-      - name: Upload APK_DOWNLOAD artifact
+      - name: Upload build outputs
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.resolve.outputs.safe_release }}_APK_DOWNLOAD
-          path: ${{ steps.build.outputs.output_dir }}/*
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Optionally commit release artifacts and update manifests
-        if: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.commit_release_artifacts == 'true') || steps.resolve.outputs.commit_release_artifacts == 'true' }}
-        env:
-          OUT_DIR: ${{ steps.build.outputs.output_dir }}
-          RELEASE_NAME: ${{ steps.resolve.outputs.release_name }}
-          SAFE_RELEASE: ${{ steps.resolve.outputs.safe_release }}
-          SOURCE_ZIP: ${{ steps.resolve.outputs.source_zip_base }}
-          SIGNING_MODE: ${{ steps.signing.outputs.signing_mode }}
-        run: |
-          set -euo pipefail
-          REL_DIR="$SWRLZ_RELEASES_DIR/${SAFE_RELEASE}_APK"
-          mkdir -p "$REL_DIR" "$SWRLZ_UPDATES_DIR"
-          cp -a "$OUT_DIR"/. "$REL_DIR"/
-
-          APK_FILE="$(find "$REL_DIR" -maxdepth 1 -type f \( -iname "${SAFE_RELEASE}_debug.apk" -o -iname "${SAFE_RELEASE}_debug_stable-signed.apk" -o -iname 'APK_*_DEBUG.apk' -o -iname '*_debug.apk' \) | sort | head -n 1 || true)"
-          BUNDLE_FILE="$(find "$REL_DIR" -maxdepth 1 -type f \( -iname "${SAFE_RELEASE}_APK_DOWNLOAD.zip" -o -iname 'BUNDLE_*.zip' -o -iname '*APK_DOWNLOAD*.zip' \) | sort | head -n 1 || true)"
-          APK_SHA=""
-          BUNDLE_SHA=""
-          [[ -n "${APK_FILE:-}" ]] && APK_SHA="$(sha256sum "$APK_FILE" | awk '{print $1}')"
-          [[ -n "${BUNDLE_FILE:-}" ]] && BUNDLE_SHA="$(sha256sum "$BUNDLE_FILE" | awk '{print $1}')"
-
-          MANIFEST_FILE="$SWRLZ_UPDATES_DIR/${SAFE_RELEASE}_manifest.json"
-          LATEST_FILE="$SWRLZ_UPDATES_DIR/latest_client.json"
-          cat > "$MANIFEST_FILE" <<JSON
-          {
-            "schema": 1,
-            "release": "$RELEASE_NAME",
-            "source_zip": "$SOURCE_ZIP",
-            "built_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "repo_commit": "$GITHUB_SHA",
-            "artifact_folder": "$REL_DIR",
-            "apk_file": "${APK_FILE:-}",
-            "apk_sha256": "$APK_SHA",
-            "bundle_file": "${BUNDLE_FILE:-}",
-            "bundle_sha256": "$BUNDLE_SHA",
-            "signing_mode": "${SIGNING_MODE:-unknown}",
-            "update_modes": {
-              "apk_install_update": true,
-              "hot_patch_assets": true,
-              "silent_self_install": false
-            }
-          }
-          JSON
-          cp "$MANIFEST_FILE" "$LATEST_FILE"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$REL_DIR" "$MANIFEST_FILE" "$LATEST_FILE"
-          git diff --cached --quiet && exit 0
-          git commit -m "build: add ${RELEASE_NAME} APK artifacts and update manifest" || { echo "::warning::Release artifact commit failed after APK artifact upload. Build artifact remains valid."; exit 0; }
-          git push || { echo "::warning::Release artifact push failed after APK artifact upload. Build artifact remains valid."; exit 0; }
+          name: ${{ steps.pair.outputs.release_name }}
+          path: |
+            ${{ steps.build.outputs.output_dir }}
+            ${{ env.SWRLZ_UPDATES_DIR }}/${{ steps.resolve.outputs.target }}_GITHUB_ACTIONS_BUILD_SUMMARY.md
+          if-no-files-found: warn
