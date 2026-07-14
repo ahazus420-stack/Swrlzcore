@@ -1,6 +1,6 @@
 # SWRLZ-CORE Build Provenance Report
 
-- Generated: 2026-07-14T18:32:24Z
+- Generated: 2026-07-14T21:33:25Z
 - Status: succeeded
 - Stage: bundle-created
 - Gradle exit code: 0
@@ -8,7 +8,7 @@
 - Android dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/CLIENT_CFv1.0.0_SWRLZ/extracted/CLIENT_CFv1.0.0_SWRLZ/android
 - Output dir: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/CLIENT_CFv1.0.0_SWRLZ/extracted/CLIENT_CFv1.0.0_SWRLZ/APK_DOWNLOAD
 - Build log: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/CLIENT_CFv1.0.0_SWRLZ/extracted/CLIENT_CFv1.0.0_SWRLZ/APK_DOWNLOAD/build_android_debug.log
-- Source commit: a64534600d7537b3f2544762d5a1e85ffcf72fb8
+- Source commit: 4ae8d4c45d73ae0aba1e5bac9d4ded1a9028ca4d
 
 ## SWRLZ Build Identity
 
@@ -112,13 +112,13 @@ cd '/home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/CLIENT_CFv1.0.0_SWRLZ/extra
 
 - APK path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/CLIENT_CFv1.0.0_SWRLZ/extracted/CLIENT_CFv1.0.0_SWRLZ/APK_DOWNLOAD/APK_CF7_276_NETPULSE_DEBUG.apk
 - APK size bytes: 20012082
-- APK SHA-256: c73bb951360cc655d960359da539bc08c5a916768fa850dd30574c8a5e18c399
+- APK SHA-256: b89996a1434d4f3a72d87cd765348d23a2d4aaa42c63267b72dd71c57a95f2d8
 
 ## Download bundle
 
 - Bundle path: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/CLIENT_CFv1.0.0_SWRLZ/extracted/CLIENT_CFv1.0.0_SWRLZ/APK_DOWNLOAD/BUNDLE_CF7_276_NETPULSE.zip
-- Bundle size bytes: 19429861
-- Bundle SHA-256: 139be23d8f61bb86036d2efa705333825c9872162cc4ec5ab0ad07dd35b1d5d2
+- Bundle size bytes: 19429286
+- Bundle SHA-256: 10ad62ab477fb92b1f97271d6f53fcdff88ad9f7222075d6962fdbd88529cf37
 
 ## Last 80 lines of build log
 
@@ -160,8 +160,8 @@ Daemon will be stopped at the end of the build
 > Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
-> Task :app:javaPreCompileDebug
 > Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
@@ -197,10 +197,10 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 3m 48s
+BUILD SUCCESSFUL in 3m 35s
 39 actionable tasks: 38 executed, 1 up-to-date
 
 Build succeeded.
-Finished: 2026-07-14T18:32:20Z
+Finished: 2026-07-14T21:33:21Z
 APK: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/CLIENT_CFv1.0.0_SWRLZ/extracted/CLIENT_CFv1.0.0_SWRLZ/APK_DOWNLOAD/APK_CF7_276_NETPULSE_DEBUG.apk
 ```
