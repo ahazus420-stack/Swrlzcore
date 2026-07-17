@@ -1,0 +1,124 @@
+name: INT-GATE-011 Promote SERVER Terminal-State Candidate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/int-gate-011-promote-server.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: int-gate-011-server-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-server-v102:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_ZIP: SOURCES/SERVER/SERVER_CFv1.0.1_SWRLZ.zip
+      BASE_SHA: c6c4a802a30743d94df80cc98fec9e409860be9b8e23dd58ff04988a569530a7
+      PATCH_B64: BUILD_REQUESTS/INT_GATE_011/INT-IMP-010E.patch.gz.b64
+      PATCH_SHA: 2165279685b8e5045ddcb6321f597caa4b11370f5909d99747f4146c8abb4764
+      NEW_ZIP: SOURCES/SERVER/SERVER_CFv1.0.2_SWRLZ.zip
+      NEW_SHA: e3a6f603020c71f0c53bf29230a7f958f1135f98e32caa05e37b2dcb450dfdba
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify base and decode accepted patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin main
+          test -f "$BASE_ZIP"
+          test -f "$PATCH_B64"
+          ACTUAL_BASE_SHA="$(sha256sum "$BASE_ZIP" | awk '{print $1}')"
+          [[ "$ACTUAL_BASE_SHA" == "$BASE_SHA" ]] || { echo "Base checksum mismatch: $ACTUAL_BASE_SHA" >&2; exit 1; }
+          unzip -tq "$BASE_ZIP"
+          base64 -d "$PATCH_B64" > /tmp/INT-IMP-010E.patch.gz
+          gzip -dc /tmp/INT-IMP-010E.patch.gz > /tmp/INT-IMP-010E.patch
+          ACTUAL_PATCH_SHA="$(sha256sum /tmp/INT-IMP-010E.patch | awk '{print $1}')"
+          [[ "$ACTUAL_PATCH_SHA" == "$PATCH_SHA" ]] || { echo "Patch checksum mismatch: $ACTUAL_PATCH_SHA" >&2; exit 1; }
+
+      - name: Apply terminal-state truth corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/int-gate-011"
+          rm -rf "$WORK"
+          mkdir -p "$WORK/extracted"
+          unzip -q "$BASE_ZIP" -d "$WORK/extracted"
+          mapfile -t WRAPPERS < <(find "$WORK/extracted" -type f -name gradlew -not -path '*/.gradle/*' -print | sort)
+          [[ "${#WRAPPERS[@]}" -eq 1 ]] || { echo "Expected one Gradle wrapper; found ${#WRAPPERS[@]}." >&2; exit 1; }
+          ROOT="$(dirname "${WRAPPERS[0]}")"
+          pushd "$ROOT" >/dev/null
+          git apply --check /tmp/INT-IMP-010E.patch
+          git apply --whitespace=nowarn /tmp/INT-IMP-010E.patch
+          python scripts/test_int_imp_006.py "$ROOT"
+          popd >/dev/null
+          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
+
+      - name: Create deterministic source-only SERVER v1.0.2 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f "$NEW_ZIP" "${NEW_ZIP%.zip}.sha256" "${NEW_ZIP%.zip}.md"
+          python - "$ROOT" "$NEW_ZIP" <<'PY'
+          from pathlib import Path
+          import sys, zipfile
+          root = Path(sys.argv[1]).resolve()
+          output = Path(sys.argv[2]).resolve()
+          excluded_dirs = {"build", ".gradle", ".idea", ".kotlin", ".git"}
+          excluded_names = {"local.properties"}
+          files = []
+          for path in root.rglob("*"):
+              if not path.is_file():
+                  continue
+              rel = path.relative_to(root)
+              if any(part in excluded_dirs for part in rel.parts) or rel.name in excluded_names:
+                  continue
+              files.append((path, Path(root.name) / rel))
+          files.sort(key=lambda item: item[1].as_posix())
+          output.parent.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+              for source, arcname in files:
+                  info = zipfile.ZipInfo(arcname.as_posix(), date_time=(2026, 7, 17, 0, 0, 0))
+                  info.compress_type = zipfile.ZIP_DEFLATED
+                  info.external_attr = ((0o755 if arcname.name == "gradlew" else 0o644) & 0xFFFF) << 16
+                  archive.writestr(info, source.read_bytes())
+          PY
+          unzip -tq "$NEW_ZIP"
+          ACTUAL_NEW_SHA="$(sha256sum "$NEW_ZIP" | awk '{print $1}')"
+          [[ "$ACTUAL_NEW_SHA" == "$NEW_SHA" ]] || { echo "SERVER v1.0.2 checksum mismatch: $ACTUAL_NEW_SHA" >&2; exit 1; }
+          printf '%s  %s\n' "$ACTUAL_NEW_SHA" "$(basename "$NEW_ZIP")" > "${NEW_ZIP%.zip}.sha256"
+          cat > "${NEW_ZIP%.zip}.md" <<DOC
+          # SERVER_CFv1.0.2_SWRLZ
+
+          - Component: SWRLZ Android NODE_HOST
+          - Source lineage: SERVER_CFv1.0.1_SWRLZ.zip
+          - Base SHA-256: $BASE_SHA
+          - Current SHA-256: $ACTUAL_NEW_SHA
+          - Checkpoints: INT-IMP-010C, INT-VER-010D, INT-IMP-010E, INT-VER-010F, INT-GATE-011
+          - Packaging: deterministic source-only ZIP; generated build/cache content excluded
+          - Verification before promotion: ZIP integrity PASS; INT-IMP-006 source contract checks PASS
+          - Build status at promotion: pending automatic GitHub debug build
+
+          Repairs foreground-service runtime ownership, evidence-derived health reporting, terminal listener states, bounded local diagnostics, unexpected listener-exit handling, JVM state-transition tests, and backup policy while preserving offline-first behavior, durable identity, discovery protocol/schema v1, and local-versus-remote boundaries.
+          DOC
+
+      - name: Promote source and remove one-shot staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add "$NEW_ZIP" "${NEW_ZIP%.zip}.sha256" "${NEW_ZIP%.zip}.md"
+          git rm -r -- BUILD_REQUESTS/INT_GATE_011 .github/workflows/int-gate-011-promote-server.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(server): promote terminal-state truth source v1.0.2"
+          git push origin HEAD:main
