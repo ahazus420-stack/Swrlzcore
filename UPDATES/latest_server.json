@@ -2,10 +2,10 @@
   "target": "SERVER",
   "component": "SWRLZ_NODE_HOST",
   "status": "succeeded",
-  "source_zip": "SOURCES/SERVER/SERVER_CFv1.0.1_SWRLZ.zip",
-  "source_sha256": "c6c4a802a30743d94df80cc98fec9e409860be9b8e23dd58ff04988a569530a7",
+  "source_zip": "SOURCES/SERVER/SERVER_CFv1.0.2_SWRLZ.zip",
+  "source_sha256": "9d278bed4944eee20d6b9dc1ea89ba9363c30a7e7daa5b91b44836c386abd200",
   "variant": "debug",
-  "workflow_run": 6,
-  "commit": "db803b4bb6da73da75624dc0bcae63e8646060e0",
+  "workflow_run": 7,
+  "commit": "668fd0e6b56fce508c25a0389f0425183865c289",
   "release_path": "RELEASES/SERVER_NODE_HOST_APK"
 }
