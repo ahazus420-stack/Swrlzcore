@@ -1,0 +1,148 @@
+name: INT-GATE-011B Promote SERVER Diagnostics Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/int-gate-011b-promote-diagnostics.yml"
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: int-gate-011b-server-diagnostics-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-server-v102-diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      BASE_ZIP: SOURCES/SERVER/SERVER_CFv1.0.1_SWRLZ.zip
+      BASE_SHA: c6c4a802a30743d94df80cc98fec9e409860be9b8e23dd58ff04988a569530a7
+      PATCH_010E_B64: BUILD_REQUESTS/INT_GATE_011/INT-IMP-010E.patch.gz.b64
+      PATCH_010E_SHA: 2165279685b8e5045ddcb6321f597caa4b11370f5909d99747f4146c8abb4764
+      PATCH_011A_B64: BUILD_REQUESTS/INT_GATE_011B/INT-IMP-011A.patch.gz.b64
+      PATCH_011A_SHA: c4e67ce3dc78f8acd9a14a2e9ff755e40834f3bc28dc18fc58ac5d1ca61d0229
+      NEW_ZIP: SOURCES/SERVER/SERVER_CFv1.0.2_SWRLZ.zip
+      NEW_SHA: 9d278bed4944eee20d6b9dc1ea89ba9363c30a7e7daa5b91b44836c386abd200
+      SERVER_WORKFLOW: build-swrlz-server-apk.yml
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify canonical base and accepted patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin main
+          test -f "$BASE_ZIP"
+          test -f "$PATCH_010E_B64"
+          test -f "$PATCH_011A_B64"
+          ACTUAL_BASE_SHA="$(sha256sum "$BASE_ZIP" | awk '{print $1}')"
+          [[ "$ACTUAL_BASE_SHA" == "$BASE_SHA" ]] || { echo "Base checksum mismatch: $ACTUAL_BASE_SHA" >&2; exit 1; }
+          unzip -tq "$BASE_ZIP"
+
+          base64 -d "$PATCH_010E_B64" > /tmp/INT-IMP-010E.patch.gz
+          gzip -dc /tmp/INT-IMP-010E.patch.gz > /tmp/INT-IMP-010E.patch
+          ACTUAL_010E_SHA="$(sha256sum /tmp/INT-IMP-010E.patch | awk '{print $1}')"
+          [[ "$ACTUAL_010E_SHA" == "$PATCH_010E_SHA" ]] || { echo "010E patch checksum mismatch: $ACTUAL_010E_SHA" >&2; exit 1; }
+
+          base64 -d "$PATCH_011A_B64" > /tmp/INT-IMP-011A.patch.gz
+          gzip -dc /tmp/INT-IMP-011A.patch.gz > /tmp/INT-IMP-011A.patch
+          ACTUAL_011A_SHA="$(sha256sum /tmp/INT-IMP-011A.patch | awk '{print $1}')"
+          [[ "$ACTUAL_011A_SHA" == "$PATCH_011A_SHA" ]] || { echo "011A patch checksum mismatch: $ACTUAL_011A_SHA" >&2; exit 1; }
+
+      - name: Apply runtime truth and diagnostics overlays
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/int-gate-011b"
+          rm -rf "$WORK"
+          mkdir -p "$WORK/extracted"
+          unzip -q "$BASE_ZIP" -d "$WORK/extracted"
+          mapfile -t WRAPPERS < <(find "$WORK/extracted" -type f -name gradlew -not -path '*/.gradle/*' -print | sort)
+          [[ "${#WRAPPERS[@]}" -eq 1 ]] || { echo "Expected one Gradle wrapper; found ${#WRAPPERS[@]}." >&2; exit 1; }
+          ROOT="$(dirname "${WRAPPERS[0]}")"
+          pushd "$ROOT" >/dev/null
+          git apply --check /tmp/INT-IMP-010E.patch
+          git apply --whitespace=nowarn /tmp/INT-IMP-010E.patch
+          git apply --check /tmp/INT-IMP-011A.patch
+          git apply --whitespace=nowarn /tmp/INT-IMP-011A.patch
+          python scripts/test_int_imp_006.py "$ROOT"
+          popd >/dev/null
+          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
+
+      - name: Create deterministic source-only SERVER v1.0.2 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f "$NEW_ZIP" "${NEW_ZIP%.zip}.sha256" "${NEW_ZIP%.zip}.md"
+          python - "$ROOT" "$NEW_ZIP" <<'PY'
+          from pathlib import Path
+          import sys, zipfile
+          root = Path(sys.argv[1]).resolve()
+          output = Path(sys.argv[2]).resolve()
+          excluded_dirs = {"build", ".gradle", ".idea", ".kotlin", ".git"}
+          excluded_names = {"local.properties"}
+          files = []
+          for path in root.rglob("*"):
+              if not path.is_file():
+                  continue
+              rel = path.relative_to(root)
+              if any(part in excluded_dirs for part in rel.parts) or rel.name in excluded_names:
+                  continue
+              files.append((path, Path(root.name) / rel))
+          files.sort(key=lambda item: item[1].as_posix())
+          output.parent.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+              for source, arcname in files:
+                  info = zipfile.ZipInfo(arcname.as_posix(), date_time=(2026, 7, 17, 0, 0, 0))
+                  info.compress_type = zipfile.ZIP_DEFLATED
+                  info.external_attr = ((0o755 if arcname.name == "gradlew" else 0o644) & 0xFFFF) << 16
+                  archive.writestr(info, source.read_bytes())
+          PY
+          unzip -tq "$NEW_ZIP"
+          ACTUAL_NEW_SHA="$(sha256sum "$NEW_ZIP" | awk '{print $1}')"
+          [[ "$ACTUAL_NEW_SHA" == "$NEW_SHA" ]] || { echo "SERVER v1.0.2 checksum mismatch: $ACTUAL_NEW_SHA" >&2; exit 1; }
+          printf '%s  %s\n' "$ACTUAL_NEW_SHA" "$(basename "$NEW_ZIP")" > "${NEW_ZIP%.zip}.sha256"
+          cat > "${NEW_ZIP%.zip}.md" <<DOC
+          # SERVER_CFv1.0.2_SWRLZ
+
+          - Component: SWRLZ Android NODE_HOST
+          - Source lineage: SERVER_CFv1.0.1_SWRLZ.zip
+          - Base SHA-256: $BASE_SHA
+          - Current SHA-256: $ACTUAL_NEW_SHA
+          - Checkpoints: INT-IMP-010C, INT-VER-010D, INT-IMP-010E, INT-VER-010F, INT-GATE-011, INT-IMP-011A, INT-GATE-011B
+          - Packaging: deterministic source-only ZIP; generated build/cache content excluded
+          - Verification before promotion: ZIP integrity PASS; INT-IMP-006 source contract checks PASS
+          - Build status at promotion: pending automatic GitHub debug build
+
+          Adds the local live diagnostics console, listener health presentation, bounded request history, HTTP status counters, filters, and clear-log action while preserving offline-first behavior, durable identity, discovery protocol/schema v1, trust boundaries, and local-versus-remote distinctions.
+          DOC
+
+      - name: Promote canonical source and remove one-shot staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add "$NEW_ZIP" "${NEW_ZIP%.zip}.sha256" "${NEW_ZIP%.zip}.md"
+          git rm -r -- BUILD_REQUESTS/INT_GATE_011 BUILD_REQUESTS/INT_GATE_011B .github/workflows/int-gate-011-promote-server.yml .github/workflows/int-gate-011b-promote-diagnostics.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(server): promote live diagnostics source v1.0.2"
+          git push origin HEAD:main
+
+      - name: Dispatch verified SERVER debug build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run "$SERVER_WORKFLOW" --repo "$GITHUB_REPOSITORY" --ref main \
+            -f source_zip="$NEW_ZIP" -f build_variant=debug -f commit_release_artifacts=true
+          echo "Dispatched $SERVER_WORKFLOW for $NEW_ZIP"
