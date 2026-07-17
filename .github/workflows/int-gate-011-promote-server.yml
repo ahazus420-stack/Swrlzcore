@@ -122,3 +122,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "feat(server): promote terminal-state truth source v1.0.2"
           git push origin HEAD:main
+
+# INT-GATE-011 merge-trigger marker
