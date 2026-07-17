@@ -12,7 +12,7 @@ For more details see https://docs.gradle.org/8.9/release-notes.html
 
 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.9/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
 Daemon will be stopped at the end of the build 
-> Task :app:clean
+> Task :app:clean UP-TO-DATE
 > Task :app:preBuild UP-TO-DATE
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
@@ -31,7 +31,10 @@ Daemon will be stopped at the end of the build
 > Task :app:processDebugManifestForPackage
 > Task :app:processDebugResources
 > Task :app:kspDebugKotlin
+
 > Task :app:compileDebugKotlin
+w: file:///home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SERVER/extracted/SWRLZ_NODE_HOST/app/src/main/java/sh/swrlz/nodehost/service/NodeRuntime.kt:253:31 Java type mismatch: inferred type is 'kotlin.String?', but 'kotlin.String' was expected.
+
 > Task :app:javaPreCompileDebug
 > Task :app:compileDebugJavaWithJavac
 > Task :app:mergeDebugShaders
@@ -61,5 +64,5 @@ Daemon will be stopped at the end of the build
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 4m 28s
-39 actionable tasks: 39 executed
+BUILD SUCCESSFUL in 4m 23s
+39 actionable tasks: 38 executed, 1 up-to-date
