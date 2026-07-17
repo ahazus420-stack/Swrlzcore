@@ -64,5 +64,5 @@ w: file:///home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/SERVER/extracted/SWRL
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 4m 23s
+BUILD SUCCESSFUL in 4m 4s
 39 actionable tasks: 38 executed, 1 up-to-date
