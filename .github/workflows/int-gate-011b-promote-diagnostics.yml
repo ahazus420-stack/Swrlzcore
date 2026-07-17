@@ -1,3 +1,4 @@
+# merge-trigger: approved INT-GATE-011B
 name: INT-GATE-011B Promote SERVER Diagnostics Candidate
 
 on:
