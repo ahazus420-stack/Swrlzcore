@@ -1,6 +1,7 @@
 name: INT-GATE-011 Promote SERVER Terminal-State Candidate
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -123,4 +124,4 @@ jobs:
           git commit -m "feat(server): promote terminal-state truth source v1.0.2"
           git push origin HEAD:main
 
-# INT-GATE-011 merge-trigger marker
+# INT-GATE-011 manual-dispatch fallback
