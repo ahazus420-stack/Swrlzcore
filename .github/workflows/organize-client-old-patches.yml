@@ -1,0 +1,70 @@
+name: Organize CLIENT old patches
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/organize-client-old-patches.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  archive-client-lineage:
+    name: Move legacy CLIENT files into OLD_PATCHES
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Move legacy CLIENT lineage files
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST="SOURCES/CLIENT/OLD_PATCHES"
+          mkdir -p "$DEST"
+          shopt -s nullglob
+
+          FILES=(
+            SOURCES/RPT_CF10_276_DEVICEANCHOR*
+            SOURCES/SHA_CF10_276_DEVICEANCHOR*
+            SOURCES/SHA_CF11_276_DISCOVERYAUTH*
+            SOURCES/SRC_CF10_276_DEVICEANCHOR*
+            SOURCES/SRC_CF11_276_DISCOVERYAUTH*
+            SOURCES/UPLOAD_CF10_276_DEVICEANCHOR*
+          )
+
+          MOVED=0
+          for FILE in "${FILES[@]}"; do
+            [[ -f "$FILE" ]] || continue
+            TARGET="$DEST/$(basename "$FILE")"
+
+            if [[ -e "$TARGET" ]]; then
+              if cmp -s "$FILE" "$TARGET"; then
+                git rm -- "$FILE"
+              else
+                echo "Refusing to overwrite different existing file: $TARGET" >&2
+                exit 1
+              fi
+            else
+              git mv -- "$FILE" "$TARGET"
+            fi
+            MOVED=$((MOVED + 1))
+          done
+
+          if [[ "$MOVED" -eq 0 ]]; then
+            echo "No matching root-level CLIENT lineage files were found."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: archive legacy CLIENT source files"
+          git push
+
+          echo "Moved $MOVED CLIENT lineage files into $DEST."
