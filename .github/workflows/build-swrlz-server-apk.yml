@@ -1,0 +1,336 @@
+name: Build SWRLZ Server APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_zip:
+        description: "Optional SERVER source ZIP path. Leave blank to select the newest versioned ZIP."
+        required: false
+        default: ""
+      build_variant:
+        description: "Android build variant"
+        required: false
+        type: choice
+        options:
+          - debug
+          - release
+        default: debug
+      commit_release_artifacts:
+        description: "Commit built APK and provenance files into RELEASES/SERVER_NODE_HOST_APK"
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches:
+      - main
+    paths:
+      - "SOURCES/SERVER/SERVER_CFv*_SWRLZ.zip"
+      - "SOURCES/SERVER/SERVER_CFv*_SWRLZ.sha256"
+      - "SOURCES/SERVER/SWRLZ_NODE_HOST_COMPLETE.zip"
+      - ".github/workflows/build-swrlz-server-apk.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: swrlz-server-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-server-apk:
+    name: Build Android NODE_HOST APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      SERVER_SOURCE_DIR: SOURCES/SERVER
+      BUILD_WORK_DIR: BUILD_WORK/SERVER
+      ARTIFACT_DIR: SERVER_ARTIFACT
+      RELEASE_DIR: RELEASES/SERVER_NODE_HOST_APK
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Select SERVER source archive
+        id: source
+        run: |
+          set -euo pipefail
+
+          REQUESTED="${{ github.event.inputs.source_zip }}"
+          if [[ -n "$REQUESTED" ]]; then
+            SOURCE_ZIP="$REQUESTED"
+          else
+            SOURCE_ZIP="$(find "$SERVER_SOURCE_DIR" -maxdepth 1 -type f -name 'SERVER_CFv*_SWRLZ.zip' -print | sort -V | tail -n 1)"
+            if [[ -z "$SOURCE_ZIP" && -f "$SERVER_SOURCE_DIR/SWRLZ_NODE_HOST_COMPLETE.zip" ]]; then
+              SOURCE_ZIP="$SERVER_SOURCE_DIR/SWRLZ_NODE_HOST_COMPLETE.zip"
+            fi
+          fi
+
+          if [[ -z "${SOURCE_ZIP:-}" || ! -f "$SOURCE_ZIP" ]]; then
+            echo "No SERVER source ZIP was found." >&2
+            exit 1
+          fi
+
+          case "$SOURCE_ZIP" in
+            "$SERVER_SOURCE_DIR"/*) ;;
+            *)
+              echo "SERVER source must be inside $SERVER_SOURCE_DIR: $SOURCE_ZIP" >&2
+              exit 1
+              ;;
+          esac
+
+          SOURCE_BASE="$(basename "$SOURCE_ZIP" .zip)"
+          CHECKSUM_FILE="${SOURCE_ZIP%.zip}.sha256"
+
+          echo "source_zip=$SOURCE_ZIP" >> "$GITHUB_OUTPUT"
+          echo "source_base=$SOURCE_BASE" >> "$GITHUB_OUTPUT"
+          echo "checksum_file=$CHECKSUM_FILE" >> "$GITHUB_OUTPUT"
+
+          echo "Selected SERVER source: $SOURCE_ZIP"
+
+      - name: Verify SERVER archive
+        id: verify
+        run: |
+          set -euo pipefail
+
+          SOURCE_ZIP="${{ steps.source.outputs.source_zip }}"
+          CHECKSUM_FILE="${{ steps.source.outputs.checksum_file }}"
+          ACTUAL_SHA="$(sha256sum "$SOURCE_ZIP" | awk '{print $1}')"
+
+          unzip -tq "$SOURCE_ZIP"
+
+          CHECKSUM_STATUS="generated-only"
+          if [[ -f "$CHECKSUM_FILE" ]]; then
+            EXPECTED_SHA="$(awk 'NF {print $1; exit}' "$CHECKSUM_FILE")"
+            if [[ -z "$EXPECTED_SHA" ]]; then
+              echo "Checksum file is empty: $CHECKSUM_FILE" >&2
+              exit 1
+            fi
+            if [[ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]]; then
+              echo "SERVER source checksum mismatch." >&2
+              echo "Expected: $EXPECTED_SHA" >&2
+              echo "Actual:   $ACTUAL_SHA" >&2
+              exit 1
+            fi
+            CHECKSUM_STATUS="verified"
+          elif [[ "$SOURCE_ZIP" == "$SERVER_SOURCE_DIR/SWRLZ_NODE_HOST_COMPLETE.zip" ]]; then
+            VERSIONED_ZIP="$(find "$SERVER_SOURCE_DIR" -maxdepth 1 -type f -name 'SERVER_CFv*_SWRLZ.zip' -print | sort -V | tail -n 1)"
+            VERSIONED_SHA_FILE="${VERSIONED_ZIP%.zip}.sha256"
+            if [[ -n "$VERSIONED_ZIP" && -f "$VERSIONED_SHA_FILE" ]] && cmp -s "$SOURCE_ZIP" "$VERSIONED_ZIP"; then
+              EXPECTED_SHA="$(awk 'NF {print $1; exit}' "$VERSIONED_SHA_FILE")"
+              if [[ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]]; then
+                echo "NODE_HOST duplicate does not match the versioned SERVER checksum." >&2
+                exit 1
+              fi
+              CHECKSUM_STATUS="verified-via-identical-versioned-archive"
+            fi
+          fi
+
+          echo "source_sha256=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
+          echo "checksum_status=$CHECKSUM_STATUS" >> "$GITHUB_OUTPUT"
+          echo "Archive integrity: PASS"
+          echo "Checksum status: $CHECKSUM_STATUS"
+
+      - name: Extract source and discover Gradle root
+        id: project
+        run: |
+          set -euo pipefail
+
+          SOURCE_ZIP="${{ steps.source.outputs.source_zip }}"
+          EXTRACT_DIR="$BUILD_WORK_DIR/extracted"
+          rm -rf "$BUILD_WORK_DIR" "$ARTIFACT_DIR"
+          mkdir -p "$EXTRACT_DIR" "$ARTIFACT_DIR"
+          unzip -q "$SOURCE_ZIP" -d "$EXTRACT_DIR"
+
+          mapfile -t WRAPPERS < <(find "$EXTRACT_DIR" -type f -name gradlew -not -path '*/.gradle/*' -print | sort)
+          if [[ "${#WRAPPERS[@]}" -eq 0 ]]; then
+            echo "No Gradle wrapper was found in the SERVER archive." >&2
+            exit 1
+          fi
+
+          PROJECT_ROOT=""
+          for WRAPPER in "${WRAPPERS[@]}"; do
+            CANDIDATE="$(dirname "$WRAPPER")"
+            if [[ -f "$CANDIDATE/settings.gradle" || -f "$CANDIDATE/settings.gradle.kts" ]]; then
+              PROJECT_ROOT="$CANDIDATE"
+              break
+            fi
+          done
+
+          if [[ -z "$PROJECT_ROOT" ]]; then
+            PROJECT_ROOT="$(dirname "${WRAPPERS[0]}")"
+          fi
+
+          if [[ ! -f "$PROJECT_ROOT/settings.gradle" && ! -f "$PROJECT_ROOT/settings.gradle.kts" ]]; then
+            echo "Gradle wrapper found, but no settings.gradle or settings.gradle.kts exists beside it." >&2
+            exit 1
+          fi
+
+          chmod +x "$PROJECT_ROOT/gradlew"
+          echo "project_root=$PROJECT_ROOT" >> "$GITHUB_OUTPUT"
+          echo "Gradle root: $PROJECT_ROOT"
+
+      - name: Build SERVER APK
+        id: build
+        run: |
+          set -euo pipefail
+
+          PROJECT_ROOT="${{ steps.project.outputs.project_root }}"
+          VARIANT="${{ github.event.inputs.build_variant }}"
+          VARIANT="${VARIANT:-debug}"
+
+          case "$VARIANT" in
+            debug) TASK="assembleDebug" ;;
+            release) TASK="assembleRelease" ;;
+            *)
+              echo "Unsupported build variant: $VARIANT" >&2
+              exit 1
+              ;;
+          esac
+
+          LOG_PATH="$GITHUB_WORKSPACE/$ARTIFACT_DIR/build_server_${VARIANT}.log"
+          pushd "$PROJECT_ROOT" >/dev/null
+          ./gradlew --no-daemon --stacktrace clean "$TASK" 2>&1 | tee "$LOG_PATH"
+          popd >/dev/null
+
+          echo "variant=$VARIANT" >> "$GITHUB_OUTPUT"
+          echo "task=$TASK" >> "$GITHUB_OUTPUT"
+          echo "build_log=$LOG_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Collect APKs and create provenance
+        id: artifact
+        run: |
+          set -euo pipefail
+
+          PROJECT_ROOT="${{ steps.project.outputs.project_root }}"
+          SOURCE_ZIP="${{ steps.source.outputs.source_zip }}"
+          SOURCE_BASE="${{ steps.source.outputs.source_base }}"
+          SOURCE_SHA="${{ steps.verify.outputs.source_sha256 }}"
+          CHECKSUM_STATUS="${{ steps.verify.outputs.checksum_status }}"
+          VARIANT="${{ steps.build.outputs.variant }}"
+          TASK="${{ steps.build.outputs.task }}"
+
+          mapfile -t APKS < <(find "$PROJECT_ROOT" -type f -path '*/build/outputs/apk/*' -name '*.apk' -print | sort)
+          if [[ "${#APKS[@]}" -eq 0 ]]; then
+            echo "Gradle completed but no APK was found under build/outputs/apk." >&2
+            exit 1
+          fi
+
+          APK_INDEX=0
+          for APK in "${APKS[@]}"; do
+            APK_INDEX=$((APK_INDEX + 1))
+            ORIGINAL="$(basename "$APK")"
+            if [[ "${#APKS[@]}" -eq 1 ]]; then
+              DEST="$ARTIFACT_DIR/SWRLZ_NODE_HOST_${VARIANT^^}.apk"
+            else
+              DEST="$ARTIFACT_DIR/SWRLZ_NODE_HOST_${VARIANT^^}_${APK_INDEX}_${ORIGINAL}"
+            fi
+            cp "$APK" "$DEST"
+            sha256sum "$DEST" > "$DEST.sha256"
+          done
+
+          REPORT="$ARTIFACT_DIR/BUILD_PROVENANCE_REPORT.md"
+          {
+            echo "# SWRLZ Android NODE_HOST Build Provenance"
+            echo
+            echo "- Status: succeeded"
+            echo "- Generated (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "- Repository: $GITHUB_REPOSITORY"
+            echo "- Source commit: $GITHUB_SHA"
+            echo "- Source ZIP: $SOURCE_ZIP"
+            echo "- Source SHA-256: $SOURCE_SHA"
+            echo "- Checksum status: $CHECKSUM_STATUS"
+            echo "- Gradle root: $PROJECT_ROOT"
+            echo "- Gradle task: $TASK"
+            echo "- Build variant: $VARIANT"
+            echo
+            echo "## APK files"
+            for BUILT in "$ARTIFACT_DIR"/*.apk; do
+              echo "- $(basename "$BUILT") — $(stat -c '%s' "$BUILT") bytes — $(sha256sum "$BUILT" | awk '{print $1}')"
+            done
+          } > "$REPORT"
+
+          BUNDLE="SWRLZ_SERVER_${SOURCE_BASE}_${VARIANT}_${GITHUB_RUN_NUMBER}.zip"
+          zip -q -r "$BUNDLE" "$ARTIFACT_DIR"
+          sha256sum "$BUNDLE" > "$BUNDLE.sha256"
+
+          echo "bundle=$BUNDLE" >> "$GITHUB_OUTPUT"
+          echo "APK collection and provenance: PASS"
+
+      - name: Upload SERVER APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SWRLZ_SERVER_APK_${{ github.run_number }}
+          path: |
+            ${{ env.ARTIFACT_DIR }}/
+            ${{ steps.artifact.outputs.bundle }}
+            ${{ steps.artifact.outputs.bundle }}.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Commit release artifacts when requested
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.commit_release_artifacts == 'true' }}
+        run: |
+          set -euo pipefail
+
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR" UPDATES
+          cp -a "$ARTIFACT_DIR/." "$RELEASE_DIR/"
+          cp "${{ steps.artifact.outputs.bundle }}" "$RELEASE_DIR/"
+          cp "${{ steps.artifact.outputs.bundle }}.sha256" "$RELEASE_DIR/"
+
+          cat > UPDATES/latest_server.json <<JSON
+          {
+            "target": "SERVER",
+            "component": "SWRLZ_NODE_HOST",
+            "status": "succeeded",
+            "source_zip": "${{ steps.source.outputs.source_zip }}",
+            "source_sha256": "${{ steps.verify.outputs.source_sha256 }}",
+            "variant": "${{ steps.build.outputs.variant }}",
+            "workflow_run": ${GITHUB_RUN_NUMBER},
+            "commit": "${GITHUB_SHA}",
+            "release_path": "$RELEASE_DIR"
+          }
+          JSON
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$RELEASE_DIR" UPDATES/latest_server.json
+
+          if git diff --cached --quiet; then
+            echo "No release artifact changes to commit."
+            exit 0
+          fi
+
+          git commit -m "build: add SWRLZ SERVER APK artifacts"
+          git push
+
+      - name: Build summary
+        run: |
+          {
+            echo "## SWRLZ SERVER APK"
+            echo
+            echo "- Source: \`${{ steps.source.outputs.source_zip }}\`"
+            echo "- Source SHA-256: \`${{ steps.verify.outputs.source_sha256 }}\`"
+            echo "- Checksum: \`${{ steps.verify.outputs.checksum_status }}\`"
+            echo "- Gradle root: \`${{ steps.project.outputs.project_root }}\`"
+            echo "- Task: \`${{ steps.build.outputs.task }}\`"
+            echo "- Artifact: \`SWRLZ_SERVER_APK_${{ github.run_number }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
