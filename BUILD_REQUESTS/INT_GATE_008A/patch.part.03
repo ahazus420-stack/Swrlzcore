@@ -1,0 +1,215 @@
+ rawContentLength.toLongOrNull() ?: throw BadHttpRequest()
++                }
++                if (contentLength < 0L || contentLength > MAX_REQUEST_BODY_BYTES) throw BadHttpRequest()
++                return DiscoveryHttpRequest(
++                    method = parts[0],
++                    path = target.substringBefore('?'),
++                    headers = headers,
++                    contentLength = contentLength,
++                )
++            }
++
++            val separator = line.indexOf(':')
++            if (separator <= 0) throw BadHttpRequest()
++            val name = line.substring(0, separator).trim().lowercase(Locale.US)
++            val value = line.substring(separator + 1).trim()
++            if (name.isEmpty()) throw BadHttpRequest()
++            headers[name] = headers[name]?.let { "$it,$value" } ?: value
++        }
++        throw BadHttpRequest()
++    }
++
++    /**
++     * Binds loopback plus explicit local-link interface addresses. It never uses
++     * 0.0.0.0, and it excludes known cellular, VPN, and tunnel interface names.
++     */
++    private fun bindDiscoverySockets(): List<ServerSocket> {
++        val addresses = approvedDiscoveryAddresses()
++        val loopback = addresses.firstOrNull { it is Inet4Address && it.isLoopbackAddress }
++            ?: return emptyList()
++        val loopbackSocket = bindDiscoverySocket(loopback) ?: return emptyList()
++        val sockets = mutableListOf(loopbackSocket)
++
++        addresses.asSequence()
++            .filterNot(InetAddress::isLoopbackAddress)
++            .forEach { address ->
++                bindDiscoverySocket(address)?.let(sockets::add)
++            }
++        return sockets
++    }
++
++    private fun bindDiscoverySocket(address: InetAddress): ServerSocket? = try {
++        ServerSocket().apply {
++            reuseAddress = true
++            bind(InetSocketAddress(address, DiscoveryProtocol.PORT), BACKLOG)
++        }
++    } catch (_: Exception) {
++        // Approved addresses can disappear while Android changes network state.
++        null
++    }
++
++    private fun approvedDiscoveryAddresses(): List<InetAddress> {
++        val addresses = linkedMapOf<String, InetAddress>()
++        val ipv4Loopback = InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1))
++        addresses[ipv4Loopback.hostAddress ?: "127.0.0.1"] = ipv4Loopback
++
++        val interfaces = try {
++            NetworkInterface.getNetworkInterfaces()
++        } catch (_: SocketException) {
++            null
++        } ?: return addresses.values.toList()
++
++        while (interfaces.hasMoreElements()) {
++            val networkInterface = interfaces.nextElement()
++            val name = networkInterface.name.lowercase(Locale.US)
++            val usable = try {
++                networkInterface.isUp && !networkInterface.isLoopback && !networkInterface.isVirtual
++            } catch (_: SocketException) {
++                false
++            }
++            if (!usable || isBlockedInterface(name) || !isApprovedLocalInterface(name)) continue
++
++            val interfaceAddresses = networkInterface.inetAddresses
++            while (interfaceAddresses.hasMoreElements()) {
++                val address = interfaceAddresses.nextElement()
++                if (address is Inet4Address &&
++                    !address.isLoopbackAddress &&
++                    (address.isSiteLocalAddress || address.isLinkLocalAddress)
++                ) {
++                    addresses[address.hostAddress] = address
++                }
++            }
++        }
++        return addresses.values.toList()
++    }
++
++    private fun isApprovedLocalInterface(name: String): Boolean = APPROVED_INTERFACE_PREFIXES.any(name::startsWith)
++
++    private fun isBlockedInterface(name: String): Boolean = BLOCKED_INTERFACE_PREFIXES.any(name::startsWith)
++
++    @Suppress("DEPRECATION")
++    private fun resolveHostVersion(): String {
++        val packageInfo = appContext.packageManager.getPackageInfo(appContext.packageName, 0)
++        return packageInfo.versionName?.trim()?.takeIf(String::isNotEmpty)
++            ?: throw IllegalStateException("NODE_HOST package version is unavailable")
++    }
++
++    private fun buildPrivateResponse(payload: ByteArray, statusCode: Int): ByteArray {
+         val statusText = if (statusCode == 200) "OK" else "NOT FOUND"
+         val headers = "HTTP/1.1 $statusCode $statusText\r\n" +
+             "Content-Type: text/plain; charset=utf-8\r\n" +
+@@ -63,4 +276,78 @@
+             "Connection: close\r\n\r\n"
+         return headers.toByteArray(StandardCharsets.UTF_8) + payload
+     }
++
++    private fun buildDiscoveryResponse(response: DiscoveryHttpResponse): ByteArray {
++        val payload = response.body.toByteArray(StandardCharsets.UTF_8)
++        val headers = buildString {
++            append("HTTP/1.1 ${response.statusCode} ${response.reason}\r\n")
++            append("Content-Type: application/json; charset=utf-8\r\n")
++            response.headers.forEach { (name, value) -> append("$name: $value\r\n") }
++            append("Content-Length: ${payload.size}\r\n")
++            append("Connection: close\r\n\r\n")
++        }
++        return headers.toByteArray(StandardCharsets.UTF_8) + payload
++    }
++
++    private fun readHttpLine(input: InputStream, maxBytes: Int): String? {
++        val buffer = ByteArrayOutputStream()
++        var sawAny = false
++        while (true) {
++            if (buffer.size() >= maxBytes) throw BadHttpRequest()
++            val value = input.read()
++            if (value == -1) return if (sawAny) buffer.toString(StandardCharsets.UTF_8.name()) else null
++            sawAny = true
++            if (value == '\n'.code) {
++                val bytes = buffer.toByteArray()
++                val length = if (bytes.isNotEmpty() && bytes.last() == '\r'.code.toByte()) bytes.size - 1 else bytes.size
++                return String(bytes, 0, length, StandardCharsets.UTF_8)
++            }
++            buffer.write(value)
++        }
++    }
++
++    private fun listenerThread(name: String, block: () -> Unit): Thread = Thread(block, name).apply {
++        isDaemon = true
++    }
++
++    private fun closeResources() {
++        privateServerSocket?.closeQuietly()
++        discoverySockets.forEach { it.closeQuietly() }
++        privateServerThread?.interrupt()
++        discoveryThreads.forEach(Thread::interrupt)
++        privateServerSocket = null
++        privateServerThread = null
++        discoverySockets.clear()
++        discoveryThreads.clear()
++        activeIdentity = null
++        hostVersion = ""
++    }
++
++    private fun ServerSocket.closeQuietly() {
++        try {
++            close()
++        } catch (_: Exception) {
++            // Stop is idempotent.
++        }
++    }
++
++    private class BadHttpRequest : Exception()
++
++    companion object {
++        private const val PRIVATE_PORT = 8080
++        private const val BACKLOG = 50
++        private const val SOCKET_TIMEOUT_MS = 2_000
++        private const val MAX_REQUEST_LINE_BYTES = 4_096
++        private const val MAX_HEADER_LINE_BYTES = 8_192
++        private const val MAX_TOTAL_HEADER_BYTES = 16_384
++        private const val MAX_HEADER_COUNT = 64
++        private const val MAX_REQUEST_BODY_BYTES = 8_192L
++
++        private val APPROVED_INTERFACE_PREFIXES = listOf(
++            "wlan", "swlan", "ap", "eth", "en", "rndis", "usb", "bnep", "bt-pan",
++        )
++        private val BLOCKED_INTERFACE_PREFIXES = listOf(
++            "rmnet", "ccmni", "pdp", "wwan", "tun", "tap", "ppp", "ipsec", "vti", "wg",
++        )
++    }
+ }
+--- a/scripts/test_int_imp_006.py
++++ b/scripts/test_int_imp_006.py
+@@ -0,0 +1,103 @@
++#!/usr/bin/env python3
++"""Source-level contract checks for INT-IMP-006. Does not build or open sockets."""
++
++from pathlib import Path
++import re
++import sys
++
++ROOT = Path(__file__).resolve().parents[1]
++SERVICE = ROOT / "app/src/main/java/sh/swrlz/nodehost/service"
++RUNTIME = (SERVICE / "NodeRuntime.kt").read_text(encoding="utf-8")
++IDENTITY = (SERVICE / "NodeIdentityStore.kt").read_text(encoding="utf-8")
++PROTOCOL = (SERVICE / "DiscoveryProtocol.kt").read_text(encoding="utf-8")
++API = (ROOT / "API.md").read_text(encoding="utf-8")
++ARCH = (ROOT / "Architecture.md").read_text(encoding="utf-8")
++
++
++def require(condition: bool, message: str) -> None:
++    if not condition:
++        raise AssertionError(message)
++
++
++# Preserved private compatibility plane.
++require("private const val PRIVATE_PORT = 8080" in RUNTIME, "private port 8080 not preserved")
++require('"/status" -> "{\\"ok\\":true,\\"node\\":\\"SWRLZ Node Host\\",\\"mode\\":\\"embedded\\"}"' in RUNTIME,
++        "/status payload changed")
++require('"/health" -> "healthy"' in RUNTIME, "/health payload changed")
++require("InetAddress.getLoopbackAddress()" in RUNTIME, "private runtime is no longer loopback-bound")
++
++# Exact discovery transport and wire contract.
++for marker in (
++    "const val PORT = 8787",
++    'const val PATH = "/discovery/signature"',
++    'private const val SERVICE = "swrlz

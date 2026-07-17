@@ -1,0 +1,147 @@
+name: INT-GATE-008A Integrate SERVER v1.0.1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/int-gate-008a-integrate-server.yml"
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: int-gate-008a-server-integration
+  cancel-in-progress: false
+
+jobs:
+  integrate-server-v101:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_ZIP: SOURCES/SERVER/SERVER_CFv1.0.0_SWRLZ.zip
+      BASE_SHA: 2a888fedce33d7052ac5ade0f2e3f0804474aa1ed402d6d21930aa06d4758190
+      NEW_ZIP: SOURCES/SERVER/SERVER_CFv1.0.1_SWRLZ.zip
+      NEW_SHA: c6c4a802a30743d94df80cc98fec9e409860be9b8e23dd58ff04988a569530a7
+      OLD_DIR: SOURCES/SERVER/OLD_PATCHES
+      STAGE_DIR: BUILD_REQUESTS/INT_GATE_008A
+      SERVER_WORKFLOW: build-swrlz-server-apk.yml
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify canonical base and assemble overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --ff-only origin main
+          test -f "$BASE_ZIP"
+          ACTUAL_BASE_SHA="$(sha256sum "$BASE_ZIP" | awk '{print $1}')"
+          [[ "$ACTUAL_BASE_SHA" == "$BASE_SHA" ]] || { echo "SERVER base checksum mismatch: $ACTUAL_BASE_SHA" >&2; exit 1; }
+          unzip -tq "$BASE_ZIP"
+          cat "$STAGE_DIR"/patch.part.* > /tmp/INT-IMP-006.patch
+          test -s /tmp/INT-IMP-006.patch
+
+      - name: Apply accepted discovery and identity overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/int-gate-008a"
+          rm -rf "$WORK"
+          mkdir -p "$WORK/extracted"
+          unzip -q "$BASE_ZIP" -d "$WORK/extracted"
+          mapfile -t WRAPPERS < <(find "$WORK/extracted" -type f -name gradlew -not -path '*/.gradle/*' -print | sort)
+          [[ "${#WRAPPERS[@]}" -eq 1 ]] || { echo "Expected one Gradle wrapper; found ${#WRAPPERS[@]}." >&2; exit 1; }
+          ROOT="$(dirname "${WRAPPERS[0]}")"
+          [[ -f "$ROOT/settings.gradle.kts" || -f "$ROOT/settings.gradle" ]]
+          pushd "$ROOT" >/dev/null
+          git apply --check /tmp/INT-IMP-006.patch
+          git apply --whitespace=nowarn /tmp/INT-IMP-006.patch
+          python scripts/test_int_imp_006.py "$ROOT"
+          popd >/dev/null
+          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
+
+      - name: Create deterministic source-only SERVER v1.0.1 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f "$NEW_ZIP" "${NEW_ZIP%.zip}.sha256" "${NEW_ZIP%.zip}.md"
+          python - "$ROOT" "$NEW_ZIP" <<'PY'
+          from pathlib import Path
+          import sys, zipfile
+          root = Path(sys.argv[1]).resolve()
+          output = Path(sys.argv[2]).resolve()
+          excluded_dirs = {"build", ".gradle", ".idea", ".kotlin", ".git"}
+          excluded_names = {"local.properties"}
+          files = []
+          for path in root.rglob("*"):
+              if not path.is_file():
+                  continue
+              rel = path.relative_to(root)
+              if any(part in excluded_dirs for part in rel.parts) or rel.name in excluded_names:
+                  continue
+              files.append((path, Path(root.name) / rel))
+          files.sort(key=lambda item: item[1].as_posix())
+          output.parent.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+              for source, arcname in files:
+                  info = zipfile.ZipInfo(arcname.as_posix(), date_time=(2026, 7, 17, 0, 0, 0))
+                  info.compress_type = zipfile.ZIP_DEFLATED
+                  info.external_attr = ((0o755 if arcname.name == "gradlew" else 0o644) & 0xFFFF) << 16
+                  archive.writestr(info, source.read_bytes())
+          PY
+          unzip -tq "$NEW_ZIP"
+          ACTUAL_NEW_SHA="$(sha256sum "$NEW_ZIP" | awk '{print $1}')"
+          [[ "$ACTUAL_NEW_SHA" == "$NEW_SHA" ]] || { echo "SERVER v1.0.1 checksum mismatch: $ACTUAL_NEW_SHA" >&2; exit 1; }
+          printf '%s  %s\n' "$ACTUAL_NEW_SHA" "$(basename "$NEW_ZIP")" > "${NEW_ZIP%.zip}.sha256"
+          cat > "${NEW_ZIP%.zip}.md" <<DOC
+          # SERVER_CFv1.0.1_SWRLZ
+
+          - Component: SWRLZ Android NODE_HOST
+          - Source lineage: SERVER_CFv1.0.0_SWRLZ.zip
+          - Base SHA-256: $BASE_SHA
+          - Current SHA-256: $ACTUAL_NEW_SHA
+          - Integration checkpoints: INT-IMP-006, INT-GATE-007A, INT-GATE-008A
+          - Packaging: deterministic source-only ZIP; generated build/cache content excluded
+          - Verification: ZIP integrity PASS; INT-IMP-006 source contract checks PASS
+          - Build status at promotion: pending GitHub debug build
+
+          Adds protocol-v1 local discovery and persistent NODE_HOST identity while preserving the loopback 8080 status/health runtime. This archive does not by itself prove CLIENT-to-NODE_HOST interoperability.
+          DOC
+
+      - name: Archive v1.0.0, promote v1.0.1, and remove staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OLD_DIR"
+          shopt -s nullglob
+          OLD_FILES=("$BASE_ZIP" "${BASE_ZIP%.zip}.sha256" SOURCES/SERVER/README_SERVER_CFv1.0.0_SWRLZ*.md)
+          for SOURCE in "${OLD_FILES[@]}"; do
+            [[ -f "$SOURCE" ]] || continue
+            DEST="$OLD_DIR/$(basename "$SOURCE")"
+            if [[ -e "$DEST" ]]; then
+              cmp -s "$SOURCE" "$DEST" || { echo "Refusing to overwrite $DEST" >&2; exit 1; }
+              git rm -- "$SOURCE"
+            else
+              git mv -- "$SOURCE" "$DEST"
+            fi
+          done
+          git add "$NEW_ZIP" "${NEW_ZIP%.zip}.sha256" "${NEW_ZIP%.zip}.md"
+          git rm -r -- "$STAGE_DIR" .github/workflows/int-gate-008a-integrate-server.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(server): promote discovery identity source v1.0.1"
+          git push origin HEAD:main
+
+      - name: Dispatch verified SERVER debug build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run "$SERVER_WORKFLOW" --repo "$GITHUB_REPOSITORY" --ref main \
+            -f source_zip="$NEW_ZIP" -f build_variant=debug -f commit_release_artifacts=true
+          echo "Dispatched $SERVER_WORKFLOW for $NEW_ZIP"

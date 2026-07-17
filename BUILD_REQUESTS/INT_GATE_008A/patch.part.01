@@ -1,0 +1,224 @@
+ble", "VERSION_UNAVAILABLE", "Host version is unavailable")
++        }
++
++        return DiscoveryHttpResponse(
++            statusCode = 200,
++            reason = "OK",
++            body = successJson(identity, hostVersion),
++            headers = mapOf("Cache-Control" to "no-store"),
++        )
++    }
++
++    private fun successJson(identity: NodeHostIdentity, hostVersion: String): String = buildString {
++        append('{')
++        append("\"ok\":true,")
++        append("\"service\":").append(jsonString(SERVICE)).append(',')
++        append("\"endpoint\":").append(jsonString(ENDPOINT)).append(',')
++        append("\"protocolVersion\":").append(PROTOCOL_VERSION).append(',')
++        append("\"schemaVersion\":").append(SCHEMA_VERSION).append(',')
++        append("\"nodeId\":").append(jsonString(identity.nodeId)).append(',')
++        append("\"installationId\":").append(jsonString(identity.installationId)).append(',')
++        append("\"displayName\":").append(jsonString(DISPLAY_NAME)).append(',')
++        append("\"hostVersion\":").append(jsonString(hostVersion)).append(',')
++        append("\"port\":").append(PORT).append(',')
++        append("\"capabilities\":[\"discovery\"],")
++        append("\"trust\":{")
++        append("\"policy\":\"pairing_required\",")
++        append("\"missionAuthorization\":\"trusted_only\"")
++        append("}}")
++    }
++
++    private fun error(
++        statusCode: Int,
++        reason: String,
++        code: String,
++        message: String,
++        headers: Map<String, String> = emptyMap(),
++    ): DiscoveryHttpResponse = DiscoveryHttpResponse(
++        statusCode = statusCode,
++        reason = reason,
++        body = buildString {
++            append('{')
++            append("\"ok\":false,")
++            append("\"error\":{")
++            append("\"code\":").append(jsonString(code)).append(',')
++            append("\"message\":").append(jsonString(message))
++            append("},")
++            append("\"protocolVersion\":").append(PROTOCOL_VERSION).append(',')
++            append("\"schemaVersion\":").append(SCHEMA_VERSION)
++            append('}')
++        },
++        headers = headers + ("Cache-Control" to "no-store"),
++    )
++
++    private fun acceptsJson(value: String): Boolean = value.split(',').any { entry ->
++        val parts = entry.split(';')
++        val mediaType = parts.first().trim().lowercase()
++        val quality = parts.drop(1)
++            .map(String::trim)
++            .firstOrNull { it.startsWith("q=", ignoreCase = true) }
++            ?.substringAfter('=')
++            ?.toDoubleOrNull()
++            ?: 1.0
++        quality > 0.0 && (
++            mediaType == "application/json" ||
++                mediaType == "application/*" ||
++                mediaType == "*/*" ||
++                mediaType.endsWith("+json")
++            )
++    }
++
++    private fun jsonString(value: String): String = buildString {
++        append('"')
++        value.forEach { character ->
++            when (character) {
++                '"' -> append("\\\"")
++                '\\' -> append("\\\\")
++                '\b' -> append("\\b")
++                '\u000C' -> append("\\f")
++                '\n' -> append("\\n")
++                '\r' -> append("\\r")
++                '\t' -> append("\\t")
++                else -> if (character.code < 0x20) {
++                    append("\\u").append(character.code.toString(16).padStart(4, '0'))
++                } else {
++                    append(character)
++                }
++            }
++        }
++        append('"')
++    }
++}
+--- a/app/src/main/java/sh/swrlz/nodehost/service/NodeIdentityStore.kt
++++ b/app/src/main/java/sh/swrlz/nodehost/service/NodeIdentityStore.kt
+@@ -0,0 +1,136 @@
++package sh.swrlz.nodehost.service
++
++import android.content.Context
++import android.util.AtomicFile
++import java.io.File
++import java.io.FileOutputStream
++import java.io.InputStreamReader
++import java.nio.charset.StandardCharsets
++import java.util.Properties
++import java.util.UUID
++
++internal data class NodeHostIdentity(
++    val nodeId: String,
++    val installationId: String,
++)
++
++/**
++ * Durable NODE_HOST identity storage kept outside Room and Android backup.
++ *
++ * The no-backup directory survives process death, reboot, and app updates, while
++ * normal Android data clearing or uninstall/reinstall removes it. AtomicFile
++ * prevents a partial write from silently becoming a new identity.
++ */
++internal class NodeIdentityStore(context: Context) {
++    private val identityFile = AtomicFile(
++        File(context.applicationContext.noBackupFilesDir, IDENTITY_FILE_NAME),
++    )
++
++    @Synchronized
++    fun loadOrCreate(): NodeHostIdentity {
++        val storeExisted = identityFile.baseFile.exists()
++        val existing = readProperties()
++        val parsed = existing?.toIdentityOrNull()
++        if (parsed != null) return parsed
++
++        val generated = NodeHostIdentity(
++            nodeId = newId(NODE_ID_PREFIX),
++            installationId = newId(INSTALLATION_ID_PREFIX),
++        )
++        val replacement = Properties().apply {
++            setProperty(KEY_NODE_ID, generated.nodeId)
++            setProperty(KEY_INSTALLATION_ID, generated.installationId)
++            if (storeExisted) {
++                setProperty(KEY_RESET_AT_MS, System.currentTimeMillis().toString())
++                existing?.getProperty(KEY_NODE_ID)
++                    ?.takeIf { isValidId(it, NODE_ID_PREFIX) }
++                    ?.let { setProperty(KEY_PREVIOUS_NODE_ID, it) }
++            }
++        }
++        persistAndVerify(replacement, generated)
++        return generated
++    }
++
++    /**
++     * Reserved for a future explicit user-authorized rotation surface.
++     * It changes only nodeId and preserves installationId plus lineage receipt.
++     */
++    @Synchronized
++    fun rotateNodeIdentity(): NodeHostIdentity {
++        val current = loadOrCreate()
++        val rotated = current.copy(nodeId = newId(NODE_ID_PREFIX))
++        val properties = readProperties() ?: Properties()
++        properties.setProperty(KEY_PREVIOUS_NODE_ID, current.nodeId)
++        properties.setProperty(KEY_NODE_ID, rotated.nodeId)
++        properties.setProperty(KEY_INSTALLATION_ID, rotated.installationId)
++        properties.setProperty(KEY_ROTATED_AT_MS, System.currentTimeMillis().toString())
++        persistAndVerify(properties, rotated)
++        return rotated
++    }
++
++    private fun readProperties(): Properties? {
++        if (!identityFile.baseFile.exists()) return null
++        return try {
++            identityFile.openRead().use { input ->
++                InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
++                    Properties().apply { load(reader) }
++                }
++            }
++        } catch (_: Exception) {
++            null
++        }
++    }
++
++    private fun persistAndVerify(properties: Properties, expected: NodeHostIdentity) {
++        var stream: FileOutputStream? = null
++        try {
++            stream = identityFile.startWrite()
++            properties.store(stream, null)
++            stream.flush()
++            identityFile.finishWrite(stream)
++            stream = null
++        } catch (error: Exception) {
++            stream?.let(identityFile::failWrite)
++            throw IllegalStateException("Unable to persist NODE_HOST identity", error)
++        }
++
++        val readBack = readProperties()?.toIdentityOrNull()
++        if (readBack != expected) {
++            throw IllegalStateException("NODE_HOST identity failed durable read-back verification")
++        }
++    }
++
++    private fun Properties.toIdentityOrNull(): NodeHostIdentity? {
++        val nodeId = getProperty(KEY_NODE_ID) ?: return null
++        val installationId = getProperty(KEY_INSTALLATION_ID) ?: return null
++        if (!isValidId(nodeId, NODE_ID_PREFIX)) return null
++        if (!isValidId(installationId, INSTALLATION_ID_PREFIX)) return null
++        return NodeHostIdentity(nodeId, installationId)
++    }
++
++    companion object {
++        internal const val NODE_ID_PREFIX = "swrlz-node-"
++        internal const val INSTALLATION_ID_PREFIX = "swrlz-install-"
++
++        private const val IDENTITY_FILE_NAME = "node_host_identity.properties"
++        private const val KEY_NODE_ID = "node_id"
++        private const val KEY_INSTALLATION_ID = "installation_id"
++        private const val KEY_PREVIOUS_NODE_ID = "previous_node_id"
++        private const val KEY_ROTATED_AT_MS = "rotated_at_ms"
++        private const val KEY_RESET_AT_MS = "identity_reset_at_ms"
++
++        private fun newId(prefix: String): String = prefix + UUID.randomUUID().toString()
++
++        internal fun isValidId(value: String, prefix: String): Boolean {
++            if (!value.startsWith(prefix)) return false
++            val suffix = value.removePrefix(prefix)
++            if (suffix.length != 36) return false
++            val uuid = try {
++                UUID.fromString(suffix)
++            } catch (_: IllegalArgumentE
