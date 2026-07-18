@@ -1,0 +1,41 @@
+name: Temporary CLIENT v1.0.1 Execute
+
+on:
+  push:
+    branches:
+      - checkpoint/client-v101-promote
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: integration-fix-011c-client-execute
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    if: github.event.head_commit.message == 'chore(client): execute 011C recovery'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: checkpoint/client-v101-promote
+          fetch-depth: 0
+      - name: Promote verified CLIENT source
+        id: promote
+        run: bash BUILD_REQUESTS/INTEGRATION_FIX_011C/promote_client_v101.sh
+      - name: Dispatch existing CLIENT build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run build-swrlz-apk_target_client_latest.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f source_zip=SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.zip \
+            -f sha_file=SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.sha256 \
+            -f release_name=CLIENT_CFv1.0.1_SWRLZ \
+            -f commit_release_artifacts=false
+      - name: Clean temporary branch
+        run: git push origin --delete checkpoint/client-v101-promote
