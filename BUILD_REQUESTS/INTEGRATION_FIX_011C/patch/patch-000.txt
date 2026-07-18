@@ -1,0 +1,60 @@
+diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/README_LATEST_2.7.6.md ccand/CLIENT_CFv1.0.0_SWRLZ/README_LATEST_2.7.6.md
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/README_LATEST_2.7.6.md	2026-07-14 15:56:40.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/README_LATEST_2.7.6.md	2026-07-18 00:00:00.000000000 +0000
+@@ -1,10 +1,16 @@
+-# SWRLZ-Core 2.7.6 CF6 Boot-Sync
++# SWRLZ-Core 2.7.6 — Current CLIENT line
+ 
+-CF6 adds Home/app-launch Core Node boot-sync, server truth testing, and lifecycle-based permission refresh.
++## CF8 Verified Admin Fallback
+ 
+-Source: `SRC_CF6_276_BOOTSYNC.zip`
+-Patch: `2.7.6-CF6-BOOTSYNC-PERMISSION-REFRESH`
+-Version: `0.2.7.6-cf6-bootsync`
+-Version code: `28`
++The current candidate is `CLIENT_CFv1.0.1_SWRLZ.zip` with Android
++`versionName 0.2.7.6-cf8-admin-fallback` / `versionCode 30`.
+ 
+-Field goal: open the app, auto-connect to the local node when available, and refresh both permission cards after returning from Android settings without requiring manual refresh.
++CF8 preserves CF7 Network Pulse and adds:
++
++- verified-token gating before `/admin/*` routes;
++- automatic fallback to `/presence/devices` when admin authentication is absent;
++- local-first Forget Admin behavior even when remote revoke is unsupported;
++- endpoint-specific HTTP error reporting;
++- separate Radar read health versus heartbeat/write-operation health.
++
++See `RPT_CF8_276_ADMIN_FALLBACK.md` for the device evidence and bounded repair.
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/RPT_CF8_276_ADMIN_FALLBACK.md ccand/CLIENT_CFv1.0.0_SWRLZ/RPT_CF8_276_ADMIN_FALLBACK.md
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/RPT_CF8_276_ADMIN_FALLBACK.md	1970-01-01 00:00:00.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/RPT_CF8_276_ADMIN_FALLBACK.md	2026-07-18 00:00:00.000000000 +0000
+@@ -0,0 +1,30 @@
++# SWRLZ-Core 2.7.6 CF8 — Verified Admin Fallback
++
++## Device evidence
++
++Fresh SERVER v1.0.3 testing proved the read-only NODE_HOST contract:
++
++- `/status` returned HTTP 200.
++- `/discovery/signature` returned HTTP 200 with hostVersion `1.0.3`.
++- `/presence/summary`, `/presence/groups`, and `/presence/devices` returned truthful authoritative-empty state.
++- The Network pulse incorrectly selected `/admin/devices` and `/admin/queues` when Admin Mode was ON but no token was saved.
++- Forget Admin attempted `/admin/session/revoke` even when no local token existed, then mislabeled the resulting 404 as a `/status` failure.
++- Heartbeat/write failures could overwrite the Radar read-health badge after a successful presence refresh.
++
++## Bounded correction
++
++- Added one verified-admin route policy shared by the Network dashboard and endpoint dialogs.
++- Admin routes now require mode enabled, a saved token, and a recorded successful verification.
++- Restored `Admin ON + token absent` state is normalized to ordinary presence mode.
++- Public device reads use `/presence/devices` unless the verified-admin policy passes.
++- `/admin/queues` is skipped rather than requested without verified authentication.
++- Forget Admin is local-first: no token means no network request; a failed or unsupported remote revoke never prevents local credential removal.
++- Forget Admin also disables the all-devices preference.
++- HTTP failures identify the actual requested route rather than claiming every 404 came from `/status`.
++- Radar read health is tracked separately from heartbeat, registration, queue, and admin operations.
++
++## Preserved boundaries
++
++- No SERVER admin aliases were invented.
++- No pairing, trust, identity,
