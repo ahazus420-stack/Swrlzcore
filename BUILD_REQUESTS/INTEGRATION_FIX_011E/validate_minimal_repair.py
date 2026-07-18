@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import pathlib
-import subprocess
 import tempfile
 import zipfile
 
@@ -15,6 +13,7 @@ EXPECTED_SOURCE_SHA = "9f567523ad184bfc14751d1aeaf527233a41a8e2a3e82378a68292a2e
 TARGET_SUFFIX = pathlib.PurePosixPath(
     "CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/net/Api.kt"
 )
+IMPORT_ANCHOR = "import io.ktor.client.statement.bodyAsText\n"
 IMPORT_LINE = "import io.ktor.client.statement.request"
 USAGE = "response.request.url.encodedPath"
 
@@ -28,10 +27,28 @@ def sha256(path: pathlib.Path) -> str:
 
 
 def tree_hashes(root: pathlib.Path) -> dict[str, str]:
-    result: dict[str, str] = {}
-    for path in sorted(p for p in root.rglob("*") if p.is_file()):
-        result[path.relative_to(root).as_posix()] = sha256(path)
-    return result
+    return {
+        path.relative_to(root).as_posix(): sha256(path)
+        for path in sorted(p for p in root.rglob("*") if p.is_file())
+    }
+
+
+def validate_patch_document() -> None:
+    patch_text = PATCH_FILE.read_text(encoding="utf-8")
+    additions = [
+        line for line in patch_text.splitlines()
+        if line.startswith("+") and not line.startswith("+++")
+    ]
+    removals = [
+        line for line in patch_text.splitlines()
+        if line.startswith("-") and not line.startswith("---")
+    ]
+    if additions != [f"+{IMPORT_LINE}"]:
+        raise SystemExit(f"patch must add exactly the request import: {additions}")
+    if removals:
+        raise SystemExit(f"patch must remove no lines: {removals}")
+    if TARGET_SUFFIX.as_posix() not in patch_text:
+        raise SystemExit("patch target path mismatch")
 
 
 def main() -> int:
@@ -40,6 +57,7 @@ def main() -> int:
         raise SystemExit(f"source SHA mismatch: {source_sha_before}")
     if not PATCH_FILE.is_file():
         raise SystemExit(f"missing patch: {PATCH_FILE}")
+    validate_patch_document()
 
     with tempfile.TemporaryDirectory(prefix="swrlz-client-v101-011e-") as temp_dir:
         root = pathlib.Path(temp_dir)
@@ -57,7 +75,9 @@ def main() -> int:
         if USAGE not in before_text:
             raise SystemExit(f"expected route-specific usage missing: {USAGE}")
         if IMPORT_LINE in before_text:
-            raise SystemExit("repair import already present; candidate is not minimal against this source")
+            raise SystemExit("repair import already present; candidate is not minimal")
+        if before_text.count(IMPORT_ANCHOR) != 1:
+            raise SystemExit("Ktor statement import anchor is not unique")
 
         build_file = root / "CLIENT_CFv1.0.0_SWRLZ/android/app/build.gradle.kts"
         build_text = build_file.read_text(encoding="utf-8")
@@ -65,16 +85,12 @@ def main() -> int:
             raise SystemExit("expected Ktor client core 2.3.12 dependency not found")
 
         before_hashes = tree_hashes(root)
-        subprocess.run(
-            ["patch", "--batch", "--forward", "--dry-run", "-p1", "-i", str(PATCH_FILE.resolve())],
-            cwd=root,
-            check=True,
+        after_text = before_text.replace(
+            IMPORT_ANCHOR,
+            f"{IMPORT_ANCHOR}{IMPORT_LINE}\n",
+            1,
         )
-        subprocess.run(
-            ["patch", "--batch", "--forward", "-p1", "-i", str(PATCH_FILE.resolve())],
-            cwd=root,
-            check=True,
-        )
+        target.write_text(after_text, encoding="utf-8")
         after_hashes = tree_hashes(root)
 
         changed = sorted(
@@ -84,8 +100,6 @@ def main() -> int:
         expected_target = TARGET_SUFFIX.as_posix()
         if changed != [expected_target]:
             raise SystemExit(f"unexpected changed paths: {changed}")
-
-        after_text = target.read_text(encoding="utf-8")
         if after_text.count(IMPORT_LINE) != 1:
             raise SystemExit("repair import was not added exactly once")
         if USAGE not in after_text:
@@ -113,7 +127,7 @@ def main() -> int:
                     "",
                     f"- Canonical source SHA-256 before: `{source_sha_before}`",
                     f"- Canonical source SHA-256 after: `{source_sha_after}`",
-                    f"- Ktor client core: `2.3.12`",
+                    "- Ktor client core: `2.3.12`",
                     f"- Changed path after applying candidate: `{expected_target}`",
                     f"- Added line: `{IMPORT_LINE}`",
                     "- Removed lines: `0`",
@@ -126,7 +140,7 @@ def main() -> int:
                     "## Interpretation",
                     "",
                     "The failed source references Ktor's `HttpResponse.request` extension but omits its import. "
-                    "Adding `io.ktor.client.statement.request` resolves that symbol while preserving the intended actual-route error reporting and changing no other source path.",
+                    "Adding `io.ktor.client.statement.request` resolves that symbol while preserving actual-route error reporting and changing no other source path.",
                     "",
                 ]
             ),
