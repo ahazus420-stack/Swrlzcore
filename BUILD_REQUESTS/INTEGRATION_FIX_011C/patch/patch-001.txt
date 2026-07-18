@@ -1,0 +1,56 @@
+ mission, or Truth Firewall rule changed.
++- Public presence remains read-only and authoritative-empty until a separately accepted persistent registry exists.
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/SWRLZ_CORE_ANDROID_CLIENT_ROADMAP_2.7.md ccand/CLIENT_CFv1.0.0_SWRLZ/SWRLZ_CORE_ANDROID_CLIENT_ROADMAP_2.7.md
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/SWRLZ_CORE_ANDROID_CLIENT_ROADMAP_2.7.md	2026-07-14 15:56:40.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/SWRLZ_CORE_ANDROID_CLIENT_ROADMAP_2.7.md	2026-07-18 00:00:00.000000000 +0000
+@@ -24,3 +24,12 @@
+ - More polished motion states: pulse, ripple, slide-in, success flash.
+ - Per-device capability chips.
+ - Safer OPEN_APP prototype with allowlist + confirmation only.
++
++
++## CF8 Verified Admin Fallback
++
++- Treat an admin UI toggle as preference only, never authentication authority.
++- Require token plus successful verification before selecting `/admin/*`.
++- Keep Forget Admin local-first and best-effort remote.
++- Preserve successful public presence reads when optional write/admin surfaces are unavailable.
++- Keep Radar connection health separate from heartbeat and command-operation status.
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/build.gradle.kts ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/build.gradle.kts
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/build.gradle.kts	2026-07-14 15:56:40.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/build.gradle.kts	2026-07-18 00:00:00.000000000 +0000
+@@ -43,8 +43,8 @@
+         applicationId = "sh.swurlz.core"
+         minSdk = 26
+         targetSdk = 34
+-        versionCode = 29
+-        versionName = "0.2.7.6-cf7-netpulse"
++        versionCode = 30
++        versionName = "0.2.7.6-cf8-admin-fallback"
+ 
+         // Optional build-time defaults. Both can be changed later inside the app.
+         val backend = (localProps["SWRLZ_BACKEND_URL"] as String?)
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/data/Prefs.kt ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/data/Prefs.kt
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/data/Prefs.kt	2026-07-14 15:56:40.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/data/Prefs.kt	2026-07-18 00:00:00.000000000 +0000
+@@ -286,6 +286,7 @@
+         SecretStore.forgetAdminSessionToken(ctx)
+         ctx.dataStore.edit { prefs ->
+             prefs[KEY_ADMIN_MODE_ENABLED] = false
++            prefs[KEY_ADMIN_ALL_DEVICES_VISIBLE] = false
+             prefs.remove(KEY_ADMIN_SESSION_ID)
+             prefs.remove(KEY_ADMIN_LAST_VERIFIED_AT)
+         }
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/model/Models.kt ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/model/Models.kt
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/model/Models.kt	2026-07-14 15:56:40.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/model/Models.kt	2026-07-18 00:00:00.000000000 +0000
+@@ -129,7 +129,7 @@
+     val lastVerifiedAt: String = "",
+     val allDevicesVisible: Boolean = false,
+ ) {
+-    val active: Boolean get() = modeEnabled && sessionTokenSaved
++    val active: Boolean get() = modeEnabled && sessionTokenSaved && lastVerifiedAt.isNotBlank()
+ }
+ 
+ 
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/net/AdminRoutePolicy.kt ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz
