@@ -1,0 +1,66 @@
+                  fontSize = 11.sp,
+                     lineHeight = 16.sp,
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/core/version.json ccand/CLIENT_CFv1.0.0_SWRLZ/core/version.json
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/core/version.json	2026-07-14 15:56:40.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/core/version.json	2026-07-18 00:00:00.000000000 +0000
+@@ -1,17 +1,17 @@
+ {
+-  "core_version": "0.2.7.6-cf5-engine-test-harness",
+-  "patch_name": "Network Discovery CF5 - Engine Test Harness",
+-  "updated_at": "2026-06-29T00:00:00Z",
++  "core_version": "0.2.7.6-cf8-admin-fallback",
++  "patch_name": "Network Discovery CF8 - Verified Admin Fallback",
++  "updated_at": "2026-07-18T00:00:00Z",
+   "schema_version": 1,
+-  "compatible_android_app_min": "0.2.7.6-cf5-engine-test-harness",
++  "compatible_android_app_min": "0.2.7.6-cf8-admin-fallback",
+   "roadmap_revision": "2.7.6",
+-  "patch_label": "2.7.6-CF5-ENGINE-TEST-HARNESS",
+-  "source_zip": "SRC_CF5_276_ENGTEST.zip",
+-  "notes": "CF5: Adds engine-first command test harness, mock fixtures, packet/state validation, and source handoff testing report standard.",
+-  "version": "0.2.7.6-cf5-engine-test-harness",
+-  "versionCode": 27,
+-  "patch": "2.7.6-CF5-ENGINE-TEST-HARNESS",
+-  "source": "SRC_CF5_276_ENGTEST.zip",
++  "patch_label": "2.7.6-CF8-ADMIN-FALLBACK",
++  "source_zip": "CLIENT_CFv1.0.1_SWRLZ.zip",
++  "notes": "Verified admin route gating, local-first admin-session forgetting, route-specific HTTP errors, and Radar read-health separation.",
++  "version": "0.2.7.6-cf8-admin-fallback",
++  "versionCode": 30,
++  "patch": "2.7.6-CF8-ADMIN-FALLBACK",
++  "source": "CLIENT_CFv1.0.1_SWRLZ.zip",
+   "roadmap": "2.7.6",
+-  "android_version_code": 27
++  "android_version_code": 30
+ }
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/scripts/test_cf8_admin_fallback.py ccand/CLIENT_CFv1.0.0_SWRLZ/scripts/test_cf8_admin_fallback.py
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/scripts/test_cf8_admin_fallback.py	1970-01-01 00:00:00.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/scripts/test_cf8_admin_fallback.py	2026-07-18 00:00:00.000000000 +0000
+@@ -0,0 +1,27 @@
++#!/usr/bin/env python3
++from pathlib import Path
++import sys
++
++root = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
++api = (root / 'android/app/src/main/java/sh/swurlz/core/net/Api.kt').read_text()
++network = (root / 'android/app/src/main/java/sh/swurlz/core/ui/screens/NetworkDiscoveryScreen.kt').read_text()
++commands = (root / 'android/app/src/main/java/sh/swurlz/core/ui/screens/CommandsScreen.kt').read_text()
++prefs = (root / 'android/app/src/main/java/sh/swurlz/core/data/Prefs.kt').read_text()
++policy = (root / 'android/app/src/main/java/sh/swurlz/core/net/AdminRoutePolicy.kt').read_text()
++build = (root / 'android/app/build.gradle.kts').read_text()
++
++assert 'skipped_no_saved_token' in api
++assert 'Local admin state was cleared' in api
++assert 'response.request.url.encodedPath' in api
++assert 'core node route unavailable: ${t.route}' in api
++assert 'Prefs.forgetAdminSession(ctx)' in api
++assert 'KEY_ADMIN_ALL_DEVICES_VISIBLE] = false' in prefs
++assert 'lastVerifiedAt.isNotBlank()' in policy
++assert 'AdminRoutePolicy.devicesPath(verifiedAdmin)' in network
++assert 'SKIPPED /admin/queues' in network
++assert 'adminMode && !adminTokenSaved' in network
++assert 'var radarStatus' in commands
++assert 'if (isRadarRead) radarStatus' in commands
++assert 'versionCode = 30' in build
++assert '0.2.7.6-cf8-admin-fallback' in build
++print('CF8 verified-admin fallback checks: PA
