@@ -1,0 +1,166 @@
+name: INTEGRATION-FIX-011F Create CLIENT v1.0.2 and Validate APK
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - checkpoint/client-v101-build-failure-011e
+    paths:
+      - ".swrlz-recovery/INTEGRATION_FIX_011F_TRIGGER"
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: integration-fix-011f-client-v102-build
+  cancel-in-progress: false
+
+jobs:
+  create-and-dispatch:
+    if: github.event.pull_request.head.ref == 'checkpoint/client-v102-build-011f-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DIAGNOSTIC_BRANCH: checkpoint/client-v101-build-failure-011e
+      TRIGGER_BRANCH: checkpoint/client-v102-build-011f-trigger
+      GENERATOR: BUILD_REQUESTS/INTEGRATION_FIX_011F/create_client_v102.py
+      OUTPUT_ZIP: SOURCES/CLIENT/CLIENT_CFv1.0.2_SWRLZ.zip
+      OUTPUT_SHA: SOURCES/CLIENT/CLIENT_CFv1.0.2_SWRLZ.sha256
+      SUCCESSOR_REPORT: reports/INTEGRATION_FIX_011F_CLIENT_V102_SUCCESSOR.md
+      DISPATCH_REPORT: reports/INTEGRATION_FIX_011F_CLIENT_V102_BUILD_DISPATCH.md
+      BUILD_WORKFLOW: build-swrlz-apk_target_client_latest.yml
+      RELEASE_NAME: CLIENT_CFv1.0.2_SWRLZ_VALIDATION
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+        with:
+          ref: checkpoint/client-v101-build-failure-011e
+          fetch-depth: 0
+
+      - name: Create deterministic CLIENT CFv1.0.2 successor
+        run: |
+          set -euo pipefail
+          test -f "$GENERATOR"
+          python3 "$GENERATOR"
+          test -f "$OUTPUT_ZIP"
+          test -f "$OUTPUT_SHA"
+          test -f "$SUCCESSOR_REPORT"
+          unzip -tq "$OUTPUT_ZIP"
+          EXPECTED="$(awk 'NF >= 1 {print $1; exit}' "$OUTPUT_SHA")"
+          ACTUAL="$(sha256sum "$OUTPUT_ZIP" | awk '{print $1}')"
+          test "$EXPECTED" = "$ACTUAL"
+
+      - name: Commit candidate source to temporary diagnostic branch
+        id: candidate
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$OUTPUT_ZIP" "$OUTPUT_SHA" "$SUCCESSOR_REPORT"
+          if ! git diff --cached --quiet; then
+            git commit -m "candidate(client): create CFv1.0.2 one-line Ktor import successor"
+            git push origin HEAD:"$DIAGNOSTIC_BRANCH"
+          fi
+          CANDIDATE_COMMIT="$(git rev-parse HEAD)"
+          CANDIDATE_SHA="$(sha256sum "$OUTPUT_ZIP" | awk '{print $1}')"
+          echo "candidate_commit=$CANDIDATE_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "candidate_sha=$CANDIDATE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch exactly one temporary CLIENT APK validation build
+        id: dispatch
+        env:
+          CANDIDATE_COMMIT: ${{ steps.candidate.outputs.candidate_commit }}
+        run: |
+          set -euo pipefail
+
+          find_matching_runs() {
+            gh run list \
+              --workflow "$BUILD_WORKFLOW" \
+              --branch "$DIAGNOSTIC_BRANCH" \
+              --event workflow_dispatch \
+              --limit 30 \
+              --json databaseId,headSha,status,conclusion,createdAt,url \
+              | python3 -c 'import json,os,sys; target=os.environ["CANDIDATE_COMMIT"]; runs=[r for r in json.load(sys.stdin) if r.get("headSha")==target]; print("\n".join(str(r["databaseId"]) for r in runs))'
+          }
+
+          mapfile -t EXISTING < <(find_matching_runs)
+          if (( ${#EXISTING[@]} > 1 )); then
+            echo "More than one build already exists for candidate commit $CANDIDATE_COMMIT" >&2
+            printf '%s\n' "${EXISTING[@]}" >&2
+            exit 1
+          fi
+
+          if (( ${#EXISTING[@]} == 1 )); then
+            RUN_ID="${EXISTING[0]}"
+            echo "Reusing the sole existing build run for this candidate commit: $RUN_ID"
+          else
+            gh workflow run "$BUILD_WORKFLOW" \
+              --ref "$DIAGNOSTIC_BRANCH" \
+              -f source_zip="$OUTPUT_ZIP" \
+              -f sha_file="$OUTPUT_SHA" \
+              -f release_name="$RELEASE_NAME" \
+              -f commit_release_artifacts=false
+
+            RUN_ID=""
+            for _ in $(seq 1 30); do
+              sleep 2
+              mapfile -t MATCHES < <(find_matching_runs)
+              if (( ${#MATCHES[@]} > 1 )); then
+                echo "Dispatch produced more than one matching build run" >&2
+                printf '%s\n' "${MATCHES[@]}" >&2
+                exit 1
+              fi
+              if (( ${#MATCHES[@]} == 1 )); then
+                RUN_ID="${MATCHES[0]}"
+                break
+              fi
+            done
+            test -n "$RUN_ID" || { echo "Could not resolve the dispatched build run ID" >&2; exit 1; }
+          fi
+
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "run_url=https://github.com/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Record build dispatch evidence on temporary branch
+        env:
+          RUN_ID: ${{ steps.dispatch.outputs.run_id }}
+          RUN_URL: ${{ steps.dispatch.outputs.run_url }}
+          CANDIDATE_COMMIT: ${{ steps.candidate.outputs.candidate_commit }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.candidate_sha }}
+        run: |
+          set -euo pipefail
+          cat > "$DISPATCH_REPORT" <<EOF
+          # INTEGRATION-FIX-011F — CLIENT CFv1.0.2 APK Validation Dispatch
+
+          - Candidate branch: \`$DIAGNOSTIC_BRANCH\`
+          - Candidate commit used by build: \`$CANDIDATE_COMMIT\`
+          - Candidate ZIP: \`$OUTPUT_ZIP\`
+          - Candidate SHA-256: \`$CANDIDATE_SHA\`
+          - Build workflow: \`$BUILD_WORKFLOW\`
+          - Build run ID: \`$RUN_ID\`
+          - Build run: $RUN_URL
+          - Release-artifact commit enabled: \`false\`
+          - Main promotion: \`no\`
+          - Release: \`no\`
+          - Deploy/install: \`no\`
+
+          Exactly one workflow-dispatch build is associated with the candidate commit above.
+          EOF
+
+          git add -- "$DISPATCH_REPORT"
+          git commit -m "evidence(client): record CFv1.0.2 validation build dispatch"
+          git push origin HEAD:"$DIAGNOSTIC_BRANCH"
+
+      - name: Close disposable signal and delete trigger branch
+        if: success()
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_ID: ${{ steps.dispatch.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          gh pr comment "$PR_NUMBER" --body "INTEGRATION-FIX-011F created the checksum-bounded CLIENT CFv1.0.2 candidate and dispatched exactly one non-release APK validation build: run $RUN_ID. No main promotion, release, deploy, or install occurred."
+          gh pr close "$PR_NUMBER" --comment "Disposable execution signal closed without merge."
+          git push origin --delete "$TRIGGER_BRANCH"
