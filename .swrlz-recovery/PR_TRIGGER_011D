@@ -1,4 +1,4 @@
 INTEGRATION-FIX-011D
 expected_source_sha256=9f567523ad184bfc14751d1aeaf527233a41a8e2a3e82378a68292a2e6a922f7
 authorized_main_paths=5
-diagnostic_retry=3
+verified_transport_retry=4
