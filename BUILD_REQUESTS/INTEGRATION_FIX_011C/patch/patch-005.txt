@@ -1,0 +1,62 @@
+ withContext(Dispatchers.IO) { getJson(base, "/presence/groups", bearer) }
+-        val devices = withContext(Dispatchers.IO) { getJson(base, if (adminMode) "/admin/devices" else "/presence/devices", bearer) }
+-        val queues = if (adminMode) withContext(Dispatchers.IO) { getJson(base, "/admin/queues", bearer) } else "Admin-only queue inspector. Enable admin session to view /admin/queues."
++        val devicesPath = AdminRoutePolicy.devicesPath(verifiedAdmin)
++        val devices = withContext(Dispatchers.IO) { getJson(base, devicesPath, bearer) }
++        val queuesPath = AdminRoutePolicy.queuePath(verifiedAdmin)
++        val queues = if (queuesPath != null) {
++            withContext(Dispatchers.IO) { getJson(base, queuesPath, bearer) }
++        } else {
++            "SKIPPED /admin/queues\nNo verified admin session; public presence reads remain active."
++        }
+         lastPulseAt = Instant.now().toString()
+         livePanel = buildString {
+-            appendLine("CF7 NETWORK PULSE · $reason")
++            appendLine("CF8 VERIFIED ADMIN PULSE · $reason")
+             appendLine("Base: $base")
+-            appendLine("Admin: ${if (adminMode) "ON" else "OFF"} · token saved: ${if (adminTokenSaved) "yes" else "no"}")
++            appendLine("Admin mode: ${if (adminMode) "ON" else "OFF"} · token saved: ${if (adminTokenSaved) "yes" else "no"} · authenticated: ${if (verifiedAdmin) "yes" else "no"}")
+             appendLine("Refresh: ${if (autoRefresh) "ON" else "OFF"} · interval: ${refreshIntervalMs / 1000}s")
+             appendLine("Last pulse: $lastPulseAt")
+             appendLine()
+@@ -142,8 +157,18 @@
+         lastGoodUrl = loadLastGoodNodeUrl(ctx)
+         lastGoodAt = loadLastGoodNodeAt(ctx)
+         adminMode = admin.modeEnabled
+-        adminTokenSaved = admin.sessionTokenSaved
+         adminToken = withContext(Dispatchers.IO) { SecretStore.adminSessionToken(ctx) }
++        adminTokenSaved = adminToken.isNotBlank()
++        adminVerifiedAt = admin.lastVerifiedAt
++        if (adminMode && !adminTokenSaved) {
++            // Android backup can restore the UI toggle without restoring Keystore-backed secrets.
++            // Normalize that split state so it cannot select authenticated endpoints.
++            adminMode = false
++            withContext(Dispatchers.IO) {
++                Prefs.setAdminModeEnabled(ctx, false)
++                Prefs.setAdminAllDevicesVisible(ctx, false)
++            }
++        }
+ 
+         if (autoReconnect) {
+             val remembered = lastGoodUrl
+@@ -184,7 +209,7 @@
+ 
+     // CF7: this loop only exists while the Network screen is composed/active.
+     // Switching tabs disposes this screen and cancels polling automatically.
+-    LaunchedEffect(autoRefresh, refreshIntervalMs, nodeUrl, foundUrl, adminMode, adminToken) {
++    LaunchedEffect(autoRefresh, refreshIntervalMs, nodeUrl, foundUrl, adminMode, adminToken, adminVerifiedAt) {
+         if (!autoRefresh) return@LaunchedEffect
+         while (isActive) {
+             refreshLiveDashboard("auto")
+@@ -261,14 +286,15 @@
+                 dialogBody = "No Core Node URL available yet."
+                 return@launch
+             }
+-            if (adminOnly && !adminMode) {
++            val verifiedAdmin = hasVerifiedAdminSession()
++            if (adminOnly && !verifiedAdmin) {
+                 dialogTitle = title
+                 dialogBody = "Admin-only. Enable and verify admin mode first."
+                 return@launch
+             }
+        
