@@ -1,0 +1,143 @@
+name: Temporary CLIENT v1.0.1 Build Dispatch Bridge
+
+on:
+  pull_request:
+    types: [opened]
+    branches:
+      - checkpoint/client-v101-promote
+    paths:
+      - ".swrlz-recovery/PR_TRIGGER_011D_BUILD"
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: integration-fix-011d-client-build-dispatch-bridge
+  cancel-in-progress: false
+
+jobs:
+  dispatch-client-build:
+    if: github.event.pull_request.head.ref == 'checkpoint/client-v101-pr-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PROMOTION_COMMIT: 43d696b02413ad52b30c860ab3d1fcca9dc21e86
+      EXPECTED_SOURCE_SHA: 9f567523ad184bfc14751d1aeaf527233a41a8e2a3e82378a68292a2e6a922f7
+      SOURCE_PATH: SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.zip
+      CHECKSUM_PATH: SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.sha256
+      CONTRACT_PATH: docs/contracts/CLIENT_VERIFIED_ADMIN_ROUTE_POLICY_V1.md
+      ROADMAP_PATH: docs/roadmap/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY.md
+      REPORT_PATH: reports/RPT_CF8_276_ADMIN_FALLBACK.md
+      BUILD_WORKFLOW: build-swrlz-apk_target_client_latest.yml
+      TRIGGER_BRANCH: checkpoint/client-v101-pr-trigger
+      STAGING_BRANCH: checkpoint/client-v101-promote
+    steps:
+      - name: Checkout current main without modifying it
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify disposable one-shot trigger
+        run: |
+          set -euo pipefail
+          git fetch origin "$TRIGGER_BRANCH"
+          git show "origin/$TRIGGER_BRANCH:.swrlz-recovery/PR_TRIGGER_011D_BUILD" > "$RUNNER_TEMP/PR_TRIGGER_011D_BUILD"
+          grep -Fx "INTEGRATION-FIX-011D-BUILD-DISPATCH" "$RUNNER_TEMP/PR_TRIGGER_011D_BUILD"
+          grep -Fx "promotion_commit=$PROMOTION_COMMIT" "$RUNNER_TEMP/PR_TRIGGER_011D_BUILD"
+          grep -Fx "expected_source_sha256=$EXPECTED_SOURCE_SHA" "$RUNNER_TEMP/PR_TRIGGER_011D_BUILD"
+          grep -Fx "authorized_main_paths=0" "$RUNNER_TEMP/PR_TRIGGER_011D_BUILD"
+
+      - name: Verify exact five-path promotion on current main
+        id: verify
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          MAIN_SHA="$(git rev-parse origin/main)"
+          git merge-base --is-ancestor "$PROMOTION_COMMIT" "$MAIN_SHA"
+
+          printf '%s\n' \
+            "$CHECKSUM_PATH" \
+            "$CONTRACT_PATH" \
+            "$ROADMAP_PATH" \
+            "$REPORT_PATH" \
+            "$SOURCE_PATH" | sort > "$RUNNER_TEMP/expected-paths.txt"
+          git diff-tree --no-commit-id --name-only -r "$PROMOTION_COMMIT" | sort > "$RUNNER_TEMP/promoted-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/promoted-paths.txt"
+
+          git diff --quiet "$PROMOTION_COMMIT..$MAIN_SHA" -- \
+            "$SOURCE_PATH" "$CHECKSUM_PATH" "$CONTRACT_PATH" "$ROADMAP_PATH" "$REPORT_PATH"
+
+          test -f "$SOURCE_PATH"
+          test -f "$CHECKSUM_PATH"
+          test "$(awk 'NF {print $1; exit}' "$CHECKSUM_PATH")" = "$EXPECTED_SOURCE_SHA"
+          test "$(sha256sum "$SOURCE_PATH" | awk '{print $1}')" = "$EXPECTED_SOURCE_SHA"
+          unzip -tq "$SOURCE_PATH"
+
+          echo "main_sha=$MAIN_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch existing CLIENT APK build and resolve run
+        id: dispatch
+        env:
+          MAIN_SHA: ${{ steps.verify.outputs.main_sha }}
+        run: |
+          set -euo pipefail
+          DISPATCHED_AT="$(date -u +%s)"
+          gh workflow run "$BUILD_WORKFLOW" \
+            --ref main \
+            -f source_zip="$SOURCE_PATH" \
+            -f sha_file="$CHECKSUM_PATH" \
+            -f release_name="CLIENT_CFv1.0.1_SWRLZ" \
+            -f commit_release_artifacts=false
+
+          RUN_ID=""
+          RUN_URL=""
+          RUN_STATUS=""
+          for attempt in $(seq 1 30); do
+            RUNS_JSON="$RUNNER_TEMP/client-build-runs.json"
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$BUILD_WORKFLOW/runs?event=workflow_dispatch&branch=main&per_page=30" > "$RUNS_JSON"
+            MATCH="$(RUNS_JSON="$RUNS_JSON" DISPATCHED_AT="$DISPATCHED_AT" MAIN_SHA="$MAIN_SHA" python3 - <<'PY'
+import datetime
+import json
+import os
+
+with open(os.environ['RUNS_JSON'], 'r', encoding='utf-8') as handle:
+    payload = json.load(handle)
+threshold = int(os.environ['DISPATCHED_AT']) - 5
+main_sha = os.environ['MAIN_SHA']
+for run in payload.get('workflow_runs', []):
+    created = datetime.datetime.fromisoformat(run['created_at'].replace('Z', '+00:00')).timestamp()
+    if run.get('head_sha') == main_sha and created >= threshold:
+        print(f"{run['id']}\t{run['html_url']}\t{run['status']}")
+        break
+PY
+)"
+            if [[ -n "$MATCH" ]]; then
+              IFS=$'\t' read -r RUN_ID RUN_URL RUN_STATUS <<< "$MATCH"
+              break
+            fi
+            sleep 2
+          done
+
+          test -n "$RUN_ID"
+          test -n "$RUN_URL"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "run_url=$RUN_URL" >> "$GITHUB_OUTPUT"
+          echo "run_status=$RUN_STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Record dispatch and remove temporary bridge
+        env:
+          MAIN_SHA: ${{ steps.verify.outputs.main_sha }}
+          RUN_ID: ${{ steps.dispatch.outputs.run_id }}
+          RUN_URL: ${{ steps.dispatch.outputs.run_url }}
+          RUN_STATUS: ${{ steps.dispatch.outputs.run_status }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh pr comment "$PR_NUMBER" --body "INTEGRATION-FIX-011D residual bridge succeeded. Promotion commit \`$PROMOTION_COMMIT\` remains an ancestor of current main \`$MAIN_SHA\`; the exact five approved paths remain unchanged; CLIENT APK workflow run [$RUN_ID]($RUN_URL) was created with status \`$RUN_STATUS\`. No production source was changed by this residual bridge."
+          gh pr close "$PR_NUMBER" --comment "Temporary execution-signal PR closed without merge."
+          git push origin --delete "$TRIGGER_BRANCH"
+          git push origin --delete "$STAGING_BRANCH"
