@@ -1,21 +1,17 @@
 name: INTEGRATION-FIX-011E CLIENT v1.0.1 Diagnostic
 
 on:
-  push:
-    branches:
-      - checkpoint/client-v101-build-failure-011e
-    paths:
-      - ".swrlz-recovery/INTEGRATION_FIX_011E_TRIGGER"
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
-      - main
+      - checkpoint/client-v101-build-failure-011e
     paths:
       - ".swrlz-recovery/INTEGRATION_FIX_011E_TRIGGER"
 
 permissions:
   actions: read
   contents: write
+  pull-requests: write
 
 concurrency:
   group: integration-fix-011e-client-v101-diagnostic
@@ -23,7 +19,7 @@ concurrency:
 
 jobs:
   diagnose:
-    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'checkpoint/client-v101-build-failure-011e'
+    if: github.event.pull_request.head.ref == 'checkpoint/client-v101-build-failure-011e-trigger'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -34,6 +30,8 @@ jobs:
       EXPECTED_SOURCE_SHA: "9f567523ad184bfc14751d1aeaf527233a41a8e2a3e82378a68292a2e6a922f7"
       REPORT_PATH: "reports/INTEGRATION_FIX_011E_CLIENT_V101_BUILD_FAILURE_DIAGNOSTIC.md"
       ERROR_PATH: "BUILD_REQUESTS/INTEGRATION_FIX_011E/compiler-errors.txt"
+      DIAGNOSTIC_BRANCH: "checkpoint/client-v101-build-failure-011e"
+      TRIGGER_BRANCH: "checkpoint/client-v101-build-failure-011e-trigger"
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@v4
@@ -97,7 +95,8 @@ jobs:
               for match in location_re.finditer(line):
                   item = (match.group("path"), int(match.group("line")), int(match.group("col")))
                   if item not in seen:
-                      locations.append(item); seen.add(item)
+                      locations.append(item)
+                      seen.add(item)
 
           contexts = []
           for absolute, line_no, col_no in locations:
@@ -111,9 +110,11 @@ jobs:
                   matches = list(source_root.rglob(pathlib.Path(relative).name))
                   exact = [p for p in matches if p.as_posix().endswith(relative)]
                   if exact:
-                      target = exact[0]; break
+                      target = exact[0]
+                      break
                   if matches:
-                      target = matches[0]; break
+                      target = matches[0]
+                      break
               if target is None:
                   contexts.append(f"### `{absolute}:{line_no}:{col_no}`\n\nSource file not resolved inside archive.\n")
                   continue
@@ -161,6 +162,17 @@ Root-cause classification and a minimal repair patch are prepared separately on 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- "$REPORT_PATH" "$ERROR_PATH"
-          git diff --cached --quiet && exit 0
-          git commit -m "diagnostic(client): capture v1.0.1 build failure evidence"
-          git push origin HEAD:checkpoint/client-v101-build-failure-011e
+          if ! git diff --cached --quiet; then
+            git commit -m "diagnostic(client): capture v1.0.1 build failure evidence"
+            git push origin HEAD:"$DIAGNOSTIC_BRANCH"
+          fi
+
+      - name: Close signal PR and delete disposable trigger branch
+        if: success()
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh pr comment "$PR_NUMBER" --body "INTEGRATION-FIX-011E diagnostic evidence capture succeeded without Gradle or main modification. Evidence was committed to \`$DIAGNOSTIC_BRANCH\`."
+          gh pr close "$PR_NUMBER" --comment "Disposable diagnostic signal PR closed without merge."
+          git push origin --delete "$TRIGGER_BRANCH"
