@@ -1,0 +1,79 @@
+name: Build SWRLZ Launcher Base
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip'
+      - 'SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.sha256'
+      - 'BUILD_REQUESTS/000_CURRENT.request'
+      - '.github/workflows/build-swrlz-launcher-base.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-launcher-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.6
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.6'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Verify source checksum
+        working-directory: SOURCES/LAUNCHER
+        run: sha256sum --check SWRLZ_LAUNCHER_BASE_CFv1.0.1.sha256
+
+      - name: Extract launcher inheritance source
+        run: |
+          set -euo pipefail
+          rm -rf build-work/launcher
+          mkdir -p build-work/launcher
+          unzip -q SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip -d build-work/launcher
+
+      - name: Regenerate Gradle wrapper
+        working-directory: build-work/launcher
+        run: gradle wrapper --gradle-version 8.6 --distribution-type bin
+
+      - name: Build launcher base debug APK
+        working-directory: build-work/launcher
+        run: ./gradlew --no-daemon --stacktrace clean :app:assembleDebug
+
+      - name: Collect build evidence
+        if: always()
+        run: |
+          mkdir -p build-evidence/launcher
+          gradle --version > build-evidence/launcher/gradle-version.txt 2>&1 || true
+          sha256sum SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip > build-evidence/launcher/source-archive.sha256
+          find build-work/launcher -type f -path '*/build/outputs/apk/*/*.apk' -print > build-evidence/launcher/apk-paths.txt || true
+
+      - name: Upload launcher base debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SWRLZ_LAUNCHER_BASE_CFv1.0.1_DEBUG_APK
+          path: build-work/launcher/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload launcher build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SWRLZ_LAUNCHER_BASE_CFv1.0.1_BUILD_EVIDENCE
+          path: build-evidence/launcher/
+          if-no-files-found: warn
