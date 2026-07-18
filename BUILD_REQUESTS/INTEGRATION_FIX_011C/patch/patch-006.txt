@@ -1,0 +1,59 @@
+     dialogTitle = title
+             dialogBody = "Loading $path …"
+-            dialogBody = withContext(Dispatchers.IO) { prettyJsonOrText(getJson(base, path, if (adminOnly || adminMode) adminToken else "")) }
++            dialogBody = withContext(Dispatchers.IO) { prettyJsonOrText(getJson(base, path, if (verifiedAdmin) adminToken else "")) }
+         }
+     }
+ 
+@@ -276,7 +302,7 @@
+         scope.launch {
+             val deviceId = adminTargetDeviceId.trim()
+             val base = activeBaseUrl()
+-            if (!adminMode) {
++            if (!hasVerifiedAdminSession()) {
+                 dialogTitle = "ADMIN ACTION"
+                 dialogBody = "Admin-only. Enable and verify admin mode first."
+                 return@launch
+@@ -300,7 +326,7 @@
+     fun createGroup() {
+         scope.launch {
+             val base = activeBaseUrl()
+-            if (!adminMode) {
++            if (!hasVerifiedAdminSession()) {
+                 dialogTitle = "CREATE GROUP"
+                 dialogBody = "Admin-only. Enable and verify admin mode first."
+                 return@launch
+@@ -433,8 +459,8 @@
+             Text(livePanel, color = tokens.text.primary, fontFamily = FontFamily.Monospace, fontSize = 10.sp, lineHeight = 15.sp)
+             Spacer(Modifier.height(8.dp))
+             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                DiscoveryButton("GROUPS") { openEndpoint("GROUPS", if (adminMode) "/presence/groups" else "/presence/groups") }
+-                DiscoveryButton("DEVICES") { openEndpoint("DEVICES", if (adminMode) "/admin/devices" else "/presence/devices", adminOnly = adminMode) }
++                DiscoveryButton("GROUPS") { openEndpoint("GROUPS", "/presence/groups") }
++                DiscoveryButton("DEVICES") { val verified = hasVerifiedAdminSession(); openEndpoint("DEVICES", AdminRoutePolicy.devicesPath(verified), adminOnly = verified) }
+             }
+             Spacer(Modifier.height(8.dp))
+             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+@@ -442,20 +468,20 @@
+                 DiscoveryButton("QUEUE") { openEndpoint("QUEUE", "/admin/queues", adminOnly = true) }
+             }
+             Spacer(Modifier.height(8.dp))
+-            if (adminMode) {
++            if (hasVerifiedAdminSession()) {
+                 DiscoveryButton("ADMIN LEDGER") { openEndpoint("ADMIN LEDGER", "/admin/ledger", adminOnly = true) }
+             } else {
+                 Text("Admin controls hidden: enable admin mode to show ledger, device actions, queues, and group creation.", color = tokens.text.secondary, fontSize = 10.sp, lineHeight = 15.sp)
+             }
+         }
+ 
+-        if (adminMode) {
++        if (hasVerifiedAdminSession()) {
+             Spacer(Modifier.height(12.dp))
+             Column(Modifier.fillMaxWidth().border(1.dp, tokens.status.warning).background(tokens.cards.bgAlt).padding(12.dp)) {
+                 Text("ADMIN ACTIONS", color = tokens.status.warning, fontFamily = FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 2.sp)
+                 Spacer(Modifier.height(6.dp))
+                 Text(
+-                    "Actions are hidden unless admin mode is enabled. Force offline works as the current disconnect/kick approximation for server 0.7.3.",
++                    "Actions require a saved, successfully verified admin session. Force offline remains the current disconnect/kick approximation for legacy admin-capable servers.",
+                     color = tokens.text.secondary,
+   
