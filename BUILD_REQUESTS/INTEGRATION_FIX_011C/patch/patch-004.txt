@@ -1,0 +1,71 @@
+tring, block: suspend () -> String) {
+         saveRelayFields()
++        val isRadarRead = label.contains("Radar", ignoreCase = true)
+         status = "$label…"
++        if (isRadarRead) radarStatus = "$label…"
+         output = runCatching { withContext(Dispatchers.IO) { block() } }.fold(
+             onSuccess = { raw ->
+                 absorbPayload(raw)
+-                lastRadarRefresh = if (label.contains("Radar", ignoreCase = true)) "just now" else lastRadarRefresh
++                lastRadarRefresh = if (isRadarRead) "just now" else lastRadarRefresh
+                 status = "$label complete"
++                if (isRadarRead) radarStatus = "$label complete"
+                 raw
+             },
+             onFailure = { err ->
+                 status = "$label failed"
++                if (isRadarRead) radarStatus = "$label failed"
+                 "${humanRelayFailure(err)}\n\n${err.message ?: "no extra detail"}"
+             },
+         )
+@@ -241,7 +246,7 @@
+             devices = devices.size,
+             online = onlineCount,
+             queued = queuedCount,
+-            status = status,
++            status = radarStatus,
+         )
+ 
+         Spacer(Modifier.height(10.dp))
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/ui/screens/NetworkDiscoveryScreen.kt ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/ui/screens/NetworkDiscoveryScreen.kt
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/ui/screens/NetworkDiscoveryScreen.kt	2026-07-14 15:56:40.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/ui/screens/NetworkDiscoveryScreen.kt	2026-07-18 00:00:00.000000000 +0000
+@@ -53,6 +53,7 @@
+ import sh.swurlz.core.data.Prefs
+ import sh.swurlz.core.data.SecretStore
+ import sh.swurlz.core.model.CoreNodeConfig
++import sh.swurlz.core.net.AdminRoutePolicy
+ import sh.swurlz.core.ui.theme.LocalSwurlzTokens
+ import java.net.HttpURLConnection
+ import java.net.Inet4Address
+@@ -84,6 +85,7 @@
+     var adminMode by remember { mutableStateOf(false) }
+     var adminTokenSaved by remember { mutableStateOf(false) }
+     var adminToken by remember { mutableStateOf("") }
++    var adminVerifiedAt by remember { mutableStateOf("") }
+     var dialogTitle by remember { mutableStateOf("") }
+     var dialogBody by remember { mutableStateOf("") }
+     var adminTargetDeviceId by remember { mutableStateOf("") }
+@@ -93,24 +95,37 @@
+ 
+     fun activeBaseUrl(): String = normalizeBaseUrl(foundUrl.ifBlank { nodeUrl.ifBlank { lastGoodUrl } })
+ 
++    fun hasVerifiedAdminSession(): Boolean = AdminRoutePolicy.hasVerifiedSession(
++        modeEnabled = adminMode,
++        savedToken = adminToken,
++        lastVerifiedAt = adminVerifiedAt,
++    )
++
+     suspend fun refreshLiveDashboard(reason: String = "manual") {
+         val base = activeBaseUrl()
+         if (base.isBlank()) {
+             livePanel = "No Core Node URL available yet. Save, scan, or reconnect first."
+             return
+         }
+-        val bearer = if (adminMode) adminToken else ""
++        val verifiedAdmin = hasVerifiedAdminSession()
++        val bearer = if (verifiedAdmin) adminToken else ""
+         val status = withContext(Dispatchers.IO) { getJson(base, "/status") }
+         val signature = withContext(Dispatchers.IO) { getJson(base, "/discovery/signature") }
+         val presence = withContext(Dispatchers.IO) { getJson(base, "/presence/summary", bearer) }
+         val groups =
