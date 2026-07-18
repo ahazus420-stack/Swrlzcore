@@ -5,155 +5,152 @@ on:
     branches:
       - checkpoint/client-v101-promote
     paths:
-      - BUILD_REQUESTS/INTEGRATION_FIX_011C/READY
+      - ".swrlz-recovery/READY"
 
 permissions:
   contents: write
   actions: write
 
 concurrency:
-  group: integration-fix-011c-client-promotion
+  group: client-v101-temporary-recovery
   cancel-in-progress: false
 
 jobs:
-  promote-client-v101:
+  promote:
+    name: Verify and promote exact CLIENT v1.0.1 payload
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      EXPECTED_MAIN: ceb3660a46e85f069c3e47dc9dc7cb091e9deaee
+      EXPECTED_MAIN_SHA: ceb3660a46e85f069c3e47dc9dc7cb091e9deaee
       STAGING_BRANCH: checkpoint/client-v101-promote
       REQUEST_DIR: BUILD_REQUESTS/INTEGRATION_FIX_011C
       BASE_ZIP: SOURCES/CLIENT/CLIENT_CFv1.0.0_SWRLZ.zip
       OUTPUT_ZIP: CLIENT_CFv1.0.1_SWRLZ.zip
-      OUTPUT_SHA256: 9f567523ad184bfc14751d1aeaf527233a41a8e2a3e82378a68292a2e6a922f7
+      EXPECTED_SOURCE_SHA: 9f567523ad184bfc14751d1aeaf527233a41a8e2a3e82378a68292a2e6a922f7
+      SOURCE_PATH: SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.zip
+      CHECKSUM_PATH: SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.sha256
+      CONTRACT_PATH: docs/contracts/CLIENT_VERIFIED_ADMIN_ROUTE_POLICY_V1.md
+      ROADMAP_PATH: docs/roadmap/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY.md
+      REPORT_PATH: reports/RPT_CF8_276_ADMIN_FALLBACK.md
 
     steps:
       - name: Checkout temporary staging branch
         uses: actions/checkout@v4
         with:
+          ref: checkpoint/client-v101-promote
           fetch-depth: 0
 
       - name: Verify authorization sentinel
-        shell: bash
         run: |
           set -euo pipefail
-          cat "$REQUEST_DIR/READY"
-          grep -Fx "INTEGRATION-FIX-011C" "$REQUEST_DIR/READY"
-          grep -Fx "expected_main=$EXPECTED_MAIN" "$REQUEST_DIR/READY"
-          grep -Fx "expected_source_sha256=$OUTPUT_SHA256" "$REQUEST_DIR/READY"
-          grep -Fx "authorized_main_paths=5" "$REQUEST_DIR/READY"
+          cat .swrlz-recovery/READY
+          grep -Fx "INTEGRATION-FIX-011C" .swrlz-recovery/READY
+          grep -Fx "expected_main=$EXPECTED_MAIN_SHA" .swrlz-recovery/READY
+          grep -Fx "expected_source_sha256=$EXPECTED_SOURCE_SHA" .swrlz-recovery/READY
+          grep -Fx "authorized_main_paths=5" .swrlz-recovery/READY
 
-      - name: Verify staged reconstruction evidence
-        shell: bash
+      - name: Reconstruct and verify exact canonical source ZIP
         run: |
           set -euo pipefail
-          cat "$REQUEST_DIR"/patch/patch-*.txt > /tmp/client-v101.patch
-          echo "63720b4bc213481b9f61346561ab26d017c75b9349b5b4e5e5ba9b844badcc6f  /tmp/client-v101.patch" | sha256sum -c -
+          cat "$REQUEST_DIR"/patch/patch-*.txt > "$RUNNER_TEMP/client-v101.patch"
+          echo "63720b4bc213481b9f61346561ab26d017c75b9349b5b4e5e5ba9b844badcc6f  $RUNNER_TEMP/client-v101.patch" | sha256sum -c -
           echo "90f296e25ead1d0b7a0fb674e37705792ef964dc626c67c9b0deb269f253ac18  $REQUEST_DIR/repack_client_v101.py" | sha256sum -c -
           echo "3384372546964a843b2b488f3fc7da3f9be2837b96c1647dfe2f659dfc0cb7ca  $REQUEST_DIR/payload/CLIENT_VERIFIED_ADMIN_ROUTE_POLICY_V1.md" | sha256sum -c -
           echo "4a4c77463a74d1090a175e9a08ae6b6480b202fb8131c3b7c18177a46c6174e6  $REQUEST_DIR/payload/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY.md" | sha256sum -c -
           echo "ecc53cc5c4be6642f80d0cd76370889996448b15004dd7d643e4f64a88226ab3  $REQUEST_DIR/payload/RPT_CF8_276_ADMIN_FALLBACK.md" | sha256sum -c -
-          echo "${OUTPUT_SHA256}  ${OUTPUT_ZIP}" > /tmp/CLIENT_CFv1.0.1_SWRLZ.sha256
-          cmp /tmp/CLIENT_CFv1.0.1_SWRLZ.sha256 "$REQUEST_DIR/payload/CLIENT_CFv1.0.1_SWRLZ.sha256"
 
-      - name: Reconstruct and verify canonical CLIENT source
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f "$BASE_ZIP"
+          TEMP="$RUNNER_TEMP/swrlz-client-v101-recovery"
+          rm -rf "$TEMP"
+          mkdir -p "$TEMP"
           python3 "$REQUEST_DIR/repack_client_v101.py" \
             --base "$BASE_ZIP" \
-            --patch /tmp/client-v101.patch \
-            --output "/tmp/$OUTPUT_ZIP"
-          echo "${OUTPUT_SHA256}  /tmp/${OUTPUT_ZIP}" | sha256sum -c -
-          unzip -t "/tmp/$OUTPUT_ZIP" >/dev/null
+            --patch "$RUNNER_TEMP/client-v101.patch" \
+            --output "$TEMP/$OUTPUT_ZIP"
+          test "$(sha256sum "$TEMP/$OUTPUT_ZIP" | awk '{print $1}')" = "$EXPECTED_SOURCE_SHA"
+          unzip -tq "$TEMP/$OUTPUT_ZIP"
+          cp "$REQUEST_DIR/payload/CLIENT_CFv1.0.1_SWRLZ.sha256" "$TEMP/CLIENT_CFv1.0.1_SWRLZ.sha256"
+          test "$(awk 'NF {print $1; exit}' "$TEMP/CLIENT_CFv1.0.1_SWRLZ.sha256")" = "$EXPECTED_SOURCE_SHA"
+          echo "Exact CLIENT source reconstruction and documentation payload: PASS"
 
-      - name: Guard main lineage
-        shell: bash
+      - name: Stage exactly five authorized paths on current main
         run: |
           set -euo pipefail
-          git fetch origin main --no-tags
-          ACTUAL_MAIN="$(git rev-parse origin/main)"
-          test "$ACTUAL_MAIN" = "$EXPECTED_MAIN" || {
-            echo "main moved: expected $EXPECTED_MAIN, found $ACTUAL_MAIN" >&2
+          TEMP="$RUNNER_TEMP/swrlz-client-v101-recovery"
+          git fetch origin main
+          ACTUAL_MAIN_SHA="$(git rev-parse origin/main)"
+          if [[ "$ACTUAL_MAIN_SHA" != "$EXPECTED_MAIN_SHA" ]]; then
+            echo "main moved; refusing promotion" >&2
+            echo "Expected: $EXPECTED_MAIN_SHA" >&2
+            echo "Actual:   $ACTUAL_MAIN_SHA" >&2
             exit 1
-          }
+          fi
 
-      - name: Promote exactly five approved paths
+          git checkout -B recovery-main origin/main
+          mkdir -p "$(dirname "$SOURCE_PATH")" "$(dirname "$CONTRACT_PATH")" "$(dirname "$ROADMAP_PATH")" "$(dirname "$REPORT_PATH")"
+          cp "$TEMP/$OUTPUT_ZIP" "$SOURCE_PATH"
+          cp "$TEMP/CLIENT_CFv1.0.1_SWRLZ.sha256" "$CHECKSUM_PATH"
+          cp "$REQUEST_DIR/payload/CLIENT_VERIFIED_ADMIN_ROUTE_POLICY_V1.md" "$CONTRACT_PATH"
+          cp "$REQUEST_DIR/payload/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY.md" "$ROADMAP_PATH"
+          cp "$REQUEST_DIR/payload/RPT_CF8_276_ADMIN_FALLBACK.md" "$REPORT_PATH"
+
+          git add -- "$SOURCE_PATH" "$CHECKSUM_PATH" "$CONTRACT_PATH" "$ROADMAP_PATH" "$REPORT_PATH"
+          printf '%s\n' \
+            "$CHECKSUM_PATH" \
+            "$CONTRACT_PATH" \
+            "$REPORT_PATH" \
+            "$ROADMAP_PATH" \
+            "$SOURCE_PATH" | sort > "$RUNNER_TEMP/expected-paths.txt"
+          git diff --cached --name-only | sort > "$RUNNER_TEMP/actual-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/actual-paths.txt"
+          test "$(sha256sum "$SOURCE_PATH" | awk '{print $1}')" = "$EXPECTED_SOURCE_SHA"
+          unzip -tq "$SOURCE_PATH"
+          echo "Exact five-path staged diff: PASS"
+
+      - name: Commit and push canonical CLIENT source to main
         id: promote
-        shell: bash
         run: |
           set -euo pipefail
-          PROMOTE_DIR="/tmp/swrlz-client-promote-${GITHUB_RUN_ID}"
-          rm -rf "$PROMOTE_DIR"
-          git worktree add --detach "$PROMOTE_DIR" "$EXPECTED_MAIN"
-          cd "$PROMOTE_DIR"
-
-          mkdir -p SOURCES/CLIENT docs/contracts docs/roadmap reports
-          cp "/tmp/$OUTPUT_ZIP" "SOURCES/CLIENT/$OUTPUT_ZIP"
-          cp "$GITHUB_WORKSPACE/$REQUEST_DIR/payload/CLIENT_CFv1.0.1_SWRLZ.sha256" "SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.sha256"
-          cp "$GITHUB_WORKSPACE/$REQUEST_DIR/payload/CLIENT_VERIFIED_ADMIN_ROUTE_POLICY_V1.md" "docs/contracts/CLIENT_VERIFIED_ADMIN_ROUTE_POLICY_V1.md"
-          cp "$GITHUB_WORKSPACE/$REQUEST_DIR/payload/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY.md" "docs/roadmap/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY.md"
-          cp "$GITHUB_WORKSPACE/$REQUEST_DIR/payload/RPT_CF8_276_ADMIN_FALLBACK.md" "reports/RPT_CF8_276_ADMIN_FALLBACK.md"
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- \
-            "SOURCES/CLIENT/$OUTPUT_ZIP" \
-            SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.sha256 \
-            docs/contracts/CLIENT_VERIFIED_ADMIN_ROUTE_POLICY_V1.md \
-            docs/roadmap/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY.md \
-            reports/RPT_CF8_276_ADMIN_FALLBACK.md
-
-          cat > /tmp/expected-paths.txt <<'EOF'
-          SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.sha256
-          SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.zip
-          docs/contracts/CLIENT_VERIFIED_ADMIN_ROUTE_POLICY_V1.md
-          docs/roadmap/SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY.md
-          reports/RPT_CF8_276_ADMIN_FALLBACK.md
-          EOF
-          git diff --cached --name-only | LC_ALL=C sort > /tmp/actual-paths.txt
-          LC_ALL=C sort -o /tmp/expected-paths.txt /tmp/expected-paths.txt
-          diff -u /tmp/expected-paths.txt /tmp/actual-paths.txt
-
           git commit -m "client: promote v1.0.1 verified admin fallback"
-          PROMOTION_SHA="$(git rev-parse HEAD)"
+          REMOTE_MAIN_SHA="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          if [[ "$REMOTE_MAIN_SHA" != "$EXPECTED_MAIN_SHA" ]]; then
+            echo "main moved after verification; refusing push" >&2
+            exit 1
+          fi
           git push origin HEAD:main
-          echo "promotion_sha=$PROMOTION_SHA" >> "$GITHUB_OUTPUT"
+          PROMOTED_SHA="$(git rev-parse HEAD)"
+          echo "promoted_sha=$PROMOTED_SHA" >> "$GITHUB_OUTPUT"
+          echo "Promoted commit: $PROMOTED_SHA"
 
-      - name: Verify promoted main and dispatch CLIENT build
+      - name: Dispatch existing CLIENT APK build workflow
         env:
           GH_TOKEN: ${{ github.token }}
-          PROMOTION_SHA: ${{ steps.promote.outputs.promotion_sha }}
-        shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main --no-tags
-          test "$(git rev-parse origin/main)" = "$PROMOTION_SHA"
           gh workflow run build-swrlz-apk_target_client_latest.yml \
             --repo "$GITHUB_REPOSITORY" \
             --ref main \
-            -f source_zip=SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.zip \
-            -f sha_file=SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.sha256 \
+            -f source_zip="$SOURCE_PATH" \
+            -f sha_file="$CHECKSUM_PATH" \
             -f release_name=CLIENT_CFv1.0.1_SWRLZ \
             -f commit_release_artifacts=false
+          echo "CLIENT APK workflow dispatch accepted."
 
-      - name: Remove temporary promotion branch
-        if: success()
-        shell: bash
+      - name: Record promotion summary
+        run: |
+          {
+            echo "## CLIENT v1.0.1 temporary recovery promotion"
+            echo
+            echo "- Promoted commit: `${{ steps.promote.outputs.promoted_sha }}`"
+            echo "- Source ZIP: `$SOURCE_PATH`"
+            echo "- Source SHA-256: `$EXPECTED_SOURCE_SHA`"
+            echo "- Exact authorized paths: 5"
+            echo "- Existing CLIENT APK workflow dispatched against `main`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete temporary staging branch
         run: |
           set -euo pipefail
           git push origin --delete "$STAGING_BRANCH"
-
-      - name: Write checkpoint summary
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo "## INTEGRATION-FIX-011C"
-            echo "- Candidate: CLIENT_CFv1.0.1_SWRLZ.zip"
-            echo "- SHA-256: $OUTPUT_SHA256"
-            echo "- Main guard: $EXPECTED_MAIN"
-            echo "- Promotion result: ${{ steps.promote.outcome }}"
-            echo "- Build dispatch and branch cleanup run only after successful promotion."
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Temporary branch cleanup requested."
