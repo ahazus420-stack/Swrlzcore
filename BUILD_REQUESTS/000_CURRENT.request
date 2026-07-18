@@ -1,6 +1,6 @@
 # BUILD REQUEST: 000_CURRENT.request
 # Purpose: Control SWRLZ CLIENT, SERVER, Keyboard, and sCore Launcher APK build lanes.
-# Workflows resolve the newest versioned ZIP and matching SHA-256 inside each lane.
+# Board workflows require exactly one active versioned ZIP and matching SHA-256 in each enabled lane.
 
 request_version=2
 build_variant=debug
@@ -25,7 +25,7 @@ score_launcher_source_lane=SOURCES/SCORE-LAUNCHER
 score_launcher_source_pattern=SCORE_LAUNCHER_CFv*_SWRLZ.zip
 
 # Usage
-# 1. Place one current source ZIP and its matching .sha256 file in the selected lane.
+# 1. Place exactly one current source ZIP and its matching .sha256 file in the selected lane.
 # 2. Keep superseded source sets in that lane's OLD_PATCHES directory.
 # 3. Set only the intended build flag(s) to true.
 # 4. Run the corresponding GitHub Actions workflow manually.
