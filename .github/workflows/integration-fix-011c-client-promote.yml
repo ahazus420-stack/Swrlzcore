@@ -147,3 +147,5 @@ jobs:
             echo "- Promotion result: ${{ steps.promote.outcome }}"
             echo "- Build dispatch and branch cleanup run only after successful promotion."
           } >> "$GITHUB_STEP_SUMMARY"
+
+# re-arm attempt 2: identical scope and gates
