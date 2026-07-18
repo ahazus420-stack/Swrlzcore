@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:allowBackup="false"
+        android:label="SWRLZ Keyboard Scaffold"
+        android:supportsRtl="true">
+
+        <service
+            android:name=".ime.SwrlzInputMethodService"
+            android:exported="true"
+            android:label="SWRLZ Keyboard Scaffold"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+    </application>
+</manifest>
