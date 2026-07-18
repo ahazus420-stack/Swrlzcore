@@ -1,0 +1,4 @@
+INTEGRATION-FIX-011D-BUILD-DISPATCH
+promotion_commit=43d696b02413ad52b30c860ab3d1fcca9dc21e86
+expected_source_sha256=9f567523ad184bfc14751d1aeaf527233a41a8e2a3e82378a68292a2e6a922f7
+authorized_main_paths=0
