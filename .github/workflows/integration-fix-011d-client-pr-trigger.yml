@@ -1,0 +1,53 @@
+name: Temporary CLIENT v1.0.1 PR Trigger Promotion
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - checkpoint/client-v101-promote
+    paths:
+      - ".swrlz-recovery/PR_TRIGGER_011D"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: integration-fix-011d-client-pr-trigger
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: github.event.pull_request.head.ref == 'checkpoint/client-v101-pr-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout verified staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: checkpoint/client-v101-promote
+          fetch-depth: 0
+
+      - name: Verify disposable PR trigger
+        env:
+          TRIGGER_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$TRIGGER_BRANCH"
+          git show "origin/$TRIGGER_BRANCH:.swrlz-recovery/PR_TRIGGER_011D" > "$RUNNER_TEMP/PR_TRIGGER_011D"
+          grep -Fx "INTEGRATION-FIX-011D" "$RUNNER_TEMP/PR_TRIGGER_011D"
+          grep -Fx "expected_source_sha256=9f567523ad184bfc14751d1aeaf527233a41a8e2a3e82378a68292a2e6a922f7" "$RUNNER_TEMP/PR_TRIGGER_011D"
+          grep -Fx "authorized_main_paths=5" "$RUNNER_TEMP/PR_TRIGGER_011D"
+
+      - name: Promote exact verified CLIENT source
+        id: promote
+        run: bash BUILD_REQUESTS/INTEGRATION_FIX_011C/promote_client_v101.sh
+
+      - name: Clean temporary branches
+        if: success()
+        env:
+          TRIGGER_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git push origin --delete "$TRIGGER_BRANCH"
+          git push origin --delete checkpoint/client-v101-promote
