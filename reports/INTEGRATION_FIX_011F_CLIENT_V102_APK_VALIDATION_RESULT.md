@@ -45,8 +45,20 @@
 - Native-library stripping reported that two libraries would be packaged unchanged; the task continued successfully.
 - No release, deployment, installation, update-manifest write, or `main` modification occurred.
 
+## Final authority and cleanup checks
+
+- Signal PR `#13` is closed without merge.
+- Disposable branch `checkpoint/client-v102-build-011f-trigger` is deleted.
+- Temporary workflow `.github/workflows/integration-fix-011f-create-client-v102-and-build.yml` is removed from the diagnostic branch.
+- Temporary sentinel `.swrlz-recovery/INTEGRATION_FIX_011F_TRIGGER` is removed from the diagnostic branch.
+- `SOURCES/CLIENT/CLIENT_CFv1.0.2_SWRLZ.sha256` remains absent from `main`.
+- `main` remains at authority base `f35a9053cbd15c1d5f77b7dd6b5b07e0b778e181` for this checkpoint comparison.
+- The candidate source, checksum, build log, summary, and reports remain isolated on `checkpoint/client-v101-build-failure-011e`.
+
 ## Retained evidence
 
+- `SOURCES/CLIENT/CLIENT_CFv1.0.2_SWRLZ.zip`
+- `SOURCES/CLIENT/CLIENT_CFv1.0.2_SWRLZ.sha256`
 - `BUILD_REQUESTS/INTEGRATION_FIX_011F/build_android_debug.log`
 - `BUILD_REQUESTS/INTEGRATION_FIX_011F/GITHUB_ACTIONS_BUILD_SUMMARY.md`
 - `reports/INTEGRATION_FIX_011F_CLIENT_V102_SUCCESSOR.md`
