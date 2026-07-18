@@ -6,6 +6,12 @@ on:
       - checkpoint/client-v101-build-failure-011e
     paths:
       - ".swrlz-recovery/INTEGRATION_FIX_011E_TRIGGER"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+    paths:
+      - ".swrlz-recovery/INTEGRATION_FIX_011E_TRIGGER"
 
 permissions:
   actions: read
@@ -17,6 +23,7 @@ concurrency:
 
 jobs:
   diagnose:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'checkpoint/client-v101-build-failure-011e'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -55,123 +62,97 @@ jobs:
           unzip -q "$SOURCE_ZIP" -d "$RUNNER_TEMP/client-v101"
           python3 - <<'PY'
           from __future__ import annotations
-
-          import os
-          import pathlib
-          import re
+          import os, pathlib, re
           from datetime import datetime, timezone
 
           log_path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "failed-job.log"
           source_root = pathlib.Path(os.environ["RUNNER_TEMP"]) / "client-v101"
           report_path = pathlib.Path(os.environ["REPORT_PATH"])
           error_path = pathlib.Path(os.environ["ERROR_PATH"])
-
           raw = log_path.read_text(encoding="utf-8", errors="replace")
           ansi = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
           lines = [ansi.sub("", line).rstrip() for line in raw.splitlines()]
-
           markers = (
-              "e: file://",
-              " error:",
-              "error:",
-              "Unresolved reference",
-              "Type mismatch",
-              "Cannot infer",
-              "No value passed",
-              "None of the following",
-              "Execution failed for task",
-              "FAILURE: Build failed",
-              "* What went wrong:",
-              "Compilation error",
+              "e: file://", " error:", "error:", "Unresolved reference",
+              "Type mismatch", "Cannot infer", "No value passed",
+              "None of the following", "Execution failed for task",
+              "FAILURE: Build failed", "* What went wrong:", "Compilation error",
           )
-          hit_indices = {i for i, line in enumerate(lines) if any(marker in line for marker in markers)}
-          selected: set[int] = set()
-          for i in hit_indices:
+          hits = {i for i, line in enumerate(lines) if any(marker in line for marker in markers)}
+          selected = set()
+          for i in hits:
               selected.update(range(max(0, i - 3), min(len(lines), i + 5)))
-
-          diagnostic_lines: list[str] = []
-          last = -2
+          diagnostic_lines, last = [], -2
           for i in sorted(selected):
               if i > last + 1 and diagnostic_lines:
                   diagnostic_lines.append("...")
               diagnostic_lines.append(lines[i])
               last = i
+          if not diagnostic_lines:
+              raise SystemExit("No compiler/build diagnostic markers were found")
 
-          location_re = re.compile(
-              r"(?:file://)?(?P<path>/[^:\s]+\.(?:kt|kts|java)):(?P<line>\d+):(?P<col>\d+)"
-          )
-          locations: list[tuple[str, int, int]] = []
-          seen: set[tuple[str, int, int]] = set()
+          location_re = re.compile(r"(?:file://)?(?P<path>/[^:\s]+\.(?:kt|kts|java)):(?P<line>\d+):(?P<col>\d+)")
+          locations, seen = [], set()
           for line in lines:
               for match in location_re.finditer(line):
                   item = (match.group("path"), int(match.group("line")), int(match.group("col")))
                   if item not in seen:
-                      locations.append(item)
-                      seen.add(item)
+                      locations.append(item); seen.add(item)
 
-          contexts: list[str] = []
+          contexts = []
           for absolute, line_no, col_no in locations:
-              relative_candidates = []
+              candidates = []
               for token in ("CLIENT_CFv1.0.1_SWRLZ/", "CLIENT_CFv1.0.0_SWRLZ/"):
                   if token in absolute:
-                      relative_candidates.append(absolute.split(token, 1)[1])
-              relative_candidates.append(absolute.lstrip("/"))
+                      candidates.append(absolute.split(token, 1)[1])
+              candidates.append(absolute.lstrip("/"))
               target = None
-              for relative in relative_candidates:
+              for relative in candidates:
                   matches = list(source_root.rglob(pathlib.Path(relative).name))
                   exact = [p for p in matches if p.as_posix().endswith(relative)]
                   if exact:
-                      target = exact[0]
-                      break
+                      target = exact[0]; break
                   if matches:
-                      target = matches[0]
-                      break
-              if target is None or not target.is_file():
-                  contexts.append(f"### `{absolute}:{line_no}:{col_no}`\n\nSource file was not resolved inside the archive.\n")
+                      target = matches[0]; break
+              if target is None:
+                  contexts.append(f"### `{absolute}:{line_no}:{col_no}`\n\nSource file not resolved inside archive.\n")
                   continue
-              src_lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
-              start = max(1, line_no - 8)
-              end = min(len(src_lines), line_no + 8)
-              excerpt = "\n".join(f"{n:5d} | {src_lines[n-1]}" for n in range(start, end + 1))
+              src = target.read_text(encoding="utf-8", errors="replace").splitlines()
+              start, end = max(1, line_no - 8), min(len(src), line_no + 8)
+              excerpt = "\n".join(f"{n:5d} | {src[n-1]}" for n in range(start, end + 1))
               rel = target.relative_to(source_root).as_posix()
-              contexts.append(
-                  f"### `{rel}:{line_no}:{col_no}`\n\n```text\n{excerpt}\n```\n"
-              )
-
-          if not diagnostic_lines:
-              raise SystemExit("No compiler/build diagnostic markers were found in the failed job log")
+              contexts.append(f"### `{rel}:{line_no}:{col_no}`\n\n```text\n{excerpt}\n```\n")
 
           error_text = "\n".join(diagnostic_lines).strip() + "\n"
           error_path.write_text(error_text, encoding="utf-8")
-
           now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
           report = f"""# INTEGRATION-FIX-011E — CLIENT v1.0.1 Build Failure Diagnostic
 
-          Generated: `{now}`
+Generated: `{now}`
 
-          ## Scope
+## Scope
 
-          - Source: `SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.zip`
-          - Expected SHA-256: `{os.environ['EXPECTED_SOURCE_SHA']}`
-          - Failed workflow run: `{os.environ['FAILED_RUN_ID']}`
-          - Failed job: `{os.environ['FAILED_JOB_ID']}`
-          - This diagnostic did **not** invoke Gradle, assemble an APK, modify `main`, publish, release, deploy, or install.
+- Source: `SOURCES/CLIENT/CLIENT_CFv1.0.1_SWRLZ.zip`
+- Expected SHA-256: `{os.environ['EXPECTED_SOURCE_SHA']}`
+- Failed workflow run: `{os.environ['FAILED_RUN_ID']}`
+- Failed job: `{os.environ['FAILED_JOB_ID']}`
+- This diagnostic did **not** invoke Gradle, assemble an APK, modify `main`, publish, release, deploy, or install.
 
-          ## Extracted failure evidence
+## Extracted failure evidence
 
-          ```text
-          {error_text.rstrip()}
-          ```
+```text
+{error_text.rstrip()}
+```
 
-          ## Referenced source context
+## Referenced source context
 
-          {chr(10).join(contexts) if contexts else 'No file-and-line compiler location was recoverable from the log.'}
+{chr(10).join(contexts) if contexts else 'No file-and-line compiler location was recoverable from the log.'}
 
-          ## Status
+## Status
 
-          Root-cause classification and a minimal repair patch are prepared separately on this diagnostic branch after review of this evidence.
-          """
-          report_path.write_text("\n".join(line.rstrip() for line in report.splitlines()) + "\n", encoding="utf-8")
+Root-cause classification and a minimal repair patch are prepared separately on this diagnostic branch after review of this evidence.
+"""
+          report_path.write_text(report, encoding="utf-8")
           PY
 
       - name: Commit diagnostic evidence to temporary branch only
