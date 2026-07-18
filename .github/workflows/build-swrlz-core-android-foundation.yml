@@ -1,0 +1,121 @@
+name: Build SWRLZ Core Android Foundation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'SOURCES/CORE_BASE/source/**'
+      - 'BUILD_REQUESTS/000_CURRENT.request'
+      - '.github/workflows/build-swrlz-core-android-foundation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.6
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.6'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Regenerate Gradle wrapper
+        working-directory: SOURCES/CORE_BASE/source
+        run: gradle wrapper --gradle-version 8.6 --distribution-type bin
+
+      - name: Build debug APK
+        working-directory: SOURCES/CORE_BASE/source
+        run: ./gradlew --no-daemon --stacktrace clean :app:assembleDebug
+
+      - name: Package canonical and inheritance source archives
+        run: |
+          set -euo pipefail
+          CORE_DIR="SOURCES/CORE_BASE"
+          CORE_ZIP="SWRLZ_CORE_ANDROID_CFv1.0.1.zip"
+          KEYBOARD_ZIP="SWRLZ_KEYBOARD_BASE_CFv1.0.1.zip"
+          LAUNCHER_ZIP="SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip"
+
+          rm -f "$CORE_DIR/packages/$CORE_ZIP" \
+                "SOURCES/KEYBOARD/$KEYBOARD_ZIP" \
+                "SOURCES/LAUNCHER/$LAUNCHER_ZIP"
+          mkdir -p "$CORE_DIR/packages" SOURCES/KEYBOARD SOURCES/LAUNCHER
+
+          (
+            cd "$CORE_DIR/source"
+            zip -qr "../packages/$CORE_ZIP" . \
+              -x '*/build/*' '.gradle/*' 'local.properties'
+          )
+
+          cp "$CORE_DIR/packages/$CORE_ZIP" "SOURCES/KEYBOARD/$KEYBOARD_ZIP"
+          cp "$CORE_DIR/packages/$CORE_ZIP" "SOURCES/LAUNCHER/$LAUNCHER_ZIP"
+
+          (
+            cd "$CORE_DIR/packages"
+            sha256sum "$CORE_ZIP" > "SWRLZ_CORE_ANDROID_CFv1.0.1.sha256"
+          )
+          (
+            cd SOURCES/KEYBOARD
+            sha256sum "$KEYBOARD_ZIP" > "SWRLZ_KEYBOARD_BASE_CFv1.0.1.sha256"
+          )
+          (
+            cd SOURCES/LAUNCHER
+            sha256sum "$LAUNCHER_ZIP" > "SWRLZ_LAUNCHER_BASE_CFv1.0.1.sha256"
+          )
+
+      - name: Record generated canonical artifacts
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            SOURCES/CORE_BASE/source/gradle/wrapper/gradle-wrapper.jar \
+            SOURCES/CORE_BASE/packages/SWRLZ_CORE_ANDROID_CFv1.0.1.zip \
+            SOURCES/CORE_BASE/packages/SWRLZ_CORE_ANDROID_CFv1.0.1.sha256 \
+            SOURCES/KEYBOARD/SWRLZ_KEYBOARD_BASE_CFv1.0.1.zip \
+            SOURCES/KEYBOARD/SWRLZ_KEYBOARD_BASE_CFv1.0.1.sha256 \
+            SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip \
+            SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.sha256
+          if ! git diff --cached --quiet; then
+            git commit -m "core-base: record CI-verified v1.0.1 packages [skip ci]"
+            git push
+          fi
+
+      - name: Collect build evidence
+        if: always()
+        run: |
+          mkdir -p build-evidence
+          gradle --version > build-evidence/gradle-version.txt 2>&1 || true
+          find SOURCES/CORE_BASE/source -type f -path '*/build/outputs/apk/*/*.apk' -print > build-evidence/apk-paths.txt || true
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SWRLZ_CORE_ANDROID_CFv1.0.1_DEBUG_APK
+          path: SOURCES/CORE_BASE/source/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SWRLZ_CORE_ANDROID_CFv1.0.1_BUILD_EVIDENCE
+          path: build-evidence/
+          if-no-files-found: warn

@@ -1,19 +1,20 @@
 # BUILD REQUEST: 000_CURRENT.request
-# Purpose: Request an automated multi-target APK build for SWRLZ client/server
+# Checkpoint: CORE-BASE-BUILD-001
+# Purpose: Verify the imported SWRLZ Core Android Foundation with GitHub Actions.
 
-# Parameters (edit as needed):
-# build_variant: debug or release
-# targets: comma-separated list of ABIs or flavor names
-
+request_id=CORE-BASE-BUILD-001
+source_lane=SOURCES/CORE_BASE/source
+workflow=.github/workflows/build-swrlz-core-android-foundation.yml
 build_variant=debug
+gradle_task=:app:assembleDebug
+java_version=17
 targets=universal
+expected_apk=SOURCES/CORE_BASE/source/app/build/outputs/apk/debug/app-debug.apk
+artifact_name=SWRLZ_CORE_ANDROID_CFv1.0.1_DEBUG_APK
+package_name=SWRLZ_CORE_ANDROID_CFv1.0.1.zip
 
-# Output artifact: a ZIP containing built APK(s)
-# Usage:
-# - Place this file at repo root and trigger CI or run the workflow locally
-# - CI picks up this request and runs `build-swrlz-apk_multi_target_ready.yml`
-
-# Example command (local):
-# ./gradlew clean :app:assembleDebug
-
-# Generated artifact pattern (CI): SWRLZ_APK_<timestamp>.zip
+# Scope guardrails:
+# - Build verification only.
+# - Do not modify canonical CLIENT or NODE_HOST implementation sources.
+# - Do not publish a release, deploy, or install the APK.
+# - Keyboard and Launcher packages remain non-divergent inheritance seeds.
