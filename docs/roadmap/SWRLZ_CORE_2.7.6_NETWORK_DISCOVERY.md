@@ -142,3 +142,20 @@ Next:
 - On-device SERVER v1.0.3 route and launcher verification
 - Persistent presence registry only through a separately accepted contract
 - 2.8.x Forge Runner / Mission Board / Action Ledger / QA Report
+
+## INTEGRATION-FIX-011A on-device evidence and correction
+
+Fresh installation of repository-built SERVER v1.0.3 proved:
+
+- `/discovery/signature`, `/status`, `/presence/summary`, `/presence/groups`, and `/presence/devices` return HTTP 200.
+- Empty groups/devices are authoritative, zero-count, local NODE_HOST state.
+- The CLIENT Network pulse selected `/admin/devices` and `/admin/queues` when the Admin Mode preference was ON even though no saved/verified token existed.
+- The CLIENT Forget Admin action attempted `/admin/session/revoke` even with no local token, and generic error mapping mislabeled the resulting route-specific 404 as `/status` unavailable.
+- The SERVER launcher image was functionally installed but visibly distorted because the foreground originated from a 72×72 indexed transport derivative.
+
+Prepared successors:
+
+- `CLIENT_CFv1.0.1_SWRLZ.zip`: verified-admin route policy, local-first Forget Admin, actual-route error reporting, restored-toggle normalization, and Radar read-health separation.
+- `SERVER_CFv1.0.4_SWRLZ.zip`: icon-only successor using the accepted high-resolution Glitch Dragon Core master; v1.0.3 compatibility/runtime source remains byte-identical.
+
+Repository promotion and APK builds remain separately approval-gated for each lane.
