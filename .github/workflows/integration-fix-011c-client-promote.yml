@@ -5,7 +5,7 @@ on:
     branches:
       - checkpoint/client-v101-promote
     paths:
-      - .github/workflows/integration-fix-011c-client-promote.yml
+      - BUILD_REQUESTS/INTEGRATION_FIX_011C/READY
 
 permissions:
   contents: write
@@ -32,6 +32,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Verify authorization sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat "$REQUEST_DIR/READY"
+          grep -Fx "INTEGRATION-FIX-011C" "$REQUEST_DIR/READY"
+          grep -Fx "expected_main=$EXPECTED_MAIN" "$REQUEST_DIR/READY"
+          grep -Fx "expected_source_sha256=$OUTPUT_SHA256" "$REQUEST_DIR/READY"
+          grep -Fx "authorized_main_paths=5" "$REQUEST_DIR/READY"
 
       - name: Verify staged reconstruction evidence
         shell: bash
@@ -147,5 +157,3 @@ jobs:
             echo "- Promotion result: ${{ steps.promote.outcome }}"
             echo "- Build dispatch and branch cleanup run only after successful promotion."
           } >> "$GITHUB_STEP_SUMMARY"
-
-# re-arm attempt 2: identical scope and gates
