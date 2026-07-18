@@ -1,0 +1,73 @@
+/core/net/AdminRoutePolicy.kt
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/net/AdminRoutePolicy.kt	1970-01-01 00:00:00.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/net/AdminRoutePolicy.kt	2026-07-18 00:00:00.000000000 +0000
+@@ -0,0 +1,19 @@
++package sh.swurlz.core.net
++
++/**
++ * Single source of truth for choosing authenticated admin surfaces.
++ * A UI preference alone never grants admin routing authority.
++ */
++object AdminRoutePolicy {
++    fun hasVerifiedSession(
++        modeEnabled: Boolean,
++        savedToken: String,
++        lastVerifiedAt: String,
++    ): Boolean = modeEnabled && savedToken.isNotBlank() && lastVerifiedAt.isNotBlank()
++
++    fun devicesPath(hasVerifiedSession: Boolean): String =
++        if (hasVerifiedSession) "/admin/devices" else "/presence/devices"
++
++    fun queuePath(hasVerifiedSession: Boolean): String? =
++        if (hasVerifiedSession) "/admin/queues" else null
++}
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/net/Api.kt ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/net/Api.kt
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/net/Api.kt	2026-07-14 15:56:40.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/net/Api.kt	2026-07-18 00:00:00.000000000 +0000
+@@ -221,7 +221,7 @@
+ 
+ 
+ class CoreNodeNotConfiguredException : IllegalStateException("Local Core Node is not configured")
+-class CoreNodeHttpException(val statusCode: Int, message: String) : IllegalStateException(message)
++class CoreNodeHttpException(val statusCode: Int, val route: String, message: String) : IllegalStateException(message)
+ class CoreNodeProtocolException(message: String) : IllegalStateException(message)
+ 
+ object CoreNodeApi {
+@@ -416,17 +416,52 @@
+     }
+ 
+     suspend fun revokeSavedAdminSession(ctx: Context): String {
+-        val c = connection(ctx)
+         val token = SecretStore.adminSessionToken(ctx)
+-        val response = Api.http.post("${c.base}/admin/session/revoke") {
+-            applyCoreSavedAdminAuth(ctx, c.token)
+-            contentType(ContentType.Application.Json)
+-            setBody(Api.json.encodeToString(mapOf("admin_session_token" to token)))
++        if (token.isBlank()) {
++            Prefs.forgetAdminSession(ctx)
++            return buildJsonObject {
++                put("ok", true)
++                put("local_session_forgotten", true)
++                put("remote_revoke", "skipped_no_saved_token")
++                put("message", "No saved admin token remained; local admin state was cleared without contacting the NODE_HOST.")
++            }.toString()
+         }
+-        val body = response.bodyAsText()
+-        validate(response, body)
++
++        val remoteResult = runCatching {
++            val c = connection(ctx)
++            val response = Api.http.post("${c.base}/admin/session/revoke") {
++                applyCoreSavedAdminAuth(ctx, c.token)
++                contentType(ContentType.Application.Json)
++                setBody(Api.json.encodeToString(mapOf("admin_session_token" to token)))
++            }
++            val body = response.bodyAsText()
++            validate(response, body)
++            body
++        }
++
++        // Local-first safety rule: forgetting local credentials must never depend on
++        // an optional remote revoke route being implemented or reachable.
+         Prefs.forgetAdminSession(ctx)
+-      
