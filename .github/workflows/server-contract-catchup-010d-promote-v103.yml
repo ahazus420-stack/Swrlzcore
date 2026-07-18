@@ -23,7 +23,7 @@ jobs:
       REQUEST_DIR: BUILD_REQUESTS/SERVER_CONTRACT_CATCHUP_010D
       BASE_ZIP: SOURCES/SERVER/SERVER_CFv1.0.2_SWRLZ.zip
       BASE_SHA: 9d278bed4944eee20d6b9dc1ea89ba9363c30a7e7daa5b91b44836c386abd200
-      OVERLAY_SHA: 4968790201758a506cc2b434da936473b4aa3889a237ae2851575b1d44cc0919
+      OVERLAY_SHA: c7a74dd0cfa122c8580378dbbf1edc4f058fe0e8c1f50f77c2e7460d2b514e07
       OUTPUT_ZIP: SOURCES/SERVER/SERVER_CFv1.0.3_SWRLZ.zip
 
     steps:
@@ -55,16 +55,16 @@ jobs:
           WORK="$RUNNER_TEMP/server-contract-catchup-010d"
           rm -rf "$WORK"
           mkdir -p "$WORK/overlay" "$WORK/output"
-          cat "$REQUEST_DIR"/OVERLAY_PARTS/part-*.b64 | base64 -d > "$WORK/SERVER_CONTRACT_CATCHUP_010D_COMPACT_OVERLAY.zip"
-          ACTUAL_OVERLAY_SHA="$(sha256sum "$WORK/SERVER_CONTRACT_CATCHUP_010D_COMPACT_OVERLAY.zip" | awk '{print $1}')"
+          cat "$REQUEST_DIR"/MINI_OVERLAY_PARTS/mini-*.b64 | base64 -d > "$WORK/SERVER_CONTRACT_CATCHUP_010D_MINI_OVERLAY.zip"
+          ACTUAL_OVERLAY_SHA="$(sha256sum "$WORK/SERVER_CONTRACT_CATCHUP_010D_MINI_OVERLAY.zip" | awk '{print $1}')"
           [[ "$ACTUAL_OVERLAY_SHA" == "$OVERLAY_SHA" ]] || {
             echo "Compact overlay checksum mismatch: $ACTUAL_OVERLAY_SHA" >&2
             exit 1
           }
-          unzip -tq "$WORK/SERVER_CONTRACT_CATCHUP_010D_COMPACT_OVERLAY.zip"
-          unzip -q "$WORK/SERVER_CONTRACT_CATCHUP_010D_COMPACT_OVERLAY.zip" -d "$WORK/overlay"
+          unzip -tq "$WORK/SERVER_CONTRACT_CATCHUP_010D_MINI_OVERLAY.zip"
+          unzip -q "$WORK/SERVER_CONTRACT_CATCHUP_010D_MINI_OVERLAY.zip" -d "$WORK/overlay"
           echo "WORK=$WORK" >> "$GITHUB_ENV"
-          echo "OVERLAY_ROOT=$WORK/overlay/COMPACT_OVERLAY" >> "$GITHUB_ENV"
+          echo "OVERLAY_ROOT=$WORK/overlay/MINI_OVERLAY" >> "$GITHUB_ENV"
 
       - name: Apply routes and Glitch Dragon Core launcher resources
         run: |
