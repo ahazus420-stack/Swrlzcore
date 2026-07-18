@@ -64,13 +64,18 @@ jobs:
           [[ -n "$LANE" ]] || LANE="SOURCES/SWRLZ-BOARD"
           [[ -n "$PATTERN" ]] || PATTERN="KEYBOARD_CFv*_SWRLZ.zip"
           [[ "$VARIANT" == "debug" || "$VARIANT" == "release" ]] || { echo "Unsupported build variant: $VARIANT" >&2; exit 1; }
+          [[ -d "$LANE" ]] || { echo "Keyboard source lane does not exist: $LANE" >&2; exit 1; }
 
           ZIP="$INPUT_ZIP"
           if [[ -z "$ZIP" ]]; then
             [[ "$ENABLED" == "true" ]] || { echo "build_keyboard is not true in $REQUEST and no manual source ZIP was supplied." >&2; exit 1; }
             mapfile -t ACTIVE_ZIPS < <(find "$LANE" -maxdepth 1 -type f -name "$PATTERN" | sort -V)
-            [[ ${#ACTIVE_ZIPS[@]} -gt 0 ]] || { echo "No Keyboard source ZIP found in $LANE matching $PATTERN" >&2; exit 1; }
-            ZIP="${ACTIVE_ZIPS[-1]}"
+            [[ ${#ACTIVE_ZIPS[@]} -eq 1 ]] || {
+              echo "Expected exactly one active Keyboard source ZIP in $LANE matching $PATTERN; found ${#ACTIVE_ZIPS[@]}." >&2
+              printf '%s\n' "${ACTIVE_ZIPS[@]:-}" >&2
+              exit 1
+            }
+            ZIP="${ACTIVE_ZIPS[0]}"
           fi
           [[ -f "$ZIP" ]] || { echo "Keyboard source ZIP not found: $ZIP" >&2; exit 1; }
 
@@ -92,9 +97,10 @@ jobs:
           SHA: ${{ steps.resolve.outputs.sha }}
         run: |
           set -euo pipefail
-          EXPECTED="$(awk '{print $1; exit}' "$SHA")"
+          EXPECTED="$(awk 'NF {print $1; exit}' "$SHA")"
           ACTUAL="$(sha256sum "$ZIP" | awk '{print $1}')"
-          [[ -n "$EXPECTED" && "$EXPECTED" == "$ACTUAL" ]] || { echo "SHA-256 mismatch for $ZIP" >&2; exit 1; }
+          [[ "$EXPECTED" =~ ^[A-Fa-f0-9]{64}$ ]] || { echo "Malformed SHA-256 value in $SHA" >&2; exit 1; }
+          [[ "${EXPECTED,,}" == "$ACTUAL" ]] || { echo "SHA-256 mismatch for $ZIP" >&2; exit 1; }
 
       - name: Extract and locate Gradle project
         id: project
@@ -103,12 +109,19 @@ jobs:
           EXTRACT_DIR: ${{ steps.resolve.outputs.extract_dir }}
         run: |
           set -euo pipefail
+          if unzip -Z1 "$ZIP" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo "Unsafe ZIP entry detected; refusing extraction." >&2
+            exit 1
+          fi
           rm -rf "$EXTRACT_DIR"
           mkdir -p "$EXTRACT_DIR"
           unzip -q "$ZIP" -d "$EXTRACT_DIR"
-          GRADLEW="$(find "$EXTRACT_DIR" -maxdepth 6 -type f -name gradlew | sort | head -n1 || true)"
-          [[ -n "$GRADLEW" ]] || { echo "No Gradle wrapper found in source ZIP" >&2; find "$EXTRACT_DIR" -maxdepth 4 -type f | sort >&2; exit 1; }
+          mapfile -t GRADLE_WRAPPERS < <(find "$EXTRACT_DIR" -maxdepth 6 -type f -name gradlew | sort)
+          [[ ${#GRADLE_WRAPPERS[@]} -eq 1 ]] || { echo "Expected exactly one Gradle wrapper; found ${#GRADLE_WRAPPERS[@]}." >&2; exit 1; }
+          GRADLEW="${GRADLE_WRAPPERS[0]}"
           PROJECT_DIR="$(dirname "$GRADLEW")"
+          [[ -f "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties" ]] || { echo "Missing Gradle wrapper properties." >&2; exit 1; }
+          [[ -f "$PROJECT_DIR/settings.gradle.kts" || -f "$PROJECT_DIR/settings.gradle" ]] || { echo "Missing Gradle settings file." >&2; exit 1; }
           chmod +x "$GRADLEW"
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
@@ -124,6 +137,8 @@ jobs:
           ./gradlew --no-daemon --stacktrace clean "$TASK" | tee "$RUNNER_TEMP/keyboard-gradle-build.log"
           APK_DIR="$PROJECT_DIR/app/build/outputs/apk/$VARIANT"
           [[ -d "$APK_DIR" ]] || { echo "APK output directory not found: $APK_DIR" >&2; find "$PROJECT_DIR" -type f -name '*.apk' >&2 || true; exit 1; }
+          mapfile -t APKS < <(find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' | sort)
+          [[ ${#APKS[@]} -gt 0 ]] || { echo "No APK artifacts found in $APK_DIR" >&2; exit 1; }
           echo "apk_dir=$APK_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Record provenance
