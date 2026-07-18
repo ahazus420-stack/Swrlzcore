@@ -6,6 +6,7 @@
 - Client versionName target: `v0.2.7.6-network-discovery`
 - Client versionCode target: `19`
 - Server lane: `0.7.3-DISCOVERY-SIGNATURE`
+- Current Android NODE_HOST contract-sync candidate: `SERVER_CFv1.0.3_SWRLZ.zip`
 
 ## Purpose
 
@@ -74,6 +75,38 @@ Expected response:
 }
 ```
 
+## SERVER v1.0.3 contract-sync addendum
+
+The Android NODE_HOST successor `SERVER_CFv1.0.3_SWRLZ.zip` preserves
+`GET /discovery/signature` and adds a bounded read-only compatibility surface
+on the same local-link listener:
+
+```http
+GET /status
+GET /presence/summary
+GET /presence/groups
+GET /presence/devices
+```
+
+These routes report only locally provable NODE_HOST state. Until a separately
+accepted persistent presence registry exists, presence is represented as an
+authoritative empty state with zero counts and empty collections. No demo node,
+synthetic device, group, online state, pairing, trust, or mission authority is
+invented.
+
+The v1.0.3 candidate advances the Android source to `versionCode 2` and
+`versionName 1.0.3`, retains protocol/schema version `1`, and adds deterministic
+Glitch Dragon Core launcher resources.
+
+### Canonical integration correction
+
+The checksum-matching v1.0.2 source uses the accepted `NodeHealth` / `_health`
+runtime model. The earlier staged one-shot applicator references stale runtime
+symbols and cannot be treated as proof that it can promote the canonical base.
+The prepared v1.0.3 source integrates directly against the actual canonical
+source. The stale manual workflow remains unmodified and must not be dispatched
+as part of the source-ZIP auto-build path.
+
 ## Acceptance test
 
 1. Build `SWRLZ_CORE_2.7.6_NETWORK_DISCOVERY` through GitHub Actions forge.
@@ -85,20 +118,27 @@ Expected response:
 7. Save the server URL.
 8. Open Admin Registry and Radar against the saved node.
 9. Confirm ghost/legacy device profiles are treated as archived lineage objects, not hard-deleted by default.
+10. Commit the approved `SERVER_CFv1.0.3_SWRLZ.zip` to `SOURCES/SERVER/` and allow the existing SERVER auto-build to run.
+11. Install the resulting NODE_HOST APK.
+12. Confirm `/status`, `/presence/summary`, `/presence/groups`, and `/presence/devices` return truthful `200` JSON responses.
+13. Confirm empty presence remains zero-count/empty-array state with no fabricated rows.
+14. Confirm the Glitch Dragon Core launcher icon renders correctly.
 
 ## Roadmap position
 
 Previous:
 
 - 2.7.5 CODEFIX1 Build Identity Sync
+- 0.7.3 Discovery Signature foundation
 
 Current:
 
 - 2.7.6 Network Discovery
-- 0.7.3 Discovery Signature
+- SERVER v1.0.3 CLIENT compatibility contract sync
 - Ghost Device Vault / Legacy Device Archive architecture rule
 
 Next:
 
-- 0.8.0 Node Host APK
+- On-device SERVER v1.0.3 route and launcher verification
+- Persistent presence registry only through a separately accepted contract
 - 2.8.x Forge Runner / Mission Board / Action Ledger / QA Report
