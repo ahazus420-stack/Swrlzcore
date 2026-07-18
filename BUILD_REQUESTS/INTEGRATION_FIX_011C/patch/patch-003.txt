@@ -1,0 +1,62 @@
+   return body
++
++        return remoteResult.fold(
++            onSuccess = { remoteBody ->
++                buildJsonObject {
++                    put("ok", true)
++                    put("local_session_forgotten", true)
++                    put("remote_revoke", "confirmed")
++                    put("remote_response", remoteBody.take(500))
++                }.toString()
++            },
++            onFailure = { err ->
++                buildJsonObject {
++                    put("ok", true)
++                    put("local_session_forgotten", true)
++                    put("remote_revoke", "unavailable")
++                    put("remote_error", cleanFailure(err))
++                    put("message", "Local admin state was cleared; remote revoke was unavailable or unsupported.")
++                }.toString()
++            },
++        )
+     }
+ 
+     suspend fun createGroup(ctx: Context, groupId: String, groupKey: String, label: String): String {
+@@ -623,10 +658,10 @@
+     fun userMessage(t: Throwable): String = when (t) {
+         is CoreNodeNotConfiguredException -> "core node not configured"
+         is CoreNodeHttpException -> when (t.statusCode) {
+-            401, 403 -> "core node pairing rejected"
+-            404 -> "core node /status route unavailable"
+-            in 500..599 -> "core node service error"
+-            else -> "core node returned HTTP ${t.statusCode}"
++            401, 403 -> "core node authorization rejected for ${t.route}"
++            404 -> "core node route unavailable: ${t.route}"
++            in 500..599 -> "core node service error at ${t.route}"
++            else -> "core node returned HTTP ${t.statusCode} for ${t.route}"
+         }
+         is CoreNodeProtocolException -> "core node returned an invalid response"
+         else -> when {
+@@ -685,7 +720,7 @@
+     private fun validate(response: HttpResponse, body: String) {
+         if (!response.status.isSuccess()) {
+             val detail = body.take(240).ifBlank { response.status.description }
+-            throw CoreNodeHttpException(response.status.value, detail)
++            throw CoreNodeHttpException(response.status.value, response.request.url.encodedPath, detail)
+         }
+         val type = response.headers[HttpHeaders.ContentType].orEmpty().lowercase()
+         if (type.isNotBlank() && !type.contains("application/json")) {
+ diff -ruN cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/ui/screens/CommandsScreen.kt ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/ui/screens/CommandsScreen.kt
+--- cbase/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/ui/screens/CommandsScreen.kt	2026-07-14 15:56:40.000000000 +0000
++++ ccand/CLIENT_CFv1.0.0_SWRLZ/android/app/src/main/java/sh/swurlz/core/ui/screens/CommandsScreen.kt	2026-07-18 00:00:00.000000000 +0000
+@@ -109,6 +109,7 @@
+     var showDebug by remember { mutableStateOf(false) }
+     var showAdminManual by remember { mutableStateOf(false) }
+     var status by remember { mutableStateOf("Relay Radar ready") }
++    var radarStatus by remember { mutableStateOf("Relay Radar ready") }
+     var output by remember { mutableStateOf("No debug output yet. Use Refresh Radar to pull server groups/devices, then tap a device card to select a target.") }
+     var groups by remember { mutableStateOf<List<GroupCardModel>>(emptyList()) }
+     var devices by remember { mutableStateOf<List<DeviceCardModel>>(emptyList()) }
+@@ -158,16 +159,20 @@
+ 
+     suspend fun runRaw(label: S
