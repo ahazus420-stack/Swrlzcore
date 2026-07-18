@@ -1,20 +1,50 @@
 # BUILD REQUEST: 000_CURRENT.request
-# Checkpoint: CORE-BASE-BUILD-001
-# Purpose: Verify the imported SWRLZ Core Android Foundation with GitHub Actions.
+# Checkpoint: CORE-BASE-BUILD-001B
+# Purpose: Enable independent GitHub Actions verification for the Core Base,
+# Keyboard inheritance lane, and Launcher inheritance lane.
 
-request_id=CORE-BASE-BUILD-001
-source_lane=SOURCES/CORE_BASE/source
-workflow=.github/workflows/build-swrlz-core-android-foundation.yml
+request_id=CORE-BASE-BUILD-001B
 build_variant=debug
 gradle_task=:app:assembleDebug
 java_version=17
 targets=universal
+
+# Independent build lanes.
+# Each lane has its own workflow, source archive or source directory,
+# expected APK path, and uploaded artifact identity.
+
+[core_base]
+enabled=true
+source_lane=SOURCES/CORE_BASE/source
+workflow=.github/workflows/build-swrlz-core-android-foundation.yml
 expected_apk=SOURCES/CORE_BASE/source/app/build/outputs/apk/debug/app-debug.apk
 artifact_name=SWRLZ_CORE_ANDROID_CFv1.0.1_DEBUG_APK
 package_name=SWRLZ_CORE_ANDROID_CFv1.0.1.zip
 
+[keyboard_base]
+enabled=true
+source_archive=SOURCES/KEYBOARD/SWRLZ_KEYBOARD_BASE_CFv1.0.1.zip
+checksum_file=SOURCES/KEYBOARD/SWRLZ_KEYBOARD_BASE_CFv1.0.1.sha256
+workflow=.github/workflows/build-swrlz-keyboard-base.yml
+workspace=build-work/keyboard
+expected_apk=build-work/keyboard/app/build/outputs/apk/debug/app-debug.apk
+artifact_name=SWRLZ_KEYBOARD_BASE_CFv1.0.1_DEBUG_APK
+package_name=SWRLZ_KEYBOARD_BASE_CFv1.0.1.zip
+
+[launcher_base]
+enabled=true
+source_archive=SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip
+checksum_file=SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.sha256
+workflow=.github/workflows/build-swrlz-launcher-base.yml
+workspace=build-work/launcher
+expected_apk=build-work/launcher/app/build/outputs/apk/debug/app-debug.apk
+artifact_name=SWRLZ_LAUNCHER_BASE_CFv1.0.1_DEBUG_APK
+package_name=SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip
+
 # Scope guardrails:
 # - Build verification only.
+# - Keyboard and Launcher remain independent inheritance lineages.
 # - Do not modify canonical CLIENT or NODE_HOST implementation sources.
-# - Do not publish a release, deploy, or install the APK.
-# - Keyboard and Launcher packages remain non-divergent inheritance seeds.
+# - Do not publish a release, deploy, or install any APK.
+# - A successful base build does not prove Keyboard or Launcher behavior beyond
+#   compilation of the inherited foundation source.
