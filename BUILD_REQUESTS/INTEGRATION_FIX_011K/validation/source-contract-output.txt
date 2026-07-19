@@ -1,0 +1,10 @@
+INTEGRATION-FIX-011K source contract validation: PASS
+- protocol/schema: 1/1
+- write routes: 4
+- registry-backed reads: 3
+- lease: 90s
+- heartbeat recommendation: 30s
+- pairing: Android Keystore-backed local access gate
+- LAN writes: fail closed
+- Gradle/APK: not invoked by this validator
+- validator_sha256: 5890827b113541231ae8c2c9e9cbccd59cf210b165da6222ddc42218e0eb27ce
