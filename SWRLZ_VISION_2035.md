@@ -31,3 +31,9 @@ Future Experiences
 Engineering Philosophy
 Today's engineering should naturally support tomorrow's architecture.
 Every improvement should strengthen the platform as a whole.
+Invisible complexity should converge; visible behavior may diverge.
+SWRLZ grows by adding capabilities to the ecosystem, not by creating isolated islands.
+
+Architecture North Star
+- `docs/architecture/SWRLZ_PLATFORM_MAP_V1.md` maps app shells, shared modules, capabilities, trust boundaries, communication paths, contract dependencies, and unresolved target-state decisions.
+- The Platform Map integrates this long-term vision with accepted contracts and Architecture Decision Records without replacing them.
