@@ -1,0 +1,122 @@
+{
+  "apkBuilt": false,
+  "base": {
+    "entries": 64,
+    "filename": "SERVER_CFv1.0.3_SWRLZ.zip",
+    "sha256": "127705a321127a05bd4c556016de4bf726fbaaa4e255f256a00e7564f44095c5"
+  },
+  "candidate": {
+    "entries": 69,
+    "filename": "SERVER_CFv1.1.0_SWRLZ.zip",
+    "sha256": "f1066675e7bccffac55bc56b8c5a5e4666ad4511c65bf84036a0a8d4bfc8a26f",
+    "size": 143721
+  },
+  "changedPaths": [
+    {
+      "path": "INTEGRATION_FIX_011K_IMPLEMENTATION_REPORT.md",
+      "sha256": "3203c172d461772ccc21f8efce2a59ac39b4350a9d6acb12ebbdf489f428a320",
+      "size": 7499
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "sha256": "0d411a652e32bde0132ff0c8dd83b8805d247156aa6e61bfbd2bb3562c36d4fd",
+      "size": 3096
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/DiscoveryProtocol.kt",
+      "sha256": "9b0cf935a10b97de01e0792265e9d60e21021c3635ca717893a7bf3f7335ce0e",
+      "size": 6380
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/NodeCompatibilityProtocol.kt",
+      "sha256": "b838106b64efea453f74a71ca49bb47fd28652c517c97fb78123fe7f6bb0e6a2",
+      "size": 11142
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/NodeRuntime.kt",
+      "sha256": "1356a15347b85ed744e88991bedd95636061d14ab8dc870332bde8ce7242a3bd",
+      "size": 23723
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/PresencePairingAuthority.kt",
+      "sha256": "43a54d4160f0b7e4923f7816f522796e539153774835feb1005513dd9eb46604",
+      "size": 4496
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/PresenceProtocol.kt",
+      "sha256": "251392a8c86c6603ae0102fac55c1c9450c278d04b4e28f16212c031becde901",
+      "size": 16558
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/PresenceRegistry.kt",
+      "sha256": "659f414fe2e4d430284ae8c008208a613c63b00ce635927d7413664bf0059f12",
+      "size": 34442
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/ui/HostScreen.kt",
+      "sha256": "f4033e53736bac4114976e19be49fee3fab13237ac0c7f972ee0cbeb07e45bd4",
+      "size": 9396
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/ui/viewmodel/HostViewModel.kt",
+      "sha256": "ee0099131fb147985b5e2fb9ad5d6a2165aff1782df8a1d2ec22cb6df0c14e88",
+      "size": 4290
+    },
+    {
+      "path": "scripts/test_presence_registry_011k.py",
+      "sha256": "5890827b113541231ae8c2c9e9cbccd59cf210b165da6222ddc42218e0eb27ce",
+      "size": 8854
+    }
+  ],
+  "checkpoint": "INTEGRATION-FIX-011K",
+  "contract": "SWRLZ-PRESENCE-WRITE-V1",
+  "gradleInvoked": false,
+  "protocolVersion": 1,
+  "schemaVersion": 1,
+  "transport": {
+    "decodedSha256": "8e2f07bd5fc2632dbf22280b95198c1a3cf15e975818f2e5b076880ae40108c6",
+    "decodedSize": 30261,
+    "format": "deterministic tar.gz replacement bundle encoded as RFC 4648 base64",
+    "materializer": "BUILD_REQUESTS/INTEGRATION_FIX_011K/materialize_server_v110_011k.py",
+    "note": "The temporary branch stores a lossless deterministic replacement transport as ordered base64 text chunks; materialization concatenates them and must reproduce the candidate SHA-256 exactly.",
+    "parts": [
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011K/transport/part-00.b64",
+        "sha256": "d2ab505db49311728ebbf700f521bfcc2a989967efc41606061f95c59f83c7a7",
+        "size": 6000
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011K/transport/part-01.b64",
+        "sha256": "4b6a3976ced8870fc068f8922cd0a1f9dc968a90e1d812ae3296da075dccefa9",
+        "size": 6000
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011K/transport/part-02.b64",
+        "sha256": "bc76c7956dc4bba284aaf378cd0aa316ffde5c4ae4ca0e06c2d33d003c930969",
+        "size": 6000
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011K/transport/part-03.b64",
+        "sha256": "f5614828a7f432191358b921f131dcfb55622378da0c2631e640c66c2c4cee09",
+        "size": 6000
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011K/transport/part-04.b64",
+        "sha256": "639df885683684b05c194bd28f4456931d7b2255e88810ac74ba3d8092bfc43b",
+        "size": 6000
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011K/transport/part-05.b64",
+        "sha256": "44bb07dda6333e05fb0629f26c067a9c2bbcfd66a24c58d1fafa7739ef868cbd",
+        "size": 6000
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011K/transport/part-06.b64",
+        "sha256": "b86f715e650de4cc2599e77de13feb955a61a4775c2fd59851bdb2c307f96589",
+        "size": 4348
+      }
+    ],
+    "path": "BUILD_REQUESTS/INTEGRATION_FIX_011K/transport/part-*.b64"
+  },
+  "workflowTriggeredByPreparation": false
+}
