@@ -1,0 +1,133 @@
+package sh.swrlz.nodehost.service
+
+import android.content.Context
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.NetworkInterface
+import java.net.ServerSocket
+import java.net.Socket
+import java.net.SocketException
+import java.net.URLDecoder
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.util.Locale
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+class NodeRuntime(context: Context) {
+    private val appContext = context.applicationContext
+    private val running = AtomicBoolean(false)
+    private val identityStore = NodeIdentityStore(appContext)
+    private val diagnostics = RuntimeDiagnostics(appContext)
+    private val presenceRegistry = PresenceRegistry(appContext)
+    private val pairingAuthority = PresencePairingAuthority(appContext)
+    private val pairedLanAuthority = PairedLanRequestAuthority(
+        pairingValidator = pairingAuthority::validate,
+        proofKeyResolver = DeviceProofKeyResolver.UNBOUND,
+    )
+    private val _health = MutableStateFlow(NodeHealth())
+    val health: StateFlow<NodeHealth> = _health.asStateFlow()
+    val diagnosticSnapshot: StateFlow<RuntimeDiagnosticSnapshot> = diagnostics.snapshot
+
+    @Volatile
+    private var activeIdentity: NodeHostIdentity? = null
+
+    @Volatile
+    private var hostVersion: String = ""
+
+    private var privateServerSocket: ServerSocket? = null
+    private var privateServerThread: Thread? = null
+    private val discoverySockets = CopyOnWriteArrayList<ServerSocket>()
+    private val discoveryThreads = CopyOnWriteArrayList<Thread>()
+
+    @Synchronized
+    fun start(): NodeHealth {
+        if (!running.compareAndSet(false, true)) return _health.value
+
+        _health.value = NodeHealth(
+            runtimeStatus = RuntimeStatus.STARTING,
+            privateApi = ListenerHealth(ListenerStatus.STARTING),
+            discoveryLoopback = ListenerHealth(ListenerStatus.STARTING),
+            discoveryLan = ListenerHealth(ListenerStatus.STARTING),
+            lastFailure = _health.value.lastFailure,
+            lastSuccessfulStartEpochMs = _health.value.lastSuccessfulStartEpochMs,
+        )
+        diagnostics.record("INFO", "runtime_starting")
+
+        var stage = "identity"
+        var privateSocket: ServerSocket? = null
+        try {
+            val identity = identityStore.loadOrCreate()
+            stage = "version"
+            val version = resolveHostVersion()
+
+            stage = "private_8080"
+            val boundPrivateSocket = ServerSocket(PRIVATE_PORT, BACKLOG, InetAddress.getLoopbackAddress())
+            privateSocket = boundPrivateSocket
+            _health.value = _health.value.copy(privateApi = ListenerHealth(ListenerStatus.RUNNING, "127.0.0.1:$PRIVATE_PORT"))
+            diagnostics.record("INFO", "listener_bound", "private_api 127.0.0.1:$PRIVATE_PORT")
+
+            stage = "discovery_8787"
+            val localDiscoverySockets = bindDiscoverySockets()
+            val loopbackSocket = localDiscoverySockets.firstOrNull { it.inetAddress.isLoopbackAddress }
+            if (loopbackSocket == null) {
+                boundPrivateSocket.close()
+                throw IllegalStateException("Discovery loopback listener is unavailable")
+            }
+            val lanCount = localDiscoverySockets.count { !it.inetAddress.isLoopbackAddress }
+
+            activeIdentity = identity
+            hostVersion = version
+            privateServerSocket = boundPrivateSocket
+            discoverySockets.addAll(localDiscoverySockets)
+
+            val now = System.currentTimeMillis()
+            _health.value = _health.value.copy(
+                runtimeStatus = if (lanCount > 0) RuntimeStatus.RUNNING else RuntimeStatus.DEGRADED,
+                discoveryLoopback = ListenerHealth(ListenerStatus.RUNNING, "127.0.0.1:${DiscoveryProtocol.PORT}"),
+                discoveryLan = if (lanCount > 0) {
+                    ListenerHealth(ListenerStatus.RUNNING, "$lanCount approved LAN listener(s)")
+                } else {
+                    ListenerHealth(ListenerStatus.UNAVAILABLE, "No approved LAN interface; loopback remains active")
+                },
+                lastSuccessfulStartEpochMs = now,
+            )
+
+            privateServerThread = listenerThread("swrlz-private-runtime") {
+                servePrivateRuntime(boundPrivateSocket)
+                reportUnexpectedListenerExit(
+                    listener = ListenerKind.PRIVATE_API,
+                    detail = "Private API listener terminated unexpectedly",
+                )
+            }
+            privateServerThread?.start()
+
+            localDiscoverySockets.forEach { socket ->
+                val address = socket.inetAddress.hostAddress ?: "unknown"
+                listenerThread("swrlz-discovery-$address") {
+                    serveDiscovery(socket)
+                    reportUnexpectedListenerExit(
+                        listener = if (socket.inetAddress.isLoopbackAddress) {
+                            ListenerKind.DISCOVERY_LOOPBACK
+                        } else {
+                            ListenerKind.DISCOVERY_LAN
+                        },
+                        detail = "Discovery listener $address terminated unexpectedly",
+                    )
+                }.also { thread ->
+                    discoveryThreads += thread
+                    thread.start()
+                }
+                diagnostics.record("INFO", "listener_bound", "discovery $address:${DiscoveryProtocol.PORT}")
+            }
+
+            diagnostics.record("INFO", "runtime_started", "status=${_health.value.runtimeStatus}")
+            return _health.value
