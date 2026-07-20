@@ -1,0 +1,126 @@
+package sh.swrlz.nodehost.service
+
+import java.time.Instant
+import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
+
+/** Protocol-v1 write adapter for the persistent SERVER-owned presence registry. */
+internal object PresenceProtocol {
+    const val GROUP_CREATE_PATH = "/groups/create"
+    const val DEVICE_REGISTER_PATH = "/devices/register"
+    const val GROUP_JOIN_PATH = "/groups/join"
+    const val DEVICE_CHECKIN_PATH = "/devices/checkin"
+    const val DEVICE_RESOLVE_PATH = "/devices/resolve"
+    const val PROTOCOL_VERSION = 1
+    const val SCHEMA_VERSION = 1
+    const val MAX_BODY_BYTES = 32 * 1024L
+
+    private val paths = setOf(
+        GROUP_CREATE_PATH,
+        DEVICE_REGISTER_PATH,
+        GROUP_JOIN_PATH,
+        DEVICE_CHECKIN_PATH,
+        DEVICE_RESOLVE_PATH,
+    )
+    private val groupIdPattern = Regex("[a-z0-9][a-z0-9._-]{0,63}")
+    private val hashHintPattern = Regex("(?:sha256:)?[a-fA-F0-9]{64}")
+
+    fun handles(path: String): Boolean = path in paths
+
+    fun handle(
+        request: DiscoveryHttpRequest,
+        registry: PresenceRegistry,
+        pairing: PresencePairingAuthority,
+        pairedLanAuthority: PairedLanRequestAuthority,
+    ): DiscoveryHttpResponse {
+        if (request.path == DEVICE_RESOLVE_PATH) {
+            return resolveDevice(request, registry, pairedLanAuthority)
+        }
+        val requestId = request.headers["x-swrlz-request-id"]
+            ?.takeIf(::validRequestId)
+            ?: UUID.randomUUID().toString()
+        return try {
+            validateTransport(request)
+            validatePairingAndExposure(request, pairing)
+            val body = parseBody(request.body)
+            validateVersions(body)
+            when (request.path) {
+                GROUP_CREATE_PATH -> createGroup(body, request, registry, requestId)
+                DEVICE_REGISTER_PATH -> registerDevice(body, request, registry, requestId)
+                GROUP_JOIN_PATH -> joinGroup(body, request, registry, requestId)
+                DEVICE_CHECKIN_PATH -> checkIn(body, registry, requestId)
+                else -> error(404, "NOT_FOUND", "Presence write route not found", requestId)
+            }
+        } catch (failure: PresenceRegistryFailure) {
+            error(failure.httpStatus, failure.code, failure.message, requestId, failure.retryable)
+        } catch (failure: ProtocolFailure) {
+            error(failure.httpStatus, failure.code, failure.safeMessage, requestId, failure.retryable)
+        } catch (_: JSONException) {
+            error(400, "INVALID_JSON", "Malformed JSON request body", requestId)
+        } catch (_: Exception) {
+            error(503, "REGISTRY_UNAVAILABLE", "Presence registry operation is unavailable", requestId, true)
+        }
+    }
+
+    private fun validateResolveTransport(request: DiscoveryHttpRequest) {
+        if (request.method != "POST") {
+            throw ProtocolFailure(405, "METHOD_NOT_ALLOWED", "Only POST is allowed")
+        }
+        if (request.contentLength <= 0L || request.body.isBlank()) {
+            throw ProtocolFailure(400, "MALFORMED_REQUEST", "JSON request body is required")
+        }
+        if (request.contentLength > MAX_BODY_BYTES) {
+            throw ProtocolFailure(413, "REQUEST_TOO_LARGE", "Request body exceeds 32 KiB")
+        }
+        val accept = request.headers["accept"]
+        if (accept == null || !acceptsJson(accept)) {
+            throw ProtocolFailure(406, "MALFORMED_REQUEST", "Accept must permit application/json")
+        }
+        val contentType = request.headers["content-type"].orEmpty().substringBefore(';').trim().lowercase()
+        if (contentType != "application/json" && !contentType.endsWith("+json")) {
+            throw ProtocolFailure(415, "MALFORMED_REQUEST", "Content-Type must be application/json")
+        }
+    }
+
+    private fun validateTransport(request: DiscoveryHttpRequest) {
+        if (request.method != "POST") {
+            throw ProtocolFailure(405, "METHOD_NOT_ALLOWED", "Only POST is allowed")
+        }
+        if (request.contentLength <= 0L || request.body.isBlank()) {
+            throw ProtocolFailure(400, "INVALID_JSON", "JSON request body is required")
+        }
+        if (request.contentLength > MAX_BODY_BYTES) {
+            throw ProtocolFailure(400, "REQUEST_TOO_LARGE", "Request body exceeds 32 KiB")
+        }
+        val accept = request.headers["accept"]
+        if (accept == null || !acceptsJson(accept)) {
+            throw ProtocolFailure(406, "JSON_REQUIRED", "Accept must permit application/json")
+        }
+        val contentType = request.headers["content-type"].orEmpty().substringBefore(';').trim().lowercase()
+        if (contentType != "application/json" && !contentType.endsWith("+json")) {
+            throw ProtocolFailure(415, "JSON_REQUIRED", "Content-Type must be application/json")
+        }
+    }
+
+    private fun validatePairingAndExposure(request: DiscoveryHttpRequest, pairing: PresencePairingAuthority) {
+        val token = request.headers["x-swurlz-pairing-token"]
+        if (token.isNullOrBlank()) throw ProtocolFailure(401, "PAIRING_REQUIRED", "Pairing token is required")
+        if (!pairing.validate(token)) throw ProtocolFailure(401, "PAIRING_TOKEN_INVALID", "Pairing token was rejected")
+        if (!request.isLoopback) {
+            // 011K intentionally exposes no toggle that could silently widen write authority.
+            throw ProtocolFailure(403, "LAN_WRITE_DISABLED", "Presence writes are loopback-only in this build")
+        }
+    }
+
+    private fun parseBody(body: String): JSONObject = try {
+        JSONObject(body)
+    } catch (_: JSONException) {
+        throw ProtocolFailure(400, "INVALID_JSON", "Malformed JSON request body")
+    }
+
+    private fun validateVersions(body: JSONObject) {
+        val protocol = version(body, "protocolVersion")
+        val schema = version(body, "schemaVersion")
+        if (protocol != PROTOCOL_VERSION) {
