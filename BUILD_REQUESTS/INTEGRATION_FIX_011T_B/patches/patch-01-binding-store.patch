@@ -1,0 +1,444 @@
+--- /dev/null
++++ b/app/src/main/java/sh/swrlz/nodehost/service/DeviceProofBindingStore.kt
+@@ -0,0 +1,441 @@
++package sh.swrlz.nodehost.service
++
++import android.content.Context
++import android.security.keystore.KeyGenParameterSpec
++import android.security.keystore.KeyProperties
++import android.util.AtomicFile
++import android.util.Base64
++import java.io.File
++import java.nio.ByteBuffer
++import java.nio.charset.StandardCharsets
++import java.security.KeyStore
++import java.security.MessageDigest
++import java.time.Instant
++import java.time.format.DateTimeFormatter
++import javax.crypto.Cipher
++import javax.crypto.KeyGenerator
++import javax.crypto.Mac
++import javax.crypto.SecretKey
++import javax.crypto.spec.GCMParameterSpec
++import javax.crypto.spec.SecretKeySpec
++import org.json.JSONArray
++import org.json.JSONObject
++
++internal enum class DeviceProofBindingState(val wireName: String) {
++    BOUND("BOUND"),
++    ENROLLMENT_REQUIRED("ENROLLMENT_REQUIRED"),
++    REVOKED("REVOKED"),
++    UNAVAILABLE("UNAVAILABLE"),
++    CONFLICT("CONFLICT");
++
++    companion object {
++        fun fromWireName(value: String): DeviceProofBindingState? = entries.firstOrNull { it.wireName == value }
++    }
++}
++
++internal data class DeviceProofBindingLookup(
++    val state: DeviceProofBindingState,
++    val proofKey: ByteArray? = null,
++    val errorCode: String? = null,
++)
++
++/**
++ * Application-private proof-key sidecar.
++ *
++ * It deliberately does not alter the authoritative presence registry. Bound
++ * proof keys are encrypted with a non-exportable Android Keystore AES-GCM key.
++ * Existing devices with no sidecar entry resolve to ENROLLMENT_REQUIRED.
++ */
++internal class DeviceProofBindingStore(context: Context) {
++    private val appContext = context.applicationContext
++    private val directory = File(appContext.noBackupFilesDir, DIRECTORY_NAME)
++    private val atomicFile = AtomicFile(File(directory, FILE_NAME))
++    private val keystore = DeviceProofKeystore()
++
++    @Volatile
++    private var loadFailureCode: String? = null
++
++    private var state: SidecarState = loadState()
++
++    @Synchronized
++    fun lookup(serverInstallationId: String, deviceId: String): DeviceProofBindingLookup {
++        loadFailureCode?.let {
++            return DeviceProofBindingLookup(
++                state = DeviceProofBindingState.UNAVAILABLE,
++                errorCode = it,
++            )
++        }
++
++        val matches = state.bindings.filter {
++            it.bindingVersion == BINDING_VERSION &&
++                it.serverInstallationId == serverInstallationId &&
++                it.deviceId == deviceId
++        }
++        if (matches.isEmpty()) {
++            return DeviceProofBindingLookup(DeviceProofBindingState.ENROLLMENT_REQUIRED)
++        }
++        if (matches.size != 1) {
++            return DeviceProofBindingLookup(
++                state = DeviceProofBindingState.CONFLICT,
++                errorCode = "PROOF_BINDING_CONFLICT",
++            )
++        }
++
++        val record = matches.single()
++        val recordState = DeviceProofBindingState.fromWireName(record.state)
++            ?: return DeviceProofBindingLookup(
++                state = DeviceProofBindingState.CONFLICT,
++                errorCode = "PROOF_BINDING_CONFLICT",
++            )
++        if (recordState != DeviceProofBindingState.BOUND) {
++            return DeviceProofBindingLookup(state = recordState, errorCode = errorCodeFor(recordState))
++        }
++
++        val ciphertext = record.ciphertext?.decodeBase64()
++            ?: return unavailable("PROOF_STORAGE_CORRUPT")
++        val nonce = record.nonce?.decodeBase64()
++            ?: return unavailable("PROOF_STORAGE_CORRUPT")
++        val proofKey = try {
++            keystore.decrypt(ciphertext, nonce, associatedData(record))
++        } catch (_: Exception) {
++            return unavailable("PROOF_KEYSTORE_INVALIDATED")
++        }
++        if (proofKey.size != PROOF_KEY_BYTES || !constantTimeHexEquals(record.keyFingerprint, sha256Hex(proofKey))) {
++            proofKey.fill(0)
++            return DeviceProofBindingLookup(
++                state = DeviceProofBindingState.CONFLICT,
++                errorCode = "PROOF_BINDING_CONFLICT",
++            )
++        }
++        return DeviceProofBindingLookup(DeviceProofBindingState.BOUND, proofKey)
++    }
++
++    /**
++     * Infrastructure-only durable binding primitive. No 011T-B route calls it.
++     * Registration and legacy enrollment integration remain separately gated.
++     */
++    @Synchronized
++    fun storeBoundProofKey(
++        serverInstallationId: String,
++        deviceId: String,
++        proofKey: ByteArray,
++        source: String,
++        nowEpochMs: Long = System.currentTimeMillis(),
++    ) {
++        require(proofKey.size == PROOF_KEY_BYTES) { "proof key must be 32 bytes" }
++        require(source in ALLOWED_SOURCES) { "unsupported proof binding source" }
++        loadFailureCode?.let { throw IllegalStateException(it) }
++
++        val now = timestamp(nowEpochMs)
++        val existing = state.bindings.filter {
++            it.bindingVersion == BINDING_VERSION &&
++                it.serverInstallationId == serverInstallationId &&
++                it.deviceId == deviceId
++        }
++        if (existing.size > 1) throw IllegalStateException("PROOF_BINDING_CONFLICT")
++
++        val metadata = BindingRecord(
++            bindingVersion = BINDING_VERSION,
++            deviceId = deviceId,
++            serverInstallationId = serverInstallationId,
++            state = DeviceProofBindingState.BOUND.wireName,
++            ciphertext = null,
++            nonce = null,
++            createdAt = existing.singleOrNull()?.createdAt ?: now,
++            updatedAt = now,
++            keyFingerprint = sha256Hex(proofKey),
++            source = source,
++        )
++        val sealed = keystore.encrypt(proofKey, associatedData(metadata))
++        val record = metadata.copy(
++            ciphertext = sealed.ciphertext.toBase64(),
++            nonce = sealed.nonce.toBase64(),
++        )
++        val retained = state.bindings.filterNot {
++            it.bindingVersion == BINDING_VERSION &&
++                it.serverInstallationId == serverInstallationId &&
++                it.deviceId == deviceId
++        }
++        commit(SidecarState(bindings = retained + record))
++    }
++
++    @Synchronized
++    fun recordNonBoundState(
++        serverInstallationId: String,
++        deviceId: String,
++        bindingState: DeviceProofBindingState,
++        source: String,
++        nowEpochMs: Long = System.currentTimeMillis(),
++    ) {
++        require(bindingState != DeviceProofBindingState.BOUND)
++        require(source in ALLOWED_SOURCES)
++        loadFailureCode?.let { throw IllegalStateException(it) }
++        val now = timestamp(nowEpochMs)
++        val existing = state.bindings.singleOrNull {
++            it.bindingVersion == BINDING_VERSION &&
++                it.serverInstallationId == serverInstallationId &&
++                it.deviceId == deviceId
++        }
++        val replacement = BindingRecord(
++            bindingVersion = BINDING_VERSION,
++            deviceId = deviceId,
++            serverInstallationId = serverInstallationId,
++            state = bindingState.wireName,
++            ciphertext = null,
++            nonce = null,
++            createdAt = existing?.createdAt ?: now,
++            updatedAt = now,
++            keyFingerprint = null,
++            source = source,
++        )
++        val retained = state.bindings.filterNot {
++            it.bindingVersion == BINDING_VERSION &&
++                it.serverInstallationId == serverInstallationId &&
++                it.deviceId == deviceId
++        }
++        commit(SidecarState(bindings = retained + replacement))
++    }
++
++    private fun unavailable(code: String) = DeviceProofBindingLookup(
++        state = DeviceProofBindingState.UNAVAILABLE,
++        errorCode = code,
++    )
++
++    private fun errorCodeFor(state: DeviceProofBindingState): String? = when (state) {
++        DeviceProofBindingState.BOUND -> null
++        DeviceProofBindingState.ENROLLMENT_REQUIRED -> "PROOF_ENROLLMENT_REQUIRED"
++        DeviceProofBindingState.REVOKED -> "PROOF_KEY_REVOKED"
++        DeviceProofBindingState.UNAVAILABLE -> "PROOF_KEY_UNAVAILABLE"
++        DeviceProofBindingState.CONFLICT -> "PROOF_BINDING_CONFLICT"
++    }
++
++    private fun loadState(): SidecarState {
++        if (!atomicFile.baseFile.exists()) return SidecarState()
++        return runCatching(::readStateFromDisk).getOrElse {
++            loadFailureCode = "PROOF_STORAGE_CORRUPT"
++            SidecarState()
++        }
++    }
++
++    private fun readStateFromDisk(): SidecarState {
++        val bytes = atomicFile.openRead().use { it.readBytes() }
++        return SidecarState.fromJson(JSONObject(String(bytes, StandardCharsets.UTF_8)))
++    }
++
++    private fun commit(next: SidecarState) {
++        directory.mkdirs()
++        val output = atomicFile.startWrite()
++        try {
++            output.write(next.toJson().toString().toByteArray(StandardCharsets.UTF_8))
++            output.flush()
++            output.fd.sync()
++            atomicFile.finishWrite(output)
++        } catch (error: Exception) {
++            runCatching { atomicFile.failWrite(output) }
++            throw IllegalStateException("PROOF_STORAGE_UNAVAILABLE", error)
++        }
++        val verified = readStateFromDisk()
++        if (verified != next) throw IllegalStateException("PROOF_STORAGE_READBACK_MISMATCH")
++        state = verified
++    }
++
++    private fun associatedData(record: BindingRecord): ByteArray = buildString {
++        append(record.bindingVersion).append('\n')
++        append(record.serverInstallationId).append('\n')
++        append(record.deviceId).append('\n')
++        append(record.state)
++    }.toByteArray(StandardCharsets.UTF_8)
++
++    private data class SidecarState(
++        val formatVersion: Int = SIDECAR_FORMAT_VERSION,
++        val bindings: List<BindingRecord> = emptyList(),
++    ) {
++        fun toJson() = JSONObject()
++            .put("formatVersion", formatVersion)
++            .put("bindings", JSONArray().apply { bindings.forEach { put(it.toJson()) } })
++
++        companion object {
++            fun fromJson(json: JSONObject): SidecarState {
++                require(json.optInt("formatVersion", SIDECAR_FORMAT_VERSION) == SIDECAR_FORMAT_VERSION)
++                val array = json.optJSONArray("bindings") ?: JSONArray()
++                return SidecarState(
++                    bindings = (0 until array.length()).map { BindingRecord.fromJson(array.getJSONObject(it)) },
++                )
++            }
++        }
++    }
++
++    private data class BindingRecord(
++        val bindingVersion: Int,
++        val deviceId: String,
++        val serverInstallationId: String,
++        val state: String,
++        val ciphertext: String?,
++        val nonce: String?,
++        val createdAt: String,
++        val updatedAt: String,
++        val keyFingerprint: String?,
++        val source: String,
++    ) {
++        fun toJson() = JSONObject()
++            .put("bindingVersion", bindingVersion)
++            .put("deviceId", deviceId)
++            .put("serverInstallationId", serverInstallationId)
++            .put("state", state)
++            .put("ciphertext", ciphertext ?: JSONObject.NULL)
++            .put("nonce", nonce ?: JSONObject.NULL)
++            .put("createdAt", createdAt)
++            .put("updatedAt", updatedAt)
++            .put("keyFingerprint", keyFingerprint ?: JSONObject.NULL)
++            .put("source", source)
++
++        companion object {
++            fun fromJson(json: JSONObject) = BindingRecord(
++                bindingVersion = json.getInt("bindingVersion"),
++                deviceId = json.getString("deviceId"),
++                serverInstallationId = json.getString("serverInstallationId"),
++                state = json.getString("state"),
++                ciphertext = json.optNullableString("ciphertext"),
++                nonce = json.optNullableString("nonce"),
++                createdAt = json.getString("createdAt"),
++                updatedAt = json.getString("updatedAt"),
++                keyFingerprint = json.optNullableString("keyFingerprint"),
++                source = json.getString("source"),
++            )
++        }
++    }
++
++    companion object {
++        const val BINDING_VERSION = 1
++        private const val SIDECAR_FORMAT_VERSION = 1
++        private const val DIRECTORY_NAME = "device-proof-v1"
++        private const val FILE_NAME = "bindings.json"
++        private const val PROOF_KEY_BYTES = 32
++        private val ALLOWED_SOURCES = setOf("NEW_REGISTRATION", "LEGACY_ENROLLMENT", "REBIND")
++
++        private fun timestamp(epochMs: Long): String =
++            DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(epochMs))
++    }
++}
++
++internal object DeviceProofKeyDerivation {
++    private const val OUTPUT_BYTES = 32
++    private const val HMAC_ALGORITHM = "HmacSHA256"
++    private const val INFO = "SWRLZ-DEVICE-PROOF-KEY-V1"
++    private const val SALT_PREFIX = "SWRLZ-DEVICE-PROOF-SALT-V1\n"
++
++    fun derive(rawDeviceKey: ByteArray, serverInstallationId: String, deviceId: String): ByteArray {
++        val salt = sha256(
++            (SALT_PREFIX + serverInstallationId + "\n" + deviceId)
++                .toByteArray(StandardCharsets.UTF_8),
++        )
++        val prk = hmac(salt, rawDeviceKey)
++        return try {
++            val info = INFO.toByteArray(StandardCharsets.UTF_8)
++            hmac(prk, info + byteArrayOf(1)).copyOf(OUTPUT_BYTES)
++        } finally {
++            prk.fill(0)
++            salt.fill(0)
++        }
++    }
++
++    private fun hmac(key: ByteArray, value: ByteArray): ByteArray = Mac.getInstance(HMAC_ALGORITHM).run {
++        init(SecretKeySpec(key, HMAC_ALGORITHM))
++        doFinal(value)
++    }
++}
++
++internal object DeviceProofHmac {
++    private const val HMAC_ALGORITHM = "HmacSHA256"
++
++    fun verify(proofKey: ByteArray, canonicalRequest: String, suppliedLowerHex: String): Boolean {
++        val expected = Mac.getInstance(HMAC_ALGORITHM).run {
++            init(SecretKeySpec(proofKey, HMAC_ALGORITHM))
++            doFinal(canonicalRequest.toByteArray(StandardCharsets.UTF_8))
++        }
++        val supplied = suppliedLowerHex.hexToBytesOrNull()
++        if (supplied == null) {
++            expected.fill(0)
++            return false
++        }
++        return try {
++            MessageDigest.isEqual(expected, supplied)
++        } finally {
++            expected.fill(0)
++            supplied.fill(0)
++        }
++    }
++}
++
++private data class SealedValue(val ciphertext: ByteArray, val nonce: ByteArray)
++
++private class DeviceProofKeystore {
++    fun encrypt(plaintext: ByteArray, associatedData: ByteArray): SealedValue {
++        val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
++        cipher.init(Cipher.ENCRYPT_MODE, loadOrCreateMasterKey())
++        cipher.updateAAD(associatedData)
++        return SealedValue(cipher.doFinal(plaintext), cipher.iv)
++    }
++
++    fun decrypt(ciphertext: ByteArray, nonce: ByteArray, associatedData: ByteArray): ByteArray {
++        val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
++        cipher.init(Cipher.DECRYPT_MODE, loadOrCreateMasterKey(), GCMParameterSpec(GCM_TAG_BITS, nonce))
++        cipher.updateAAD(associatedData)
++        return cipher.doFinal(ciphertext)
++    }
++
++    @Synchronized
++    private fun loadOrCreateMasterKey(): SecretKey {
++        val keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER).apply { load(null) }
++        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
++        return runCatching { generateMasterKey(256) }.getOrElse { generateMasterKey(128) }
++    }
++
++    private fun generateMasterKey(bits: Int): SecretKey {
++        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_PROVIDER)
++        generator.init(
++            KeyGenParameterSpec.Builder(
++                KEY_ALIAS,
++                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
++            )
++                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
++                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
++                .setRandomizedEncryptionRequired(true)
++                .setKeySize(bits)
++                .build(),
++        )
++        return generator.generateKey()
++    }
++
++    companion object {
++        private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
++        private const val KEY_ALIAS = "swrlz.device-proof.master.v1"
++        private const val CIPHER_TRANSFORMATION = "AES/GCM/NoPadding"
++        private const val GCM_TAG_BITS = 128
++    }
++}
++
++internal fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
++internal fun sha256Hex(bytes: ByteArray): String = sha256(bytes).joinToString("") { "%02x".format(it.toInt() and 0xFF) }
++
++private fun constantTimeHexEquals(left: String?, right: String): Boolean {
++    if (left == null) return false
++    return MessageDigest.isEqual(
++        left.toByteArray(StandardCharsets.US_ASCII),
++        right.toByteArray(StandardCharsets.US_ASCII),
++    )
++}
++
++private fun ByteArray.toBase64(): String = Base64.encodeToString(this, Base64.NO_WRAP)
++private fun String.decodeBase64(): ByteArray? = runCatching { Base64.decode(this, Base64.DEFAULT) }.getOrNull()
++private fun String.hexToBytesOrNull(): ByteArray? {
++    if (length % 2 != 0 || any { it !in "0123456789abcdef" }) return null
++    return runCatching {
++        ByteBuffer.allocate(length / 2).apply {
++            chunked(2).forEach { put(it.toInt(16).toByte()) }
++        }.array()
++    }.getOrNull()
++}
++
++private fun JSONObject.optNullableString(name: String): String? =
++    if (!has(name) || isNull(name)) null else optString(name).takeIf(String::isNotBlank)
