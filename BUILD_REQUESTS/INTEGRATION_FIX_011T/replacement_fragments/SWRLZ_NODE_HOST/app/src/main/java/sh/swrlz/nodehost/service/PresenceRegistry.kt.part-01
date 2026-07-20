@@ -1,0 +1,122 @@
+                auditFailure(requestId, "device_register", input.deviceId, null, input.deviceId, "DEVICE_KEY_CONFLICT")
+                throw PresenceRegistryFailure(409, "DEVICE_KEY_CONFLICT", "Device identity conflicts with an existing registry record")
+            }
+            if (existing.lifecycleState == BLOCKED) {
+                auditFailure(requestId, "device_register", input.deviceId, null, input.deviceId, "DEVICE_BLOCKED")
+                throw PresenceRegistryFailure(403, "DEVICE_BLOCKED", "Device is blocked")
+            }
+            val now = timestamp()
+            val updated = existing.copy(
+                deviceLabel = input.deviceLabel,
+                role = input.role,
+                identitySchema = input.identitySchema,
+                deviceUuid = input.deviceUuid,
+                deviceAnchor = input.deviceAnchor,
+                fingerprintHash = input.fingerprintHash,
+                profileMergeKey = input.profileMergeKey,
+                clientVersion = input.clientVersion,
+                patchLabel = input.patchLabel,
+                capabilities = input.capabilities,
+                updatedAt = now,
+            )
+            val devices = state.devices.map { if (it.deviceId == updated.deviceId) updated else it }
+            val warning = duplicateIdentityWarning(updated, devices)
+            commit(
+                state.copy(
+                    revision = state.revision + 1,
+                    devices = devices,
+                    audit = appendAudit(state.audit, audit(requestId, "device_register", input.deviceId, null, input.deviceId, "accepted", "IDEMPOTENT_UPDATE")),
+                ),
+            )
+            return DeviceMutation(false, updated.toView(online = isDeviceOnline(updated.deviceId)), warning)
+        }
+
+        val now = timestamp()
+        val created = DeviceRecord(
+            deviceId = input.deviceId,
+            deviceKeyVerifier = KeyVerifier.create(input.deviceKey, random),
+            deviceLabel = input.deviceLabel,
+            role = input.role,
+            lifecycleState = ACTIVE,
+            trustState = PAIRED,
+            identitySchema = input.identitySchema,
+            deviceUuid = input.deviceUuid,
+            deviceAnchor = input.deviceAnchor,
+            fingerprintHash = input.fingerprintHash,
+            profileMergeKey = input.profileMergeKey,
+            clientVersion = input.clientVersion,
+            patchLabel = input.patchLabel,
+            capabilities = input.capabilities,
+            successorDeviceId = null,
+            createdAt = now,
+            updatedAt = now,
+            lastSeenAt = null,
+        )
+        val warning = duplicateIdentityWarning(created, state.devices + created)
+        commit(
+            state.copy(
+                revision = state.revision + 1,
+                devices = state.devices + created,
+                audit = appendAudit(state.audit, audit(requestId, "device_register", input.deviceId, null, input.deviceId, "accepted", "CREATED")),
+            ),
+        )
+        return DeviceMutation(true, created.toView(false), warning)
+    }
+
+    @Synchronized
+    fun joinGroup(
+        groupId: String,
+        groupKey: String,
+        registration: DeviceRegistrationInput,
+        requestId: String,
+    ): JoinMutation {
+        requireAvailable()
+        val group = activeGroup(groupId)
+        if (!KeyVerifier.verify(groupKey, group.groupKeyVerifier)) {
+            auditFailure(requestId, "group_join", registration.deviceId, groupId, registration.deviceId, "GROUP_KEY_INVALID")
+            throw PresenceRegistryFailure(403, "GROUP_KEY_INVALID", "Group credentials were rejected")
+        }
+
+        val existingDevice = state.devices.firstOrNull { it.deviceId == registration.deviceId }
+        val registrationMode: String
+        val device: DeviceRecord
+        val nextDevices: List<DeviceRecord>
+        if (existingDevice == null) {
+            val now = timestamp()
+            device = DeviceRecord(
+                deviceId = registration.deviceId,
+                deviceKeyVerifier = KeyVerifier.create(registration.deviceKey, random),
+                deviceLabel = registration.deviceLabel,
+                role = registration.role,
+                lifecycleState = ACTIVE,
+                trustState = PAIRED,
+                identitySchema = registration.identitySchema,
+                deviceUuid = registration.deviceUuid,
+                deviceAnchor = registration.deviceAnchor,
+                fingerprintHash = registration.fingerprintHash,
+                profileMergeKey = registration.profileMergeKey,
+                clientVersion = registration.clientVersion,
+                patchLabel = registration.patchLabel,
+                capabilities = registration.capabilities,
+                successorDeviceId = null,
+                createdAt = now,
+                updatedAt = now,
+                lastSeenAt = null,
+            )
+            nextDevices = state.devices + device
+            registrationMode = "legacy_atomic_join"
+        } else {
+            if (existingDevice.lifecycleState == BLOCKED) {
+                auditFailure(requestId, "group_join", registration.deviceId, groupId, registration.deviceId, "DEVICE_BLOCKED")
+                throw PresenceRegistryFailure(403, "DEVICE_BLOCKED", "Device is blocked")
+            }
+            if (!KeyVerifier.verify(registration.deviceKey, existingDevice.deviceKeyVerifier)) {
+                auditFailure(requestId, "group_join", registration.deviceId, groupId, registration.deviceId, "DEVICE_KEY_INVALID")
+                throw PresenceRegistryFailure(401, "DEVICE_KEY_INVALID", "Device credentials were rejected")
+            }
+            device = existingDevice
+            nextDevices = state.devices
+            registrationMode = "existing_device"
+        }
+
+        val key = membershipKey(groupId, registration.deviceId)
