@@ -1,0 +1,125 @@
+            throw ProtocolFailure(422, "PROTOCOL_VERSION_UNSUPPORTED", "Unsupported presence protocol version")
+        }
+        if (schema != SCHEMA_VERSION) {
+            throw ProtocolFailure(422, "SCHEMA_VERSION_UNSUPPORTED", "Unsupported presence schema version")
+        }
+    }
+
+    private fun resolveDevice(
+        request: DiscoveryHttpRequest,
+        registry: PresenceRegistry,
+        authority: PairedLanRequestAuthority,
+    ): DiscoveryHttpResponse {
+        var requestId = request.headers[PairedLanRequestAuthority.REQUEST_ID_HEADER].orEmpty()
+        return try {
+            validateResolveTransport(request)
+            requestId = authority.authorizeResolveTransport(request)
+            val body = parseBody(request.body)
+            validateStrictVersions(body)
+            val identity = resolutionIdentity(body)
+            val lookup = registry.resolveDevice(identity)
+            when (lookup.kind) {
+                DeviceResolutionKind.UNKNOWN -> resolutionSuccess(
+                    requestId = requestId,
+                    registryRevision = lookup.registryRevision,
+                    resolution = "UNKNOWN",
+                    device = null,
+                    membershipCount = 0,
+                    lineage = null,
+                )
+                DeviceResolutionKind.IDENTITY_CONFLICT -> resolutionSuccess(
+                    requestId = requestId,
+                    registryRevision = lookup.registryRevision,
+                    resolution = "IDENTITY_CONFLICT",
+                    device = null,
+                    membershipCount = 0,
+                    lineage = null,
+                )
+                DeviceResolutionKind.ACTION_REQUIRED -> resolutionSuccess(
+                    requestId = requestId,
+                    registryRevision = lookup.registryRevision,
+                    resolution = "ACTION_REQUIRED",
+                    device = null,
+                    membershipCount = 0,
+                    lineage = null,
+                )
+                DeviceResolutionKind.KNOWN_CANDIDATE,
+                DeviceResolutionKind.RETIRED_CANDIDATE,
+                DeviceResolutionKind.REPLACED_CANDIDATE,
+                DeviceResolutionKind.BLOCKED_CANDIDATE -> resolveProofBoundCandidate(request, authority, identity, lookup, requestId)
+            }
+        } catch (failure: PresenceRegistryFailure) {
+            resolveError(failure.httpStatus, failure.code, failure.message, requestId, failure.retryable)
+        } catch (failure: PairedLanAuthorizationFailure) {
+            resolveError(failure.httpStatus, failure.code, failure.safeMessage, requestId, failure.retryable)
+        } catch (failure: ProtocolFailure) {
+            resolveError(failure.httpStatus, failure.code, failure.safeMessage, requestId, failure.retryable)
+        } catch (_: JSONException) {
+            resolveError(400, "MALFORMED_REQUEST", "Malformed JSON request body", requestId)
+        } catch (_: Exception) {
+            resolveError(503, "INTERNAL_ERROR", "Device resolution is unavailable", requestId, true)
+        }
+    }
+
+    private fun resolveProofBoundCandidate(
+        request: DiscoveryHttpRequest,
+        authority: PairedLanRequestAuthority,
+        identity: DeviceResolutionInput,
+        lookup: DeviceResolutionLookup,
+        requestId: String,
+    ): DiscoveryHttpResponse {
+        return when (val proof = authority.verifyKnownDevice(
+            request = request,
+            expectedDeviceId = identity.deviceId,
+            protocolVersion = PROTOCOL_VERSION,
+            schemaVersion = SCHEMA_VERSION,
+        )) {
+            DeviceProofVerification.KeyUnbound -> resolutionSuccess(
+                requestId = requestId,
+                registryRevision = lookup.registryRevision,
+                resolution = "ACTION_REQUIRED",
+                device = null,
+                membershipCount = 0,
+                lineage = null,
+            )
+            is DeviceProofVerification.Verified -> {
+                if (proof.deviceKeyFingerprint != identity.deviceKeyFingerprint) {
+                    throw PairedLanAuthorizationFailure(
+                        httpStatus = 409,
+                        code = "DEVICE_KEY_MISMATCH",
+                        safeMessage = "Device key fingerprint does not match the bound proof key",
+                    )
+                }
+                val resolution = when (lookup.kind) {
+                    DeviceResolutionKind.KNOWN_CANDIDATE -> "KNOWN"
+                    DeviceResolutionKind.RETIRED_CANDIDATE -> "RETIRED"
+                    DeviceResolutionKind.REPLACED_CANDIDATE -> "REPLACED"
+                    DeviceResolutionKind.BLOCKED_CANDIDATE -> "BLOCKED"
+                    else -> "ACTION_REQUIRED"
+                }
+                val lineage = lookup.successorDeviceId?.let { successor ->
+                    JSONObject()
+                        .put("device_id", identity.deviceId)
+                        .put("successor_device_id", successor)
+                }
+                resolutionSuccess(
+                    requestId = requestId,
+                    registryRevision = lookup.registryRevision,
+                    resolution = resolution,
+                    device = lookup.device,
+                    membershipCount = lookup.membershipCount,
+                    lineage = lineage,
+                )
+            }
+        }
+    }
+
+    private fun resolutionIdentity(body: JSONObject): DeviceResolutionInput {
+        val identity = body.opt("identity") as? JSONObject
+            ?: throw ProtocolFailure(400, "MALFORMED_REQUEST", "identity object is required")
+        val deviceId = deviceId(identity.requiredString("device_id"))
+        val keyFingerprint = hashHint(
+            identity.requiredString("device_key_fingerprint"),
+            "device_key_fingerprint",
+        ).removePrefix("sha256:")
+        identity.optionalString("device_label")?.let { display(it, "device_label") }
