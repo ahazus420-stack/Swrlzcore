@@ -24,16 +24,18 @@ SERVER v1.1.0 stores salted PBKDF2 device-key verifiers and cannot recover the o
 
 The candidate does not use pairing as device proof, does not accept a raw device key in `/devices/resolve`, and does not use the PBKDF2 verifier as an HMAC key.
 
-## Transport
+## Readable replacement evidence
 
-The temporary branch stores a deterministic, lossless replacement bundle as ordered text:
+The temporary branch stores the exact candidate delta as reviewable UTF-8 implementation files:
 
 ```text
-transport/part-*.b64
-Decoded bundle SHA-256: 396613db4e1d4e660382c4d63fd5a8f45aad3cadafa7b552a25d11590af22d79
+replacements/SWRLZ_NODE_HOST/...
+replacement_fragments/SWRLZ_NODE_HOST/...
 ```
 
-Run `materialize_server_v111_011t.py` against the exact v1.1.0 base. The script rejects a wrong base, unsafe bundle paths, replacement mismatch, non-deterministic output, invalid ZIP, or incorrect entry count.
+Five smaller replacements are stored directly. The three largest Kotlin replacements are split only for repository transport and are reassembled byte-for-byte in lexical `part-*` order. `candidate-manifest.json` locks the exact eight candidate paths, sizes, and SHA-256 values.
+
+Run `materialize_server_v111_011t.py` against the exact v1.1.0 base. The script rejects a wrong base, missing or ambiguous evidence, replacement path/content mismatch, a non-deterministic output identity, invalid ZIP, or incorrect entry count. Local verification reproduced the candidate byte-for-byte with SHA-256 `63ef4e92e4a582be8a9a81dcc193fc0608f9b8e14362f9a688be72668f4211c5`.
 
 ## Validation boundary
 
