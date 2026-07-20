@@ -1,0 +1,49 @@
+        ?.take(200)
+        ?.takeIf { it.isNotEmpty() }
+        ?: "Operation failed"
+
+    private fun listenerThread(name: String, block: () -> Unit): Thread = Thread(block, name).apply {
+        isDaemon = true
+    }
+
+    private fun closeResources() {
+        privateServerSocket?.closeQuietly()
+        discoverySockets.forEach { it.closeQuietly() }
+        privateServerThread?.interrupt()
+        discoveryThreads.forEach(Thread::interrupt)
+        privateServerSocket = null
+        privateServerThread = null
+        discoverySockets.clear()
+        discoveryThreads.clear()
+        activeIdentity = null
+        hostVersion = ""
+    }
+
+    private fun ServerSocket.closeQuietly() {
+        try {
+            close()
+        } catch (_: Exception) {
+            // Stop is idempotent.
+        }
+    }
+
+    private class BadHttpRequest : Exception()
+
+    companion object {
+        private const val PRIVATE_PORT = 8080
+        private const val BACKLOG = 50
+        private const val SOCKET_TIMEOUT_MS = 2_000
+        private const val MAX_REQUEST_LINE_BYTES = 4_096
+        private const val MAX_HEADER_LINE_BYTES = 8_192
+        private const val MAX_TOTAL_HEADER_BYTES = 16_384
+        private const val MAX_HEADER_COUNT = 64
+        private const val MAX_REQUEST_BODY_BYTES = PresenceProtocol.MAX_BODY_BYTES
+
+        private val APPROVED_INTERFACE_PREFIXES = listOf(
+            "wlan", "swlan", "ap", "eth", "en", "rndis", "usb", "bnep", "bt-pan",
+        )
+        private val BLOCKED_INTERFACE_PREFIXES = listOf(
+            "rmnet", "ccmni", "pdp", "wwan", "tun", "tap", "ppp", "ipsec", "vti", "wg",
+        )
+    }
+}
