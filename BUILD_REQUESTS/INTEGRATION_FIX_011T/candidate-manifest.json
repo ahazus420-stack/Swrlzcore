@@ -1,0 +1,29 @@
+{
+  "checkpoint": "INTEGRATION-FIX-011T",
+  "protocolVersion": 1,
+  "schemaVersion": 1,
+  "apkBuilt": false,
+  "gradleInvoked": false,
+  "workflowTriggeredByPreparation": false,
+  "base": {
+    "filename": "SERVER_CFv1.1.0_SWRLZ.zip",
+    "sha256": "f1066675e7bccffac55bc56b8c5a5e4666ad4511c65bf84036a0a8d4bfc8a26f",
+    "entries": 69
+  },
+  "candidate": {
+    "filename": "SERVER_CFv1.1.1_SWRLZ.zip",
+    "sha256": "63ef4e92e4a582be8a9a81dcc193fc0608f9b8e14362f9a688be72668f4211c5",
+    "size": 156982,
+    "entries": 72
+  },
+  "changedPaths": [
+    {"path":"INTEGRATION_FIX_011T_IMPLEMENTATION_REPORT.md","sha256":"532b17d0b399b549ca7760753b27b76ef187c09067563f8c653a50191ebc5292","size":8285},
+    {"path":"app/build.gradle.kts","sha256":"01d42fbfe04342db3473f3a2e9d08f3c8c22e8f3c166a312b6a41a73fab92158","size":3096},
+    {"path":"app/src/main/java/sh/swrlz/nodehost/service/DiscoveryProtocol.kt","sha256":"ddba2fd3982fd6cc7a55043769981659005cc72bbbfe880bb8a77ac61445d8be","size":6804},
+    {"path":"app/src/main/java/sh/swrlz/nodehost/service/NodeRuntime.kt","sha256":"c49c5d826af3ac7fe992970ce40a7c93ac3ed01386ca676a0c70ae82150f7e44","size":25582},
+    {"path":"app/src/main/java/sh/swrlz/nodehost/service/PairedLanRequestAuthority.kt","sha256":"092542c9d11478d9882dcf6c4d0bd7b65d310b4eee391f10201f7610ad7eb0e5","size":9891},
+    {"path":"app/src/main/java/sh/swrlz/nodehost/service/PresenceProtocol.kt","sha256":"3b934cd6d53f9ec44a0e73b79389452610e9510704b72211575f68b58c1cb4a0","size":27547},
+    {"path":"app/src/main/java/sh/swrlz/nodehost/service/PresenceRegistry.kt","sha256":"cfab3c4c485803941cb92729e16b33e350a9272c14e967321e0cba369f4ac40c","size":38296},
+    {"path":"scripts/test_paired_lan_resolve_011t.py","sha256":"437427f0145efb3d0698e94c03abd4e2ff9278b29f4efaa7a9e5e5f6ac29f9cb","size":10110}
+  ]
+}
