@@ -69,17 +69,60 @@
   "protocolVersion": 1,
   "schemaVersion": 1,
   "transport": {
-    "decodedSha256": "d170b75dc798e1d8d1c98d0ae0ead543ef07e19cb65e9ba0c6f2f4d5720700c3",
-    "decodedSize": 33009,
-    "format": "deterministic tar.gz replacement bundle encoded as RFC 4648 base64",
+    "format": "ordered UTF-8 unified-diff patch files",
     "parts": [
       {
-        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/replacement-bundle.b64",
-        "sha256": "c5db994b1644748e130b93b94cbbcd1400f51da0f52a60e4f461654b16f7b826",
-        "size": 44012
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/patch-00-meta-runtime-registry.patch",
+        "sha256": "3b0cbbe1514b85cff88f89c73edfacdd58bc4df4e535980e450004920db18e6f",
+        "size": 1350
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/patch-00b-implementation-report.patch",
+        "sha256": "6033a78e85b60c09f3923e8b435815bb079d875aba8218d3d3e12243099c6345",
+        "size": 3326
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/patch-00c-version.patch",
+        "sha256": "00c5afd359cd0cf860673288e96f463da61ddfdb8c7f5a9370260a702fcd098d",
+        "size": 362
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/patch-00d-discovery.patch",
+        "sha256": "251a4b9656e07503bc29051b69a89e2fa653010a1237e62c78e3c1d65432cade",
+        "size": 1198
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/patch-00e-runtime.patch",
+        "sha256": "024e0fbdf5bb72c25de688e1d28e866c5f7953f8b724bf0fa9277753152decb8",
+        "size": 4334
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/patch-00f-registry-resolution.patch",
+        "sha256": "a24b5660fa92efb280e47c3748084d5b7bddae12ea38d05c3485e5d8ff8799d0",
+        "size": 4385
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/patch-01-binding-store.patch",
+        "sha256": "05c39bf097e58a95b2ee02d5b77d8a7e8e669b0b091132bbea14361d3ec18534",
+        "size": 17870
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/patch-02-presence-protocol.patch",
+        "sha256": "48490c2768625e5ae9b0eb79ee3ad58720f84b75e81b3d9be0b4474bb212e022",
+        "size": 18921
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/patch-03-request-security.patch",
+        "sha256": "2319afcfa42c1e030650a1e1592baf83ee739d01ddb5e2788f091737443916dd",
+        "size": 6166
+      },
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/patch-04-static-validator.patch",
+        "sha256": "0c828a53a97aeaa18e1e5371bcb3ef6f9541788188e0429d7f0904b51fcb6969",
+        "size": 13665
       }
     ],
-    "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/replacement-bundle.b64"
+    "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/patches/*.patch"
   },
   "workflowTriggeredByPreparation": false
 }
