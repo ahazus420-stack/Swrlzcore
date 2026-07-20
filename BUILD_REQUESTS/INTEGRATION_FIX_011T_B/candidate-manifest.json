@@ -1,0 +1,85 @@
+{
+  "apkBuilt": false,
+  "base": {
+    "entries": 69,
+    "filename": "SERVER_CFv1.1.0_SWRLZ.zip",
+    "sha256": "f1066675e7bccffac55bc56b8c5a5e4666ad4511c65bf84036a0a8d4bfc8a26f"
+  },
+  "candidate": {
+    "entries": 73,
+    "filename": "SERVER_CFv1.1.1_SWRLZ.zip",
+    "sha256": "762d72e445a3a9fcb48da11905dbc0261b206060b55760dfa96fefbf1e9486e4",
+    "size": 159733
+  },
+  "changedPaths": [
+    {
+      "path": "API.md",
+      "sha256": "aa6547fce37d4ffd9287bff236b5919c67aa24f058d3180b4eb5fb41ca1c6942",
+      "size": 4635
+    },
+    {
+      "path": "INTEGRATION_FIX_011T_B_IMPLEMENTATION_REPORT.md",
+      "sha256": "05c1a65cd7f0f26afbe149a8a9cf5c43cb6759a491cc0ed4bdc2a9ea99e83cee",
+      "size": 3158
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "sha256": "01d42fbfe04342db3473f3a2e9d08f3c8c22e8f3c166a312b6a41a73fab92158",
+      "size": 3096
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/DeviceProofBindingStore.kt",
+      "sha256": "a1eb1cc9c4f58ebde99704f5de1e2be268ea98a0e20c93e6170d9a9bd54c5a44",
+      "size": 17320
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/DiscoveryProtocol.kt",
+      "sha256": "721f43ec0404e3a3479bbefc1dc709ed2fc37dc8f484d66ba03a3bcb7d832de0",
+      "size": 6703
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/NodeRuntime.kt",
+      "sha256": "19b97f61e6cdeecc38c40b2fd139b95260326c3e32ab8b1656cea383d855e0f3",
+      "size": 25681
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/PresenceProtocol.kt",
+      "sha256": "b94632dbd0ed32f4dcd711cadf2e2b4b60007f29f1ae971141cd8b88dedaf84d",
+      "size": 27048
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/PresenceRegistry.kt",
+      "sha256": "3d08fac7cbfeb34ad37107d5b19d58b3c4ca63695e2ff27ca036d23721af89dc",
+      "size": 38190
+    },
+    {
+      "path": "app/src/main/java/sh/swrlz/nodehost/service/PresenceRequestSecurity.kt",
+      "sha256": "37cbf812c098e7ebe5a1504b03469331a00fbcf55d757dbac0c26ec5b1fe1531",
+      "size": 5924
+    },
+    {
+      "path": "scripts/test_device_proof_011tb.py",
+      "sha256": "0b4f2c92a9461fad2207f9adb5e7dd2e882298d1f6e849980a3c629630fa0fbd",
+      "size": 13334
+    }
+  ],
+  "checkpoint": "INTEGRATION-FIX-011T-B",
+  "contract": "SERVER_DEVICE_PROOF_KEY_BINDING_AND_LEGACY_ENROLLMENT_V1",
+  "gradleInvoked": false,
+  "protocolVersion": 1,
+  "schemaVersion": 1,
+  "transport": {
+    "decodedSha256": "d170b75dc798e1d8d1c98d0ae0ead543ef07e19cb65e9ba0c6f2f4d5720700c3",
+    "decodedSize": 33009,
+    "format": "deterministic tar.gz replacement bundle encoded as RFC 4648 base64",
+    "parts": [
+      {
+        "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/replacement-bundle.b64",
+        "sha256": "c5db994b1644748e130b93b94cbbcd1400f51da0f52a60e4f461654b16f7b826",
+        "size": 44012
+      }
+    ],
+    "path": "BUILD_REQUESTS/INTEGRATION_FIX_011T_B/replacement-bundle.b64"
+  },
+  "workflowTriggeredByPreparation": false
+}
