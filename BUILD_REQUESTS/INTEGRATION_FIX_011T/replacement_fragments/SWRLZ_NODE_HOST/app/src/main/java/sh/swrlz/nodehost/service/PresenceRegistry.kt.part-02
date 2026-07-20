@@ -1,0 +1,120 @@
+        val existingMembership = state.memberships.firstOrNull { membershipKey(it.groupId, it.deviceId) == key }
+        if (existingMembership != null && existingMembership.membershipState == ACTIVE) {
+            appendAuditOnly(requestId, "group_join", registration.deviceId, groupId, registration.deviceId, "accepted", "IDEMPOTENT")
+            return JoinMutation(
+                joined = false,
+                registrationMode = registrationMode,
+                membership = existingMembership.toView(isMembershipOnline(existingMembership)),
+                device = device.toView(isDeviceOnline(device.deviceId)),
+            )
+        }
+
+        val now = timestamp()
+        val membership = MembershipRecord(
+            groupId = groupId,
+            deviceId = registration.deviceId,
+            membershipState = ACTIVE,
+            joinedAt = existingMembership?.joinedAt ?: now,
+            updatedAt = now,
+            lastSeenAt = existingMembership?.lastSeenAt,
+            leaseExpiresAt = existingMembership?.leaseExpiresAt,
+        )
+        val memberships = state.memberships.filterNot { membershipKey(it.groupId, it.deviceId) == key } + membership
+        commit(
+            state.copy(
+                revision = state.revision + 1,
+                devices = nextDevices,
+                memberships = memberships,
+                audit = appendAudit(state.audit, audit(requestId, "group_join", registration.deviceId, groupId, registration.deviceId, "accepted", registrationMode.uppercase())),
+            ),
+        )
+        return JoinMutation(
+            joined = true,
+            registrationMode = registrationMode,
+            membership = membership.toView(false),
+            device = device.toView(false),
+        )
+    }
+
+    @Synchronized
+    fun checkIn(
+        groupId: String,
+        deviceId: String,
+        deviceKey: String,
+        requestId: String,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): CheckinMutation {
+        requireAvailable()
+        activeGroup(groupId)
+        val device = state.devices.firstOrNull { it.deviceId == deviceId }
+            ?: throw PresenceRegistryFailure(404, "DEVICE_NOT_FOUND", "Device is not registered")
+        if (device.lifecycleState == BLOCKED) {
+            auditFailure(requestId, "device_checkin", deviceId, groupId, deviceId, "DEVICE_BLOCKED")
+            throw PresenceRegistryFailure(403, "DEVICE_BLOCKED", "Device is blocked")
+        }
+        if (device.lifecycleState != ACTIVE) {
+            auditFailure(requestId, "device_checkin", deviceId, groupId, deviceId, "POLICY_BLOCKED")
+            throw PresenceRegistryFailure(403, "POLICY_BLOCKED", "Device lifecycle does not permit check-in")
+        }
+        if (!KeyVerifier.verify(deviceKey, device.deviceKeyVerifier)) {
+            auditFailure(requestId, "device_checkin", deviceId, groupId, deviceId, "DEVICE_KEY_INVALID")
+            throw PresenceRegistryFailure(401, "DEVICE_KEY_INVALID", "Device credentials were rejected")
+        }
+        val key = membershipKey(groupId, deviceId)
+        val membership = state.memberships.firstOrNull { membershipKey(it.groupId, it.deviceId) == key }
+            ?: throw PresenceRegistryFailure(404, "MEMBERSHIP_NOT_FOUND", "Device is not a member of this group")
+        if (membership.membershipState != ACTIVE) {
+            throw PresenceRegistryFailure(403, "POLICY_BLOCKED", "Membership does not permit check-in")
+        }
+
+        val lastSeenAt = timestamp(nowEpochMs)
+        val leaseExpiresAt = timestamp(nowEpochMs + LEASE_SECONDS * 1_000L)
+        val updatedDevice = device.copy(lastSeenAt = lastSeenAt, updatedAt = lastSeenAt)
+        val updatedMembership = membership.copy(
+            lastSeenAt = lastSeenAt,
+            leaseExpiresAt = leaseExpiresAt,
+            updatedAt = lastSeenAt,
+        )
+        commit(
+            state.copy(
+                revision = state.revision + 1,
+                devices = state.devices.map { if (it.deviceId == deviceId) updatedDevice else it },
+                memberships = state.memberships.map { if (membershipKey(it.groupId, it.deviceId) == key) updatedMembership else it },
+                audit = appendAudit(state.audit, audit(requestId, "device_checkin", deviceId, groupId, deviceId, "accepted", "LEASE_REFRESHED")),
+            ),
+        )
+        checkedInThisRuntime += key
+        return CheckinMutation(groupId, deviceId, lastSeenAt, leaseExpiresAt, LEASE_SECONDS)
+    }
+
+    @Synchronized
+    fun verifyGroupCredentials(groupId: String, groupKey: String): Boolean {
+        if (!available) return false
+        val group = state.groups.firstOrNull { it.groupId == groupId && it.state == ACTIVE } ?: return false
+        return KeyVerifier.verify(groupKey, group.groupKeyVerifier)
+    }
+
+    @Synchronized
+    fun snapshot(
+        groupScope: String?,
+        actorDeviceId: String?,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): PresenceRegistrySnapshot {
+        requireAvailable()
+        val permittedGroups = when {
+            !groupScope.isNullOrBlank() -> setOf(groupScope)
+            !actorDeviceId.isNullOrBlank() -> state.memberships
+                .filter { it.deviceId == actorDeviceId && it.membershipState == ACTIVE }
+                .mapTo(linkedSetOf(), MembershipRecord::groupId)
+            else -> emptySet()
+        }
+        val groups = state.groups
+            .filter { it.groupId in permittedGroups && it.state == ACTIVE }
+            .map { it.toView() }
+        val memberships = state.memberships
+            .filter { it.groupId in permittedGroups && it.membershipState == ACTIVE }
+            .map { it.toView(isMembershipOnline(it, nowEpochMs)) }
+        val visibleDeviceIds = memberships.mapTo(linkedSetOf(), PresenceMembershipView::deviceId)
+        val devices = state.devices
+            .filter { it.deviceId in visibleDeviceIds && it.lifecycleState == ACTIVE }
+            .map { it.toView(isDeviceOnline(it.deviceId, nowEpochMs)) }
