@@ -1,0 +1,153 @@
+        } catch (error: Exception) {
+            running.set(false)
+            privateSocket?.closeQuietly()
+            closeResources()
+            val failure = RuntimeFailure(
+                timestampEpochMs = System.currentTimeMillis(),
+                stage = stage,
+                listener = when (stage) {
+                    "private_8080" -> "private_api"
+                    "discovery_8787" -> "discovery"
+                    else -> null
+                },
+                errorType = error.javaClass.simpleName.take(64),
+                message = sanitizeError(error.message),
+            )
+            _health.value = terminalStartupFailureHealth(
+                previous = _health.value,
+                stage = stage,
+                failure = failure,
+            )
+            diagnostics.record("ERROR", "runtime_start_failed", "stage=$stage type=${failure.errorType} message=${failure.message}")
+            return _health.value
+        }
+    }
+
+    @Synchronized
+    fun stop() {
+        if (!running.getAndSet(false) && _health.value.runtimeStatus == RuntimeStatus.STOPPED) return
+        closeResources()
+        _health.value = _health.value.copy(
+            runtimeStatus = RuntimeStatus.STOPPED,
+            privateApi = ListenerHealth(),
+            discoveryLoopback = ListenerHealth(),
+            discoveryLan = ListenerHealth(),
+        )
+        diagnostics.record("INFO", "runtime_stopped")
+    }
+
+    fun readRecentDiagnostics(): String = diagnostics.readRecent()
+
+    fun clearDiagnostics() = diagnostics.clear()
+
+    fun revealPresencePairingToken(): String = pairingAuthority.revealToken()
+
+    fun rotatePresencePairingToken(): String = pairingAuthority.rotateToken()
+
+    fun presencePairingTokenPreview(): String = pairingAuthority.tokenPreview()
+
+    fun presenceRegistryAvailable(): Boolean = presenceRegistry.available
+
+    @Synchronized
+    private fun reportUnexpectedListenerExit(listener: ListenerKind, detail: String) {
+        if (!running.get()) return
+
+        val failure = RuntimeFailure(
+            timestampEpochMs = System.currentTimeMillis(),
+            stage = "listener_loop",
+            listener = listener.wireName,
+            errorType = "ListenerTerminated",
+            message = sanitizeError(detail),
+        )
+        _health.value = unexpectedListenerExitHealth(_health.value, listener, failure)
+        diagnostics.record(
+            "ERROR",
+            "listener_terminated",
+            "listener=${listener.wireName} message=${failure.message}",
+        )
+    }
+
+    private fun servePrivateRuntime(server: ServerSocket) {
+        while (running.get()) {
+            val client = try {
+                server.accept()
+            } catch (_: SocketException) {
+                break
+            } catch (_: Exception) {
+                if (!running.get()) break else continue
+            }
+            try {
+                client.use(::handlePrivateClient)
+            } catch (_: Exception) {
+                if (!running.get()) break
+            }
+        }
+    }
+
+    private fun handlePrivateClient(socket: Socket) {
+        val started = System.nanoTime()
+        socket.soTimeout = SOCKET_TIMEOUT_MS
+        val requestLine = readHttpLine(socket.getInputStream(), MAX_REQUEST_LINE_BYTES) ?: return
+        val parts = requestLine.split(' ')
+        val method = parts.getOrNull(0) ?: "UNKNOWN"
+        val path = parts.getOrNull(1)?.substringBefore('?') ?: "/"
+        val payload = when (path) {
+            "/status" -> "{\"ok\":true,\"node\":\"SWRLZ Node Host\",\"mode\":\"embedded\"}"
+            "/health" -> "healthy"
+            else -> "not found"
+        }.toByteArray(StandardCharsets.UTF_8)
+        val statusCode = if (path == "/status" || path == "/health") 200 else 404
+        socket.getOutputStream().use { output ->
+            output.write(buildPrivateResponse(payload, statusCode))
+            output.flush()
+        }
+        diagnostics.recordHttp(method, path, statusCode, elapsedMs(started), "private")
+    }
+
+    private fun serveDiscovery(server: ServerSocket) {
+        while (running.get()) {
+            val client = try {
+                server.accept()
+            } catch (_: SocketException) {
+                break
+            } catch (_: Exception) {
+                if (!running.get()) break else continue
+            }
+            try {
+                client.use(::handleDiscoveryClient)
+            } catch (_: Exception) {
+                if (!running.get()) break
+            }
+        }
+    }
+
+    private fun handleDiscoveryClient(socket: Socket) {
+        val started = System.nanoTime()
+        socket.soTimeout = SOCKET_TIMEOUT_MS
+        var method = "UNKNOWN"
+        var path = "/"
+        val response = try {
+            val request = parseDiscoveryRequest(
+                input = socket.getInputStream(),
+                localAddress = socket.localAddress,
+                remoteAddress = socket.inetAddress,
+            )
+            method = request.method
+            path = request.path
+            if (PresenceProtocol.handles(request.path)) {
+                PresenceProtocol.handle(
+                    request = request,
+                    registry = presenceRegistry,
+                    pairing = pairingAuthority,
+                    pairedLanAuthority = pairedLanAuthority,
+                )
+            } else if (NodeCompatibilityProtocol.handles(request.path)) {
+                val runtime = _health.value
+                NodeCompatibilityProtocol.handle(
+                    request = request,
+                    snapshot = NodeCompatibilitySnapshot(
+                        phase = runtime.runtimeStatus.name,
+                        identityReady = activeIdentity != null,
+                        discoveryHealthy = runtime.discoveryLoopback.status == ListenerStatus.RUNNING,
+                        privateHealthy = runtime.privateApi.status == ListenerStatus.RUNNING,
+                        nodeId = activeIdentity?.nodeId,
