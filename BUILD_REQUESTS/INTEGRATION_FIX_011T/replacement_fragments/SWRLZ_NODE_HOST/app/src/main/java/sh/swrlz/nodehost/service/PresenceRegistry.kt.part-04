@@ -1,0 +1,156 @@
+        state.devices.any { it.deviceId == deviceId && it.lifecycleState == ACTIVE } &&
+            state.memberships.any { it.deviceId == deviceId && isMembershipOnline(it, nowEpochMs) }
+
+    private fun isMembershipOnline(membership: MembershipRecord, nowEpochMs: Long = System.currentTimeMillis()): Boolean {
+        val lease = membership.leaseExpiresAt?.let(::parseTimestamp) ?: return false
+        return membership.membershipState == ACTIVE &&
+            membershipKey(membership.groupId, membership.deviceId) in checkedInThisRuntime &&
+            nowEpochMs < lease
+    }
+
+    private fun appendAuditOnly(
+        requestId: String,
+        eventType: String,
+        actorDeviceId: String?,
+        groupId: String?,
+        deviceId: String?,
+        result: String,
+        reasonCode: String,
+    ) {
+        commit(
+            state.copy(
+                revision = state.revision + 1,
+                audit = appendAudit(state.audit, audit(requestId, eventType, actorDeviceId, groupId, deviceId, result, reasonCode)),
+            ),
+        )
+    }
+
+    private fun auditFailure(
+        requestId: String,
+        eventType: String,
+        actorDeviceId: String?,
+        groupId: String?,
+        deviceId: String?,
+        reasonCode: String,
+    ) {
+        runCatching { appendAuditOnly(requestId, eventType, actorDeviceId, groupId, deviceId, "rejected", reasonCode) }
+    }
+
+    private fun audit(
+        requestId: String,
+        eventType: String,
+        actorDeviceId: String?,
+        groupId: String?,
+        deviceId: String?,
+        result: String,
+        reasonCode: String,
+    ) = AuditRecord(
+        auditId = UUID.randomUUID().toString(),
+        requestId = requestId,
+        eventType = eventType,
+        actorDeviceId = actorDeviceId,
+        groupId = groupId,
+        deviceId = deviceId,
+        timestamp = timestamp(),
+        result = result,
+        reasonCode = reasonCode,
+    )
+
+    private fun appendAudit(existing: List<AuditRecord>, record: AuditRecord): List<AuditRecord> =
+        (existing + record).takeLast(MAX_AUDIT_RECORDS)
+
+    private fun requireAvailable() {
+        loadFailure?.let { throw PresenceRegistryFailure(503, "REGISTRY_UNAVAILABLE", "Persistent registry is unavailable", true) }
+    }
+
+    private fun commit(next: RegistryState) {
+        registryDir.mkdirs()
+        val bytes = next.toJson().toString().toByteArray(StandardCharsets.UTF_8)
+        val output = try {
+            atomicFile.startWrite()
+        } catch (error: Exception) {
+            throw PresenceRegistryFailure(503, "PERSISTENCE_UNAVAILABLE", "Durable registry commit could not start", true)
+        }
+        try {
+            output.write(bytes)
+            output.flush()
+            output.fd.sync()
+            atomicFile.finishWrite(output)
+        } catch (error: Exception) {
+            runCatching { atomicFile.failWrite(output) }
+            throw PresenceRegistryFailure(503, "PERSISTENCE_UNAVAILABLE", "Durable registry commit failed", true)
+        }
+        val verified = runCatching(::readStateFromDisk).getOrElse {
+            throw PresenceRegistryFailure(503, "PERSISTENCE_UNAVAILABLE", "Durable registry read-back failed", true)
+        }
+        if (verified.revision != next.revision) {
+            throw PresenceRegistryFailure(503, "PERSISTENCE_UNAVAILABLE", "Durable registry revision mismatch", true)
+        }
+        state = verified
+    }
+
+    private fun loadState(): RegistryState {
+        if (!atomicFile.baseFile.exists()) return RegistryState()
+        return runCatching(::readStateFromDisk).getOrElse { error ->
+            loadFailure = error.javaClass.simpleName.take(64)
+            RegistryState()
+        }
+    }
+
+    private fun readStateFromDisk(): RegistryState {
+        val bytes = atomicFile.openRead().use { it.readBytes() }
+        return RegistryState.fromJson(JSONObject(String(bytes, StandardCharsets.UTF_8)))
+    }
+
+    private fun GroupRecord.toView() = PresenceGroupView(groupId, label, creatorDeviceId, state, createdAt, updatedAt)
+
+    private fun DeviceRecord.toView(online: Boolean) = PresenceDeviceView(
+        deviceId, deviceLabel, role, lifecycleState, trustState, clientVersion, patchLabel,
+        capabilities, successorDeviceId, createdAt, updatedAt, lastSeenAt, online,
+    )
+
+    private fun MembershipRecord.toView(online: Boolean) = PresenceMembershipView(
+        groupId, deviceId, membershipState, joinedAt, updatedAt, lastSeenAt, leaseExpiresAt, online,
+    )
+
+    companion object {
+        const val LEASE_SECONDS = 90
+        const val HEARTBEAT_SECONDS = 30
+        private const val MAX_AUDIT_RECORDS = 256
+        private const val ACTIVE = "active"
+        private const val RETIRED = "retired"
+        private const val BLOCKED = "blocked"
+        private const val REVOKED = "revoked"
+        private const val PAIRED = "paired"
+
+        private fun membershipKey(groupId: String, deviceId: String): String = "$groupId\u0000$deviceId"
+        private fun timestamp(epochMs: Long = System.currentTimeMillis()): String =
+            DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(epochMs))
+        private fun parseTimestamp(value: String): Long = Instant.parse(value).toEpochMilli()
+    }
+}
+
+internal data class DeviceRegistrationInput(
+    val deviceId: String,
+    val deviceKey: String,
+    val deviceLabel: String,
+    val role: String,
+    val identitySchema: Int?,
+    val deviceUuid: String?,
+    val deviceAnchor: String?,
+    val fingerprintHash: String?,
+    val profileMergeKey: String?,
+    val clientVersion: String?,
+    val patchLabel: String?,
+    val capabilities: List<String>,
+)
+
+private data class RegistryState(
+    val protocolVersion: Int = 1,
+    val schemaVersion: Int = 1,
+    val revision: Long = 0,
+    val groups: List<GroupRecord> = emptyList(),
+    val devices: List<DeviceRecord> = emptyList(),
+    val memberships: List<MembershipRecord> = emptyList(),
+    val audit: List<AuditRecord> = emptyList(),
+) {
