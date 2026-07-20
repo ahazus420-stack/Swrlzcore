@@ -1,0 +1,261 @@
+--- /dev/null
++++ b/scripts/test_device_proof_011tb.py
+@@ -0,0 +1,258 @@
++#!/usr/bin/env python3
++"""Static source-bound validator for INTEGRATION-FIX-011T-B.
++
++This validator intentionally does not invoke Gradle, Android tooling, or APK
++assembly. It checks the bounded source delta and independent crypto/reference
++invariants for the paired-LAN non-mutating device-resolution slice.
++"""
++from __future__ import annotations
++
++import argparse
++import hashlib
++import hmac
++import re
++import sys
++from pathlib import Path
++
++EXPECTED_CHANGED = {
++    "API.md",
++    "INTEGRATION_FIX_011T_B_IMPLEMENTATION_REPORT.md",
++    "app/build.gradle.kts",
++    "app/src/main/java/sh/swrlz/nodehost/service/DeviceProofBindingStore.kt",
++    "app/src/main/java/sh/swrlz/nodehost/service/DiscoveryProtocol.kt",
++    "app/src/main/java/sh/swrlz/nodehost/service/NodeRuntime.kt",
++    "app/src/main/java/sh/swrlz/nodehost/service/PresenceProtocol.kt",
++    "app/src/main/java/sh/swrlz/nodehost/service/PresenceRegistry.kt",
++    "app/src/main/java/sh/swrlz/nodehost/service/PresenceRequestSecurity.kt",
++    "scripts/test_device_proof_011tb.py",
++}
++
++
++def require(condition: bool, message: str) -> None:
++    if not condition:
++        raise AssertionError(message)
++
++
++def read(root: Path, relative: str) -> str:
++    path = root / relative
++    require(path.is_file(), f"missing required path: {relative}")
++    return path.read_text(encoding="utf-8")
++
++
++def digest(path: Path) -> str:
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def changed_paths(base: Path, candidate: Path) -> set[str]:
++    base_files = {p.relative_to(base).as_posix(): p for p in base.rglob("*") if p.is_file()}
++    candidate_files = {p.relative_to(candidate).as_posix(): p for p in candidate.rglob("*") if p.is_file()}
++    changed: set[str] = set()
++    for relative in sorted(set(base_files) | set(candidate_files)):
++        left = base_files.get(relative)
++        right = candidate_files.get(relative)
++        if left is None or right is None or digest(left) != digest(right):
++            changed.add(relative)
++    return changed
++
++
++def extract_function(source: str, marker: str) -> str:
++    start = source.find(marker)
++    require(start >= 0, f"function marker missing: {marker}")
++    brace = source.find("{", start)
++    require(brace >= 0, f"function body missing: {marker}")
++    depth = 0
++    in_string = False
++    escaped = False
++    for index in range(brace, len(source)):
++        char = source[index]
++        if in_string:
++            if escaped:
++                escaped = False
++            elif char == "\\":
++                escaped = True
++            elif char == '"':
++                in_string = False
++            continue
++        if char == '"':
++            in_string = True
++        elif char == "{":
++            depth += 1
++        elif char == "}":
++            depth -= 1
++            if depth == 0:
++                return re.sub(r"\s+", " ", source[start : index + 1]).strip()
++    raise AssertionError(f"unterminated function: {marker}")
++
++
++def hkdf_sha256(ikm: bytes, salt: bytes, info: bytes, length: int) -> bytes:
++    prk = hmac.new(salt, ikm, hashlib.sha256).digest()
++    output = b""
++    previous = b""
++    counter = 1
++    while len(output) < length:
++        previous = hmac.new(prk, previous + info + bytes([counter]), hashlib.sha256).digest()
++        output += previous
++        counter += 1
++    return output[:length]
++
++
++def validate(root: Path, base: Path) -> list[str]:
++    actual_changed = changed_paths(base, root)
++    require(actual_changed == EXPECTED_CHANGED, f"changed-path limiter mismatch: {sorted(actual_changed)}")
++
++    build = read(root, "app/build.gradle.kts")
++    discovery = read(root, "app/src/main/java/sh/swrlz/nodehost/service/DiscoveryProtocol.kt")
++    runtime = read(root, "app/src/main/java/sh/swrlz/nodehost/service/NodeRuntime.kt")
++    protocol = read(root, "app/src/main/java/sh/swrlz/nodehost/service/PresenceProtocol.kt")
++    registry = read(root, "app/src/main/java/sh/swrlz/nodehost/service/PresenceRegistry.kt")
++    security = read(root, "app/src/main/java/sh/swrlz/nodehost/service/PresenceRequestSecurity.kt")
++    sidecar = read(root, "app/src/main/java/sh/swrlz/nodehost/service/DeviceProofBindingStore.kt")
++    api = read(root, "API.md")
++    report = read(root, "INTEGRATION_FIX_011T_B_IMPLEMENTATION_REPORT.md")
++
++    require('versionName = "1.1.1"' in build and "versionCode = 4" in build, "successor version not advanced")
++    require("PROTOCOL_VERSION = 1" in protocol and "SCHEMA_VERSION = 1" in protocol, "protocol/schema changed")
++    require('DEVICE_RESOLVE_PATH = "/devices/resolve"' in protocol, "resolve route missing")
++    require('presence.device.resolve.v1' in discovery, "resolve capability missing")
++    require('presence.device.proof.hmac.v1' in discovery, "proof capability missing")
++    require('presenceWriteExposure' in discovery and 'loopback-only' in discovery, "mutation exposure no longer loopback-only")
++    require('presenceResolveExposure' in discovery and 'loopback-and-approved-lan' in discovery, "resolve exposure missing")
++
++    require("AndroidKeyStore" in sidecar, "Android Keystore provider missing")
++    require('swrlz.device-proof.master.v1' in sidecar, "canonical proof master alias missing")
++    require("AES/GCM/NoPadding" in sidecar and "GCMParameterSpec" in sidecar, "AES-GCM protection missing")
++    require("setKeySize(256)" not in sidecar, "unexpected literal call shape")
++    require("generateMasterKey(256)" in sidecar and "generateMasterKey(128)" in sidecar, "AES-256/fallback policy missing")
++    require("noBackupFilesDir" in sidecar and "AtomicFile" in sidecar, "application-private atomic sidecar missing")
++    require("output.fd.sync()" in sidecar and "readStateFromDisk" in sidecar, "sidecar durability/readback missing")
++    require("ciphertext" in sidecar and "nonce" in sidecar and "keyFingerprint" in sidecar, "sidecar binding fields missing")
++    require('.put("device_key"' not in sidecar and '.put("deviceKey"' not in sidecar, "plaintext device key serialization detected")
++
++    for state in ("BOUND", "ENROLLMENT_REQUIRED", "REVOKED", "UNAVAILABLE", "CONFLICT"):
++        require(state in sidecar, f"binding state missing: {state}")
++    require("HKDF-SHA256" in report, "implementation report omits HKDF")
++    require("SWRLZ-DEVICE-PROOF-SALT-V1\\n" in sidecar, "HKDF salt domain missing")
++    require("SWRLZ-DEVICE-PROOF-KEY-V1" in sidecar, "HKDF info domain missing")
++    require("HmacSHA256" in sidecar, "HMAC-SHA256 implementation missing")
++    require("MessageDigest.isEqual" in sidecar, "constant-time proof comparison missing")
++
++    raw_key = b"stable-device-key-0001"
++    server_id = "swrlz-install-123e4567-e89b-42d3-a456-426614174000"
++    device_id = "device-alpha"
++    salt = hashlib.sha256(("SWRLZ-DEVICE-PROOF-SALT-V1\n" + server_id + "\n" + device_id).encode()).digest()
++    proof_key = hkdf_sha256(raw_key, salt, b"SWRLZ-DEVICE-PROOF-KEY-V1", 32)
++    require(proof_key.hex() == "6a02da01a6522a6b11cd23f555a615cd37500788f5cd8354d73754b67310062e", "HKDF reference vector changed")
++
++    body = b'{"protocolVersion":1,"schemaVersion":1,"identity":{"device_id":"device-alpha","device_key_fingerprint":"' + hashlib.sha256(raw_key).hexdigest().encode() + b'"}}'
++    body_hash = hashlib.sha256(body).hexdigest()
++    canonical = "\n".join(
++        [
++            "POST",
++            "/devices/resolve",
++            "1",
++            "1",
++            device_id,
++            "1784567890123",
++            "nonce-0123456789abcdef",
++            "request-011tb-vector",
++            body_hash,
++        ]
++    ).encode()
++    proof = hmac.new(proof_key, canonical, hashlib.sha256).hexdigest()
++    require(proof == "4e91966276c763ea58bb90e3e0c606882a470c5151733649ecd375b3b8ae4804", "HMAC reference vector changed")
++
++    for header in (
++        "x-swrlz-pairing-token",
++        "x-swrlz-device-id",
++        "x-swrlz-device-timestamp",
++        "x-swrlz-device-nonce",
++        "x-swrlz-device-proof",
++    ):
++        require(header in security, f"security header missing: {header}")
++    require("x-swurlz-pairing-token" in security, "legacy loopback pairing alias not preserved")
++    require("CLOCK_SKEW_MS" in security and "REPLAY_WINDOW_MS" in security, "freshness/replay window missing")
++    require("DEVICE_PROOF_REPLAYED" in security and "DEVICE_PROOF_STALE" in security, "proof failure codes missing")
++    require("bodySha256Hex" in security and "request.bodySha256Hex" in security, "exact-body hash not bound into proof")
++    require("rememberNonce" in security and "MAX_REPLAY_ENTRIES" in security, "bounded replay cache missing")
++
++    require("bodySha256Hex = sha256Hex(bodyBytes)" in runtime, "exact request bytes are not hashed before decoding")
++    require("socket.inetAddress?.isLoopbackAddress" in runtime, "remote loopback classification missing")
++    require("isApprovedLocalPeer(socket.inetAddress, socket.localAddress)" in runtime, "LAN peer classification missing")
++    require("sameIpv4Prefix" in runtime and "networkPrefixLength" in runtime, "same-prefix local-LAN policy missing")
++
++    require("fun resolveDevice(input: DeviceResolutionInput)" in registry, "non-mutating registry resolution missing")
++    resolve_body = extract_function(registry, "fun resolveDevice(input: DeviceResolutionInput)")
++    require("commit(" not in resolve_body and "appendAudit" not in resolve_body, "resolve mutates persistent registry")
++    require("PresenceDeviceResolutionStatus.UNKNOWN" in resolve_body, "unknown resolution missing")
++    require("PresenceDeviceResolutionStatus.IDENTITY_CONFLICT" in resolve_body, "identity conflict resolution missing")
++    require("successorDeviceId" in resolve_body, "lineage preservation missing")
++
++    require("PROOF_ENROLLMENT_REQUIRED" in protocol, "legacy proof enrollment state missing")
++    require("ACTION_REQUIRED" in protocol, "action-required resolution missing")
++    require("proofBindings.lookup" in protocol, "proof sidecar lookup not wired")
++    require("verifyKnownDeviceProof" in protocol, "known-device proof verification not wired")
++    require("requestSecurity.requireResolveExposure" in protocol, "paired LAN resolve gate missing")
++    require("requestSecurity.requireMutationExposure" in protocol, "existing mutation gate missing")
++    require("LAN_WRITE_DISABLED" in security, "LAN mutation fail-closed code missing")
++
++    all_source = "\n".join(
++        p.read_text(encoding="utf-8")
++        for p in (root / "app/src/main/java").rglob("*.kt")
++    )
++    require(all_source.count("storeBoundProofKey(") == 1, "registration/enrollment binding integration occurred")
++    require('/devices/proof/enroll' not in all_source, "legacy enrollment endpoint was created")
++    require("membership/restore" not in protocol, "membership restoration entered 011T-B")
++    require("create-and-join" not in protocol, "atomic create-and-join entered 011T-B")
++    require("admin/session" not in protocol, "admin routes entered 011T-B")
++
++    base_protocol = read(base, "app/src/main/java/sh/swrlz/nodehost/service/PresenceProtocol.kt")
++    for marker in ("private fun createGroup(", "private fun registerDevice(", "private fun joinGroup(", "private fun checkIn("):
++        require(extract_function(protocol, marker) == extract_function(base_protocol, marker), f"existing mutation adapter changed: {marker}")
++    base_registry = read(base, "app/src/main/java/sh/swrlz/nodehost/service/PresenceRegistry.kt")
++    for marker in (
++        "fun createGroup(",
++        "fun registerDevice(",
++        "fun joinGroup(",
++        "fun checkIn(",
++        "fun retireDevice(",
++    ):
++        require(extract_function(registry, marker) == extract_function(base_registry, marker), f"existing registry mutation changed: {marker}")
++
++    require("non-mutating" in api.lower() and "PROOF_ENROLLMENT_REQUIRED" in api, "API documentation incomplete")
++    require("Gradle" in report and "not invoked" in report, "build boundary missing from report")
++    require("Truth Firewall" in report, "Truth Firewall boundary missing")
++    require("no registration-time proof binding" in report, "registration exclusion missing")
++
++    return [
++        "changed paths: 10 (bounded)",
++        "protocol/schema: 1/1",
++        "candidate version: 1.1.1 (code 4)",
++        "mutating routes: unchanged and loopback-only",
++        "paired-LAN route: POST /devices/resolve (non-mutating)",
++        "proof sidecar: AtomicFile + Android Keystore AES-GCM",
++        "proof derivation: HKDF-SHA256, SERVER/device scoped",
++        "proof verification: HMAC-SHA256 + exact body hash + replay controls",
++        "legacy known device: PROOF_ENROLLMENT_REQUIRED, never UNKNOWN",
++        "Gradle/APK/workflow: not invoked",
++    ]
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("root", nargs="?", type=Path, default=Path(__file__).resolve().parents[1])
++    parser.add_argument("--base", required=True, type=Path)
++    args = parser.parse_args()
++    try:
++        notes = validate(args.root.resolve(), args.base.resolve())
++    except AssertionError as error:
++        print(f"INTEGRATION-FIX-011T-B static validation: FAIL\n{error}", file=sys.stderr)
++        return 1
++    print("INTEGRATION-FIX-011T-B static validation: PASS")
++    for note in notes:
++        print(f"- {note}")
++    print(f"- validator_sha256: {hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
