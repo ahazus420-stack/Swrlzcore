@@ -3,21 +3,19 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
-import io
 import json
+import re
 import shutil
-import tarfile
 import tempfile
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 BASE_SHA = "f1066675e7bccffac55bc56b8c5a5e4666ad4511c65bf84036a0a8d4bfc8a26f"
-BUNDLE_SHA = "d170b75dc798e1d8d1c98d0ae0ead543ef07e19cb65e9ba0c6f2f4d5720700c3"
 OUTPUT_SHA = "762d72e445a3a9fcb48da11905dbc0261b206060b55760dfa96fefbf1e9486e4"
 PREFIX = "SWRLZ_NODE_HOST/"
 EXPECTED_ENTRIES = 73
+HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 
 
 def sha_bytes(value: bytes) -> str:
@@ -28,15 +26,75 @@ def sha_file(path: Path) -> str:
     return sha_bytes(path.read_bytes())
 
 
-def safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
-    root = destination.resolve()
-    for member in archive.getmembers():
-        target = (destination / member.name).resolve()
-        if root != target and root not in target.parents:
-            raise SystemExit(f"unsafe replacement path: {member.name}")
-        if not member.isfile() and not member.isdir():
-            raise SystemExit(f"unsupported replacement member: {member.name}")
-    archive.extractall(destination)
+def patch_path(value: str) -> str | None:
+    value = value.strip()
+    if value == "/dev/null":
+        return None
+    if value.startswith("a/") or value.startswith("b/"):
+        value = value[2:]
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts:
+        raise SystemExit(f"unsafe patch path: {value}")
+    return path.as_posix()
+
+
+def apply_patch(project: Path, patch_file: Path) -> set[str]:
+    lines = patch_file.read_text(encoding="utf-8").splitlines(keepends=True)
+    index = 0
+    changed: set[str] = set()
+    while index < len(lines):
+        if not lines[index].startswith("--- "):
+            raise SystemExit(f"invalid patch header in {patch_file.name}: {lines[index]!r}")
+        old_path = patch_path(lines[index][4:])
+        index += 1
+        if index >= len(lines) or not lines[index].startswith("+++ "):
+            raise SystemExit(f"missing new-file header in {patch_file.name}")
+        new_path = patch_path(lines[index][4:])
+        index += 1
+        target_path = new_path or old_path
+        if target_path is None:
+            raise SystemExit(f"delete-only patches are unsupported: {patch_file.name}")
+        target = project / target_path
+        original = [] if old_path is None else target.read_text(encoding="utf-8").splitlines(keepends=True)
+        output: list[str] = []
+        original_index = 0
+        while index < len(lines) and lines[index].startswith("@@ "):
+            match = HUNK.match(lines[index])
+            if not match:
+                raise SystemExit(f"invalid hunk header in {patch_file.name}: {lines[index]!r}")
+            old_start = int(match.group(1))
+            desired_index = max(0, old_start - 1)
+            if desired_index < original_index:
+                raise SystemExit(f"overlapping hunk in {patch_file.name}")
+            output.extend(original[original_index:desired_index])
+            original_index = desired_index
+            index += 1
+            while index < len(lines) and not lines[index].startswith("@@ ") and not lines[index].startswith("--- "):
+                line = lines[index]
+                index += 1
+                if line.startswith("\\ No newline at end of file"):
+                    continue
+                if not line:
+                    raise SystemExit(f"empty patch record in {patch_file.name}")
+                marker, text = line[0], line[1:]
+                if marker == " ":
+                    if original_index >= len(original) or original[original_index] != text:
+                        raise SystemExit(f"patch context mismatch in {patch_file.name}:{target_path}")
+                    output.append(original[original_index])
+                    original_index += 1
+                elif marker == "-":
+                    if original_index >= len(original) or original[original_index] != text:
+                        raise SystemExit(f"patch removal mismatch in {patch_file.name}:{target_path}")
+                    original_index += 1
+                elif marker == "+":
+                    output.append(text)
+                else:
+                    raise SystemExit(f"invalid patch record {marker!r} in {patch_file.name}")
+        output.extend(original[original_index:])
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("".join(output), encoding="utf-8", newline="")
+        changed.add(target_path)
+    return changed
 
 
 def deterministic_zip(root: Path, output: Path) -> None:
@@ -60,45 +118,35 @@ def main() -> int:
 
     here = Path(__file__).resolve().parent
     manifest = json.loads((here / "candidate-manifest.json").read_text(encoding="utf-8"))
-    bundle_path = here / "replacement-bundle.b64"
-    if not bundle_path.is_file():
-        raise SystemExit("replacement transport bundle is missing")
-    encoded = bundle_path.read_text(encoding="ascii")
-    bundle = base64.b64decode(encoded, validate=True)
-    if sha_bytes(bundle) != BUNDLE_SHA:
-        raise SystemExit("replacement transport checksum mismatch")
+    patch_paths = sorted((here / "patches").glob("*.patch"))
+    if not patch_paths:
+        raise SystemExit("patch transport is missing")
+    expected_transport = {Path(item["path"]).name: item["sha256"] for item in manifest["transport"]["parts"]}
+    actual_transport = {path.name: sha_file(path) for path in patch_paths}
+    if actual_transport != expected_transport:
+        raise SystemExit("patch transport checksum mismatch")
 
     base = args.base.resolve()
     if sha_file(base) != BASE_SHA:
         raise SystemExit("SERVER v1.1.0 base checksum mismatch")
-
     expected = {entry["path"]: entry["sha256"] for entry in manifest["changedPaths"]}
-    with tempfile.TemporaryDirectory(prefix="swrlz-011tb-") as temporary:
-        temp = Path(temporary)
-        replacement_root = temp / "replacements"
-        replacement_root.mkdir()
-        with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as replacement_archive:
-            safe_extract(replacement_archive, replacement_root)
-        replacement_project = replacement_root / "SWRLZ_NODE_HOST"
-        actual = {
-            p.relative_to(replacement_project).as_posix(): sha_file(p)
-            for p in replacement_project.rglob("*")
-            if p.is_file()
-        }
-        if actual != expected:
-            raise SystemExit("replacement path or content limiter mismatch")
 
-        extracted = temp / "base"
+    with tempfile.TemporaryDirectory(prefix="swrlz-011tb-") as temporary:
+        extracted = Path(temporary) / "base"
         with ZipFile(base) as source:
             bad = source.testzip()
             if bad:
                 raise SystemExit(f"base ZIP integrity failure: {bad}")
             source.extractall(extracted)
         project = extracted / "SWRLZ_NODE_HOST"
-        for relative in sorted(expected):
-            target = project / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(replacement_project / relative, target)
+        changed: set[str] = set()
+        for patch in patch_paths:
+            changed.update(apply_patch(project, patch))
+        if changed != set(expected):
+            raise SystemExit(f"patch changed-path limiter mismatch: {sorted(changed)}")
+        actual = {relative: sha_file(project / relative) for relative in expected}
+        if actual != expected:
+            raise SystemExit("patched content checksum mismatch")
 
         output = args.output.resolve()
         output.parent.mkdir(parents=True, exist_ok=True)
