@@ -1,0 +1,133 @@
+        identity.optionalString("role")?.let { descriptive(it, "role", 1, 64) }
+        identity.optionalString("client_version")?.let { descriptive(it, "client_version", 1, 96) }
+        identity.optionalString("patch_label")?.let { descriptive(it, "patch_label", 1, 128) }
+        return DeviceResolutionInput(
+            deviceId = deviceId,
+            deviceKeyFingerprint = keyFingerprint,
+            deviceUuid = identity.optionalString("device_uuid")?.let(::uuidIdentity),
+            deviceAnchor = identity.optionalString("device_anchor")?.let { hashHint(it, "device_anchor") },
+            fingerprintHash = identity.optionalString("fingerprint_hash")?.let { hashHint(it, "fingerprint_hash") },
+            profileMergeKey = identity.optionalString("profile_merge_key")?.let { hashHint(it, "profile_merge_key") },
+        )
+    }
+
+    private fun validateStrictVersions(body: JSONObject) {
+        val protocol = requiredVersion(body, "protocolVersion")
+        val schema = requiredVersion(body, "schemaVersion")
+        if (protocol != PROTOCOL_VERSION) {
+            throw ProtocolFailure(422, "PROTOCOL_INCOMPATIBLE", "Unsupported presence protocol version")
+        }
+        if (schema != SCHEMA_VERSION) {
+            throw ProtocolFailure(422, "SCHEMA_INCOMPATIBLE", "Unsupported presence schema version")
+        }
+    }
+
+    private fun requiredVersion(body: JSONObject, name: String): Int {
+        if (!body.has(name)) throw ProtocolFailure(400, "MALFORMED_REQUEST", "$name is required")
+        val value = body.opt(name)
+        if (value !is Number) throw ProtocolFailure(400, "MALFORMED_REQUEST", "$name must be an integer")
+        return value.toInt()
+    }
+
+    private fun resolutionSuccess(
+        requestId: String,
+        registryRevision: Long,
+        resolution: String,
+        device: PresenceDeviceView?,
+        membershipCount: Int,
+        lineage: JSONObject?,
+    ): DiscoveryHttpResponse {
+        val body = JSONObject()
+            .put("ok", true)
+            .put("protocolVersion", PROTOCOL_VERSION)
+            .put("schemaVersion", SCHEMA_VERSION)
+            .put("requestId", requestId)
+            .put("serverTime", Instant.now().toString())
+            .put("registryRevision", registryRevision)
+            .put("resolution", resolution)
+            .put("device", device?.let(::resolutionDeviceJson) ?: JSONObject.NULL)
+            .put("membershipCount", membershipCount)
+            .put("lineage", lineage ?: JSONObject.NULL)
+        return DiscoveryHttpResponse(200, "OK", body.toString(), noStoreHeaders())
+    }
+
+    private fun resolutionDeviceJson(device: PresenceDeviceView): JSONObject = JSONObject()
+        .put("device_id", device.deviceId)
+        .put("device_label", device.deviceLabel)
+        .put("role", device.role)
+        .put("status", device.lifecycleState)
+
+    private fun resolveError(
+        status: Int,
+        code: String,
+        message: String,
+        requestId: String,
+        retryable: Boolean = false,
+    ): DiscoveryHttpResponse {
+        val actionRequired = code in setOf(
+            "IDENTITY_CONFLICT",
+            "DEVICE_KEY_MISMATCH",
+            "DEVICE_PROOF_REQUIRED",
+            "DEVICE_PROOF_INVALID",
+            "DEVICE_PROOF_STALE",
+            "DEVICE_PROOF_REPLAYED",
+        )
+        val body = JSONObject()
+            .put("ok", false)
+            .put("protocolVersion", PROTOCOL_VERSION)
+            .put("schemaVersion", SCHEMA_VERSION)
+            .put("requestId", requestId)
+            .put("error", JSONObject()
+                .put("code", code)
+                .put("message", message)
+                .put("actionRequired", actionRequired)
+                .put("retryable", retryable))
+        val headers = if (status == 405) noStoreHeaders() + ("Allow" to "POST") else noStoreHeaders()
+        return DiscoveryHttpResponse(status, reason(status), body.toString(), headers)
+    }
+
+    private fun createGroup(
+        body: JSONObject,
+        request: DiscoveryHttpRequest,
+        registry: PresenceRegistry,
+        requestId: String,
+    ): DiscoveryHttpResponse {
+        val groupId = groupId(body.requiredString("group_id"))
+        val groupKey = secret(body.requiredString("group_key"), "group_key", 8, 128)
+        val label = display(body.requiredString("label"), "label")
+        val creator = body.optionalString("creator_device_id")
+            ?: request.headers["x-swrlz-device-node-id"]
+            ?: throw ProtocolFailure(400, "INVALID_FIELD", "creator_device_id or X-SWRLZ-Device-Node-Id is required")
+        val creatorDeviceId = deviceId(creator)
+        val result = registry.createGroup(groupId, groupKey, label, creatorDeviceId, requestId)
+        val payload = JSONObject()
+            .put("created", result.created)
+            .put("group", groupJson(result.group))
+        return success(200, requestId, payload)
+    }
+
+    private fun registerDevice(
+        body: JSONObject,
+        request: DiscoveryHttpRequest,
+        registry: PresenceRegistry,
+        requestId: String,
+    ): DiscoveryHttpResponse {
+        val result = registry.registerDevice(registration(body, request), requestId)
+        val payload = JSONObject()
+            .put("created", result.created)
+            .put("device", deviceJson(result.device))
+            .put("identityWarning", result.identityWarning ?: JSONObject.NULL)
+        return success(200, requestId, payload)
+    }
+
+    private fun joinGroup(
+        body: JSONObject,
+        request: DiscoveryHttpRequest,
+        registry: PresenceRegistry,
+        requestId: String,
+    ): DiscoveryHttpResponse {
+        val groupId = groupId(body.requiredString("group_id"))
+        val groupKey = secret(body.requiredString("group_key"), "group_key", 8, 128)
+        val result = registry.joinGroup(groupId, groupKey, registration(body, request), requestId)
+        val payload = JSONObject()
+            .put("joined", result.joined)
