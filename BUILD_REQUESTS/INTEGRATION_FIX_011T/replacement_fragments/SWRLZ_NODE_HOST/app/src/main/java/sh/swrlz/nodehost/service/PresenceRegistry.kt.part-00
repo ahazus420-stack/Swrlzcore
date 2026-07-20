@@ -1,0 +1,186 @@
+package sh.swrlz.nodehost.service
+
+import android.content.Context
+import android.util.AtomicFile
+import android.util.Base64
+import java.io.File
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.time.Instant
+import java.time.format.DateTimeFormatter
+import java.util.UUID
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
+import org.json.JSONArray
+import org.json.JSONObject
+
+internal data class PresenceGroupView(
+    val groupId: String,
+    val label: String,
+    val creatorDeviceId: String,
+    val state: String,
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+internal data class PresenceDeviceView(
+    val deviceId: String,
+    val deviceLabel: String,
+    val role: String,
+    val lifecycleState: String,
+    val trustState: String,
+    val clientVersion: String?,
+    val patchLabel: String?,
+    val capabilities: List<String>,
+    val successorDeviceId: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val lastSeenAt: String?,
+    val online: Boolean,
+)
+
+internal data class PresenceMembershipView(
+    val groupId: String,
+    val deviceId: String,
+    val membershipState: String,
+    val joinedAt: String,
+    val updatedAt: String,
+    val lastSeenAt: String?,
+    val leaseExpiresAt: String?,
+    val online: Boolean,
+)
+
+internal data class PresenceRegistrySnapshot(
+    val revision: Long,
+    val groups: List<PresenceGroupView>,
+    val devices: List<PresenceDeviceView>,
+    val memberships: List<PresenceMembershipView>,
+) {
+    val onlineCount: Int get() = devices.count(PresenceDeviceView::online)
+}
+
+internal data class DeviceResolutionInput(
+    val deviceId: String,
+    val deviceKeyFingerprint: String,
+    val deviceUuid: String?,
+    val deviceAnchor: String?,
+    val fingerprintHash: String?,
+    val profileMergeKey: String?,
+)
+
+internal enum class DeviceResolutionKind {
+    KNOWN_CANDIDATE,
+    UNKNOWN,
+    RETIRED_CANDIDATE,
+    REPLACED_CANDIDATE,
+    BLOCKED_CANDIDATE,
+    IDENTITY_CONFLICT,
+    ACTION_REQUIRED,
+}
+
+internal data class DeviceResolutionLookup(
+    val registryRevision: Long,
+    val kind: DeviceResolutionKind,
+    val device: PresenceDeviceView?,
+    val membershipCount: Int,
+    val successorDeviceId: String?,
+)
+
+internal data class GroupMutation(val created: Boolean, val group: PresenceGroupView)
+internal data class DeviceMutation(
+    val created: Boolean,
+    val device: PresenceDeviceView,
+    val identityWarning: String?,
+)
+internal data class JoinMutation(
+    val joined: Boolean,
+    val registrationMode: String,
+    val membership: PresenceMembershipView,
+    val device: PresenceDeviceView,
+)
+internal data class CheckinMutation(
+    val groupId: String,
+    val deviceId: String,
+    val lastSeenAt: String,
+    val leaseExpiresAt: String,
+    val leaseSeconds: Int,
+)
+
+internal class PresenceRegistryFailure(
+    val httpStatus: Int,
+    val code: String,
+    override val message: String,
+    val retryable: Boolean = false,
+) : Exception(message)
+
+/**
+ * Restart-persistent, SERVER-owned presence truth.
+ *
+ * The registry deliberately does not share Room tables with mission state. It
+ * uses one AtomicFile transaction so group/device/membership/audit changes are
+ * committed together or not reported as successful. Plaintext keys are never
+ * serialized. Online state also requires an accepted check-in during this
+ * process lifetime, so restart cannot revive a stale lease.
+ */
+internal class PresenceRegistry(context: Context) {
+    private val registryDir = File(context.applicationContext.noBackupFilesDir, "presence-v1")
+    private val atomicFile = AtomicFile(File(registryDir, "registry.json"))
+    private val random = SecureRandom()
+    private val checkedInThisRuntime = linkedSetOf<String>()
+
+    @Volatile
+    private var loadFailure: String? = null
+
+    private var state: RegistryState = loadState()
+
+    val available: Boolean get() = loadFailure == null
+
+    @Synchronized
+    fun createGroup(
+        groupId: String,
+        groupKey: String,
+        label: String,
+        creatorDeviceId: String,
+        requestId: String,
+    ): GroupMutation {
+        requireAvailable()
+        val existing = state.groups.firstOrNull { it.groupId == groupId }
+        if (existing != null) {
+            if (existing.creatorDeviceId != creatorDeviceId || !KeyVerifier.verify(groupKey, existing.groupKeyVerifier)) {
+                auditFailure(requestId, "group_create", creatorDeviceId, groupId, null, "GROUP_CONFLICT")
+                throw PresenceRegistryFailure(409, "GROUP_CONFLICT", "Group conflicts with an existing registry record")
+            }
+            appendAuditOnly(requestId, "group_create", creatorDeviceId, groupId, null, "accepted", "IDEMPOTENT")
+            return GroupMutation(created = false, group = existing.toView())
+        }
+
+        val now = timestamp()
+        val record = GroupRecord(
+            groupId = groupId,
+            label = label,
+            groupKeyVerifier = KeyVerifier.create(groupKey, random),
+            creatorDeviceId = creatorDeviceId,
+            state = ACTIVE,
+            createdAt = now,
+            updatedAt = now,
+        )
+        commit(
+            state.copy(
+                revision = state.revision + 1,
+                groups = state.groups + record,
+                audit = appendAudit(state.audit, audit(requestId, "group_create", creatorDeviceId, groupId, null, "accepted", "CREATED")),
+            ),
+        )
+        return GroupMutation(created = true, group = record.toView())
+    }
+
+    @Synchronized
+    fun registerDevice(
+        input: DeviceRegistrationInput,
+        requestId: String,
+    ): DeviceMutation {
+        requireAvailable()
+        val existing = state.devices.firstOrNull { it.deviceId == input.deviceId }
+        if (existing != null) {
+            if (!KeyVerifier.verify(input.deviceKey, existing.deviceKeyVerifier)) {
