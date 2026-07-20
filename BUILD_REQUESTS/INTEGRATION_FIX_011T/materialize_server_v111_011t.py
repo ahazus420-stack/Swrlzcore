@@ -3,18 +3,13 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
-import io
 import json
-import shutil
-import tarfile
 import tempfile
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 BASE_SHA = "f1066675e7bccffac55bc56b8c5a5e4666ad4511c65bf84036a0a8d4bfc8a26f"
-BUNDLE_SHA = "396613db4e1d4e660382c4d63fd5a8f45aad3cadafa7b552a25d11590af22d79"
 OUTPUT_SHA = "63ef4e92e4a582be8a9a81dcc193fc0608f9b8e14362f9a688be72668f4211c5"
 PREFIX = "SWRLZ_NODE_HOST/"
 EXPECTED_ENTRIES = 72
@@ -26,27 +21,6 @@ def sha_bytes(value: bytes) -> str:
 
 def sha_file(path: Path) -> str:
     return sha_bytes(path.read_bytes())
-
-
-def safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
-    root = destination.resolve()
-    for member in archive.getmembers():
-        target = (destination / member.name).resolve()
-        if root != target and root not in target.parents:
-            raise SystemExit(f"unsafe replacement path: {member.name}")
-        if not member.isfile() and not member.isdir():
-            raise SystemExit(f"unsupported replacement member: {member.name}")
-    for member in archive.getmembers():
-        target = destination / member.name
-        if member.isdir():
-            target.mkdir(parents=True, exist_ok=True)
-            continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        source = archive.extractfile(member)
-        if source is None:
-            raise SystemExit(f"replacement member could not be read: {member.name}")
-        with source, target.open("wb") as output:
-            shutil.copyfileobj(source, output)
 
 
 def deterministic_zip(root: Path, output: Path) -> None:
@@ -63,6 +37,19 @@ def deterministic_zip(root: Path, output: Path) -> None:
             result.writestr(info, path.read_bytes(), compress_type=ZIP_DEFLATED, compresslevel=9)
 
 
+def replacement_bytes(here: Path, relative: str) -> bytes:
+    direct = here / "replacements" / "SWRLZ_NODE_HOST" / relative
+    fragment_base = here / "replacement_fragments" / "SWRLZ_NODE_HOST"
+    fragments = sorted(fragment_base.glob(relative + ".part-*"))
+    if direct.is_file() and fragments:
+        raise SystemExit(f"ambiguous direct and fragmented replacement: {relative}")
+    if direct.is_file():
+        return direct.read_bytes()
+    if fragments:
+        return b"".join(path.read_bytes() for path in fragments)
+    raise SystemExit(f"replacement evidence is missing: {relative}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", type=Path, default=Path("SERVER_CFv1.1.0_SWRLZ.zip"))
@@ -71,35 +58,18 @@ def main() -> int:
 
     here = Path(__file__).resolve().parent
     manifest = json.loads((here / "candidate-manifest.json").read_text(encoding="utf-8"))
-    part_paths = sorted((here / "transport").glob("part-*.b64"))
-    if not part_paths:
-        raise SystemExit("replacement transport parts are missing")
-    encoded = "".join(path.read_text(encoding="ascii") for path in part_paths)
-    bundle = base64.b64decode(encoded, validate=True)
-    if sha_bytes(bundle) != BUNDLE_SHA:
-        raise SystemExit("replacement transport checksum mismatch")
+    expected = {entry["path"]: entry["sha256"] for entry in manifest["changedPaths"]}
+    replacements = {relative: replacement_bytes(here, relative) for relative in expected}
+    actual = {relative: sha_bytes(value) for relative, value in replacements.items()}
+    if actual != expected:
+        raise SystemExit("replacement path or content limiter mismatch")
 
     base = args.base.resolve()
     if sha_file(base) != BASE_SHA:
         raise SystemExit("SERVER v1.1.0 base checksum mismatch")
 
-    expected = {entry["path"]: entry["sha256"] for entry in manifest["changedPaths"]}
     with tempfile.TemporaryDirectory(prefix="swrlz-011t-") as temporary:
-        temp = Path(temporary)
-        replacement_root = temp / "replacements"
-        replacement_root.mkdir()
-        with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as archive:
-            safe_extract(archive, replacement_root)
-        replacement_project = replacement_root / "SWRLZ_NODE_HOST"
-        actual = {
-            p.relative_to(replacement_project).as_posix(): sha_file(p)
-            for p in replacement_project.rglob("*")
-            if p.is_file()
-        }
-        if actual != expected:
-            raise SystemExit("replacement path or content limiter mismatch")
-
-        extracted = temp / "base"
+        extracted = Path(temporary) / "base"
         with ZipFile(base) as source:
             bad = source.testzip()
             if bad:
@@ -108,10 +78,10 @@ def main() -> int:
                 raise SystemExit("base entry-count mismatch")
             source.extractall(extracted)
         project = extracted / "SWRLZ_NODE_HOST"
-        for relative in sorted(expected):
+        for relative, value in sorted(replacements.items()):
             target = project / relative
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(replacement_project / relative, target)
+            target.write_bytes(value)
 
         output = args.output.resolve()
         output.parent.mkdir(parents=True, exist_ok=True)
