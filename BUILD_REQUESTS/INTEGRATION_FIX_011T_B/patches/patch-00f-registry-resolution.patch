@@ -1,0 +1,112 @@
+--- a/app/src/main/java/sh/swrlz/nodehost/service/PresenceRegistry.kt
++++ b/app/src/main/java/sh/swrlz/nodehost/service/PresenceRegistry.kt
+@@ -80,6 +80,36 @@
+     val leaseSeconds: Int,
+ )
+ 
++internal enum class PresenceDeviceResolutionStatus {
++    ACTIVE,
++    UNKNOWN,
++    RETIRED,
++    REPLACED,
++    BLOCKED,
++    IDENTITY_CONFLICT,
++}
++
++internal data class DeviceResolutionInput(
++    val deviceId: String,
++    val deviceKeyFingerprint: String,
++    val deviceUuid: String?,
++    val deviceAnchor: String?,
++    val fingerprintHash: String?,
++    val profileMergeKey: String?,
++    val deviceLabel: String?,
++    val role: String?,
++    val clientVersion: String?,
++    val patchLabel: String?,
++)
++
++internal data class PresenceDeviceResolution(
++    val status: PresenceDeviceResolutionStatus,
++    val registryRevision: Long,
++    val device: PresenceDeviceView?,
++    val membershipCount: Int,
++    val successorDeviceId: String?,
++)
++
+ internal class PresenceRegistryFailure(
+     val httpStatus: Int,
+     val code: String,
+@@ -368,6 +398,72 @@
+         return CheckinMutation(groupId, deviceId, lastSeenAt, leaseExpiresAt, LEASE_SECONDS)
+     }
+ 
++    /** Non-mutating exact-device resolution used by paired bootstrap. */
++    @Synchronized
++    fun resolveDevice(input: DeviceResolutionInput): PresenceDeviceResolution {
++        requireAvailable()
++        val exact = state.devices.firstOrNull { it.deviceId == input.deviceId }
++        if (exact == null) {
++            val correlated = state.devices.firstOrNull { candidate ->
++                listOf(
++                    input.deviceUuid to candidate.deviceUuid,
++                    input.deviceAnchor to candidate.deviceAnchor,
++                    input.fingerprintHash to candidate.fingerprintHash,
++                    input.profileMergeKey to candidate.profileMergeKey,
++                ).any { (submitted, stored) ->
++                    !submitted.isNullOrBlank() && !stored.isNullOrBlank() && submitted == stored
++                }
++            }
++            return PresenceDeviceResolution(
++                status = if (correlated == null) {
++                    PresenceDeviceResolutionStatus.UNKNOWN
++                } else {
++                    PresenceDeviceResolutionStatus.IDENTITY_CONFLICT
++                },
++                registryRevision = state.revision,
++                device = null,
++                membershipCount = 0,
++                successorDeviceId = correlated?.successorDeviceId,
++            )
++        }
++
++        val submittedConflict = listOf(
++            input.deviceUuid to exact.deviceUuid,
++            input.deviceAnchor to exact.deviceAnchor,
++            input.fingerprintHash to exact.fingerprintHash,
++            input.profileMergeKey to exact.profileMergeKey,
++        ).any { (submitted, stored) ->
++            !submitted.isNullOrBlank() && !stored.isNullOrBlank() && submitted != stored
++        }
++        if (submittedConflict) {
++            return PresenceDeviceResolution(
++                status = PresenceDeviceResolutionStatus.IDENTITY_CONFLICT,
++                registryRevision = state.revision,
++                device = null,
++                membershipCount = 0,
++                successorDeviceId = exact.successorDeviceId,
++            )
++        }
++
++        val status = when {
++            exact.lifecycleState == BLOCKED -> PresenceDeviceResolutionStatus.BLOCKED
++            exact.lifecycleState == RETIRED && !exact.successorDeviceId.isNullOrBlank() -> PresenceDeviceResolutionStatus.REPLACED
++            exact.lifecycleState == RETIRED -> PresenceDeviceResolutionStatus.RETIRED
++            exact.lifecycleState == ACTIVE -> PresenceDeviceResolutionStatus.ACTIVE
++            else -> PresenceDeviceResolutionStatus.IDENTITY_CONFLICT
++        }
++        val memberships = state.memberships.count {
++            it.deviceId == exact.deviceId && it.membershipState == ACTIVE
++        }
++        return PresenceDeviceResolution(
++            status = status,
++            registryRevision = state.revision,
++            device = exact.toView(isDeviceOnline(exact.deviceId)),
++            membershipCount = memberships,
++            successorDeviceId = exact.successorDeviceId,
++        )
++    }
++
+     @Synchronized
+     fun verifyGroupCredentials(groupId: String, groupKey: String): Boolean {
+         if (!available) return false
