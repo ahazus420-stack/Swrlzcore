@@ -1,0 +1,89 @@
+--- a/app/src/main/java/sh/swrlz/nodehost/service/NodeRuntime.kt
++++ b/app/src/main/java/sh/swrlz/nodehost/service/NodeRuntime.kt
+@@ -26,6 +26,8 @@
+     private val diagnostics = RuntimeDiagnostics(appContext)
+     private val presenceRegistry = PresenceRegistry(appContext)
+     private val pairingAuthority = PresencePairingAuthority(appContext)
++    private val proofBindings = DeviceProofBindingStore(appContext)
++    private val presenceRequestSecurity = PresenceRequestSecurity()
+     private val _health = MutableStateFlow(NodeHealth())
+     val health: StateFlow<NodeHealth> = _health.asStateFlow()
+     val diagnosticSnapshot: StateFlow<RuntimeDiagnosticSnapshot> = diagnostics.snapshot
+@@ -255,7 +257,8 @@
+         val response = try {
+             val request = parseDiscoveryRequest(
+                 input = socket.getInputStream(),
+-                isLoopback = socket.localAddress?.isLoopbackAddress == true,
++                isLoopback = socket.inetAddress?.isLoopbackAddress == true,
++                isLocalLan = isApprovedLocalPeer(socket.inetAddress, socket.localAddress),
+             )
+             method = request.method
+             path = request.path
+@@ -264,6 +267,9 @@
+                     request = request,
+                     registry = presenceRegistry,
+                     pairing = pairingAuthority,
++                    proofBindings = proofBindings,
++                    requestSecurity = presenceRequestSecurity,
++                    serverInstallationId = activeIdentity?.installationId,
+                 )
+             } else if (NodeCompatibilityProtocol.handles(request.path)) {
+                 val runtime = _health.value
+@@ -320,7 +326,11 @@
+     private fun elapsedMs(startedNanos: Long): Long =
+         (System.nanoTime() - startedNanos).coerceAtLeast(0L) / 1_000_000L
+ 
+-    private fun parseDiscoveryRequest(input: InputStream, isLoopback: Boolean): DiscoveryHttpRequest {
++    private fun parseDiscoveryRequest(
++        input: InputStream,
++        isLoopback: Boolean,
++        isLocalLan: Boolean,
++    ): DiscoveryHttpRequest {
+         val requestLine = readHttpLine(input, MAX_REQUEST_LINE_BYTES) ?: throw BadHttpRequest()
+         val parts = requestLine.split(' ')
+         if (parts.size != 3 || !parts[2].startsWith("HTTP/1.")) throw BadHttpRequest()
+@@ -357,7 +367,9 @@
+                     headers = headers,
+                     contentLength = contentLength,
+                     body = String(bodyBytes, StandardCharsets.UTF_8),
++                    bodySha256Hex = sha256Hex(bodyBytes),
+                     isLoopback = isLoopback,
++                    isLocalLan = isLocalLan,
+                 )
+             }
+ 
+@@ -371,6 +383,34 @@
+         throw BadHttpRequest()
+     }
+ 
++    private fun isApprovedLocalPeer(remote: InetAddress?, local: InetAddress?): Boolean {
++        if (remote !is Inet4Address || local !is Inet4Address) return false
++        if (remote.isLoopbackAddress || local.isLoopbackAddress) return false
++        if (!(remote.isSiteLocalAddress || remote.isLinkLocalAddress)) return false
++        if (!(local.isSiteLocalAddress || local.isLinkLocalAddress)) return false
++        val networkInterface = runCatching { NetworkInterface.getByInetAddress(local) }.getOrNull() ?: return false
++        val prefixLength = networkInterface.interfaceAddresses
++            .firstOrNull { it.address == local }
++            ?.networkPrefixLength
++            ?.toInt()
++            ?: return false
++        if (prefixLength !in 1..32) return false
++        return sameIpv4Prefix(remote.address, local.address, prefixLength)
++    }
++
++    private fun sameIpv4Prefix(left: ByteArray, right: ByteArray, prefixLength: Int): Boolean {
++        if (left.size != 4 || right.size != 4) return false
++        var remaining = prefixLength
++        for (index in left.indices) {
++            if (remaining <= 0) return true
++            val bits = minOf(8, remaining)
++            val mask = (0xFF shl (8 - bits)) and 0xFF
++            if ((left[index].toInt() and mask) != (right[index].toInt() and mask)) return false
++            remaining -= bits
++        }
++        return true
++    }
++
+     private fun parseQuery(rawQuery: String): Map<String, String> {
+         if (rawQuery.isBlank()) return emptyMap()
+         val values = linkedMapOf<String, String>()
