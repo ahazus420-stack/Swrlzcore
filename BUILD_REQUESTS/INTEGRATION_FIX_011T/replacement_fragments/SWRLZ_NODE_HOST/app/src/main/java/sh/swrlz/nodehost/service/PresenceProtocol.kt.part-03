@@ -1,0 +1,123 @@
+            .put("registrationMode", result.registrationMode)
+            .put("membership", membershipJson(result.membership))
+            .put("device", deviceJson(result.device))
+        return success(200, requestId, payload)
+    }
+
+    private fun checkIn(
+        body: JSONObject,
+        registry: PresenceRegistry,
+        requestId: String,
+    ): DiscoveryHttpResponse {
+        val groupId = groupId(body.requiredString("group_id"))
+        val deviceId = deviceId(body.requiredString("device_id"))
+        val deviceKey = secret(body.requiredString("device_key"), "device_key", 16, 256)
+        val result = registry.checkIn(groupId, deviceId, deviceKey, requestId)
+        val payload = JSONObject()
+            .put("accepted", true)
+            .put("device_id", result.deviceId)
+            .put("group_id", result.groupId)
+            .put("last_seen_at", result.lastSeenAt)
+            .put("lease_seconds", result.leaseSeconds)
+            .put("heartbeat_recommended_seconds", PresenceRegistry.HEARTBEAT_SECONDS)
+            .put("lease_expires_at", result.leaseExpiresAt)
+            .put("online", true)
+        return success(200, requestId, payload)
+    }
+
+    private fun registration(body: JSONObject, request: DiscoveryHttpRequest): DeviceRegistrationInput {
+        val identity = body.optJSONObject("identity")
+        val identitySchema = identity?.takeIf { it.has("schemaVersion") }?.optInt("schemaVersion")
+        if (identitySchema != null && identitySchema != 1) {
+            throw ProtocolFailure(422, "SCHEMA_VERSION_UNSUPPORTED", "Unsupported identity schema version")
+        }
+        val capabilities = body.optJSONArray("capabilities")?.let(::capabilities)
+            ?: emptyList()
+        return DeviceRegistrationInput(
+            deviceId = deviceId(body.requiredString("device_id")),
+            deviceKey = secret(body.requiredString("device_key"), "device_key", 16, 256),
+            deviceLabel = display(body.requiredString("device_label"), "device_label"),
+            role = descriptive(body.requiredString("role"), "role", 1, 64),
+            identitySchema = identitySchema,
+            deviceUuid = identity?.optionalString("device_uuid")?.let(::uuidIdentity),
+            deviceAnchor = identity?.optionalString("device_anchor")?.let { hashHint(it, "device_anchor") },
+            fingerprintHash = identity?.optionalString("fingerprint_hash")?.let { hashHint(it, "fingerprint_hash") },
+            profileMergeKey = identity?.optionalString("profile_merge_key")?.let { hashHint(it, "profile_merge_key") },
+            clientVersion = body.optionalString("client_version")
+                ?.let { descriptive(it, "client_version", 1, 96) }
+                ?: request.headers["x-swrlz-app-version"]?.take(96),
+            patchLabel = body.optionalString("patch_label")
+                ?.let { descriptive(it, "patch_label", 1, 128) }
+                ?: request.headers["x-swrlz-patch-label"]?.take(128),
+            capabilities = capabilities,
+        )
+    }
+
+    private fun version(body: JSONObject, name: String): Int {
+        if (!body.has(name)) return 1 // accepted legacy adapter
+        val value = body.opt(name)
+        if (value !is Number) throw ProtocolFailure(400, "INVALID_FIELD", "$name must be an integer")
+        return value.toInt()
+    }
+
+    private fun groupId(value: String): String = value.trim().also {
+        if (!groupIdPattern.matches(it)) throw ProtocolFailure(400, "INVALID_FIELD", "group_id is invalid")
+    }
+
+    private fun deviceId(value: String): String = descriptive(value, "device_id", 1, 128)
+
+    private fun display(value: String, field: String): String = descriptive(value, field, 1, 96)
+
+    private fun descriptive(value: String, field: String, min: Int, max: Int): String = value.trim().also {
+        if (it.length !in min..max || it.any { character -> character.code !in 0x20..0x7E }) {
+            throw ProtocolFailure(400, "INVALID_FIELD", "$field is invalid")
+        }
+    }
+
+    private fun secret(value: String, field: String, min: Int, max: Int): String = value.also {
+        if (it.length !in min..max || it.any(Char::isISOControl)) {
+            throw ProtocolFailure(400, "INVALID_FIELD", "$field is invalid")
+        }
+    }
+
+    private fun uuidIdentity(value: String): String = value.trim().also {
+        if (runCatching { UUID.fromString(it) }.isFailure) {
+            throw ProtocolFailure(400, "INVALID_FIELD", "device_uuid must be a UUID")
+        }
+    }
+
+    private fun hashHint(value: String, field: String): String = value.trim().also {
+        if (!hashHintPattern.matches(it)) {
+            throw ProtocolFailure(400, "INVALID_FIELD", "$field must be a redacted SHA-256 value")
+        }
+    }.lowercase()
+
+    private fun capabilities(array: JSONArray): List<String> {
+        if (array.length() > 64) throw ProtocolFailure(400, "INVALID_FIELD", "capabilities has too many entries")
+        return (0 until array.length())
+            .map { index -> descriptive(array.getString(index), "capabilities", 1, 96) }
+            .distinct()
+    }
+
+    private fun success(status: Int, requestId: String, payload: JSONObject): DiscoveryHttpResponse {
+        val body = JSONObject()
+            .put("ok", true)
+            .put("protocolVersion", PROTOCOL_VERSION)
+            .put("schemaVersion", SCHEMA_VERSION)
+            .put("requestId", requestId)
+        payload.keys().forEachRemaining { key -> body.put(key, payload.get(key)) }
+        return DiscoveryHttpResponse(status, reason(status), body.toString(), noStoreHeaders())
+    }
+
+    private fun error(
+        status: Int,
+        code: String,
+        message: String,
+        requestId: String,
+        retryable: Boolean = false,
+    ): DiscoveryHttpResponse {
+        val body = JSONObject()
+            .put("ok", false)
+            .put("protocolVersion", PROTOCOL_VERSION)
+            .put("schemaVersion", SCHEMA_VERSION)
+            .put("requestId", requestId)
