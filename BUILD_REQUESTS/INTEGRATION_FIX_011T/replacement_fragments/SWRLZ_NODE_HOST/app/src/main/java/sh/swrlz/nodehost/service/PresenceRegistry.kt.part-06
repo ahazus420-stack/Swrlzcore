@@ -1,0 +1,54 @@
+            json.getString("audit_id"), json.getString("request_id"), json.getString("event_type"),
+            json.optNullableString("actor_device_id"), json.optNullableString("group_id"),
+            json.optNullableString("device_id"), json.getString("timestamp"),
+            json.getString("result"), json.getString("reason_code"),
+        )
+    }
+}
+
+private object KeyVerifier {
+    private const val ALGORITHM = "PBKDF2WithHmacSHA256"
+    private const val ITERATIONS = 120_000
+    private const val KEY_BITS = 256
+    private const val SALT_BYTES = 16
+
+    fun create(secret: String, random: SecureRandom): String {
+        val salt = ByteArray(SALT_BYTES).also(random::nextBytes)
+        val hash = derive(secret, salt, ITERATIONS)
+        return listOf(
+            "pbkdf2_sha256",
+            ITERATIONS.toString(),
+            Base64.encodeToString(salt, Base64.NO_WRAP),
+            Base64.encodeToString(hash, Base64.NO_WRAP),
+        ).joinToString("\$")
+    }
+
+    fun verify(secret: String, encoded: String): Boolean = runCatching {
+        val parts = encoded.split('$')
+        if (parts.size != 4 || parts[0] != "pbkdf2_sha256") return false
+        val iterations = parts[1].toInt()
+        val salt = Base64.decode(parts[2], Base64.DEFAULT)
+        val expected = Base64.decode(parts[3], Base64.DEFAULT)
+        MessageDigest.isEqual(expected, derive(secret, salt, iterations))
+    }.getOrDefault(false)
+
+    private fun derive(secret: String, salt: ByteArray, iterations: Int): ByteArray {
+        val spec = PBEKeySpec(secret.toCharArray(), salt, iterations, KEY_BITS)
+        return try {
+            SecretKeyFactory.getInstance(ALGORITHM).generateSecret(spec).encoded
+        } finally {
+            spec.clearPassword()
+        }
+    }
+}
+
+private fun JSONObject.putNullable(name: String, value: Any?): JSONObject = put(name, value ?: JSONObject.NULL)
+private fun JSONObject.optNullableString(name: String): String? =
+    if (!has(name) || isNull(name)) null else optString(name).takeIf(String::isNotBlank)
+private fun JSONObject.optNullableInt(name: String): Int? = if (!has(name) || isNull(name)) null else getInt(name)
+private fun JSONArray?.stringList(): List<String> = this?.let { array ->
+    (0 until array.length()).mapNotNull { index -> array.optString(index).takeIf(String::isNotBlank) }
+} ?: emptyList()
+private fun <T> JSONArray?.mapObjects(transform: (JSONObject) -> T): List<T> = this?.let { array ->
+    (0 until array.length()).map { index -> transform(array.getJSONObject(index)) }
+} ?: emptyList()
