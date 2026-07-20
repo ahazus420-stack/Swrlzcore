@@ -39,7 +39,7 @@ python SWRLZ_NODE_HOST/scripts/test_device_proof_011tb.py \
   --base <extracted SERVER v1.1.0 SWRLZ_NODE_HOST directory>
 ```
 
-The replacement transport is stored as `replacement-bundle.b64`.
+The transparent replacement transport is stored as ordered UTF-8 unified-diff files under `patches/`.
 
 No workflow, Gradle task, APK build, installation, release, or deployment is
 triggered by this transport or materializer.
