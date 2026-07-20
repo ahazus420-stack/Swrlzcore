@@ -1,0 +1,129 @@
+                        installationId = activeIdentity?.installationId,
+                        hostVersion = hostVersion,
+                        lanUrls = discoverySockets
+                            .asSequence()
+                            .filter { socket -> !socket.isClosed && !socket.inetAddress.isLoopbackAddress }
+                            .mapNotNull { socket ->
+                                socket.inetAddress.hostAddress?.let { address ->
+                                    "http://$address:${socket.localPort}"
+                                }
+                            }
+                            .toList(),
+                    ),
+                    registry = presenceRegistry,
+                    pairing = pairingAuthority,
+                )
+            } else {
+                DiscoveryProtocol.handle(request, activeIdentity, hostVersion)
+            }
+        } catch (_: BadHttpRequest) {
+            DiscoveryHttpResponse(
+                statusCode = 400,
+                reason = "Bad Request",
+                body = "{\"ok\":false,\"error\":{\"code\":\"BAD_REQUEST\",\"message\":\"Malformed discovery request\"},\"protocolVersion\":1,\"schemaVersion\":1}",
+                headers = mapOf("Cache-Control" to "no-store"),
+            )
+        } catch (_: Exception) {
+            DiscoveryHttpResponse(
+                statusCode = 500,
+                reason = "Internal Server Error",
+                body = "{\"ok\":false,\"error\":{\"code\":\"DISCOVERY_ERROR\",\"message\":\"Discovery response unavailable\"},\"protocolVersion\":1,\"schemaVersion\":1}",
+                headers = mapOf("Cache-Control" to "no-store"),
+            )
+        }
+
+        socket.getOutputStream().use { output ->
+            output.write(buildDiscoveryResponse(response))
+            output.flush()
+        }
+        diagnostics.recordHttp(method, path, response.statusCode, elapsedMs(started), "discovery")
+    }
+
+
+    private fun elapsedMs(startedNanos: Long): Long =
+        (System.nanoTime() - startedNanos).coerceAtLeast(0L) / 1_000_000L
+
+    private fun parseDiscoveryRequest(
+        input: InputStream,
+        localAddress: InetAddress?,
+        remoteAddress: InetAddress?,
+    ): DiscoveryHttpRequest {
+        val requestLine = readHttpLine(input, MAX_REQUEST_LINE_BYTES) ?: throw BadHttpRequest()
+        val parts = requestLine.split(' ')
+        if (parts.size != 3 || !parts[2].startsWith("HTTP/1.")) throw BadHttpRequest()
+
+        val target = parts[1]
+        if (!target.startsWith('/')) throw BadHttpRequest()
+        val headers = linkedMapOf<String, String>()
+        val duplicateHeaders = linkedSetOf<String>()
+        var totalHeaderBytes = 0
+
+        repeat(MAX_HEADER_COUNT) {
+            val line = readHttpLine(input, MAX_HEADER_LINE_BYTES) ?: throw BadHttpRequest()
+            totalHeaderBytes += line.length
+            if (totalHeaderBytes > MAX_TOTAL_HEADER_BYTES) throw BadHttpRequest()
+            if (line.isEmpty()) {
+                if (headers["transfer-encoding"]?.isNotBlank() == true) throw BadHttpRequest()
+                val rawContentLength = headers["content-length"]
+                val contentLength = when {
+                    rawContentLength == null -> 0L
+                    else -> rawContentLength.toLongOrNull() ?: throw BadHttpRequest()
+                }
+                if (contentLength < 0L || contentLength > MAX_REQUEST_BODY_BYTES) throw BadHttpRequest()
+                val bodyBytes = ByteArray(contentLength.toInt())
+                var offset = 0
+                while (offset < bodyBytes.size) {
+                    val count = input.read(bodyBytes, offset, bodyBytes.size - offset)
+                    if (count <= 0) throw BadHttpRequest()
+                    offset += count
+                }
+                val rawQuery = target.substringAfter('?', "")
+                return DiscoveryHttpRequest(
+                    method = parts[0].uppercase(Locale.US),
+                    path = target.substringBefore('?'),
+                    query = parseQuery(rawQuery),
+                    headers = headers,
+                    contentLength = contentLength,
+                    body = decodeUtf8(bodyBytes),
+                    bodySha256Hex = sha256Hex(bodyBytes),
+                    duplicateHeaders = duplicateHeaders,
+                    isLoopback = localAddress?.isLoopbackAddress == true &&
+                        remoteAddress?.isLoopbackAddress == true,
+                    isLocalLan = isAcceptedLocalLanPeer(localAddress, remoteAddress),
+                    remoteAddress = remoteAddress?.hostAddress,
+                )
+            }
+
+            val separator = line.indexOf(':')
+            if (separator <= 0) throw BadHttpRequest()
+            val name = line.substring(0, separator).trim().lowercase(Locale.US)
+            val value = line.substring(separator + 1).trim()
+            if (name.isEmpty()) throw BadHttpRequest()
+            if (name in headers) duplicateHeaders += name
+            headers[name] = headers[name]?.let { "$it,$value" } ?: value
+        }
+        throw BadHttpRequest()
+    }
+
+
+    private fun decodeUtf8(value: ByteArray): String = try {
+        StandardCharsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+            .decode(ByteBuffer.wrap(value))
+            .toString()
+    } catch (_: Exception) {
+        throw BadHttpRequest()
+    }
+
+    private fun sha256Hex(value: ByteArray): String = buildString(64) {
+        MessageDigest.getInstance("SHA-256").digest(value).forEach { byte ->
+            append("%02x".format(Locale.US, byte.toInt() and 0xff))
+        }
+    }
+
+    private fun isAcceptedLocalLanPeer(localAddress: InetAddress?, remoteAddress: InetAddress?): Boolean =
+        localAddress is Inet4Address &&
+            !localAddress.isLoopbackAddress &&
+            remoteAddress is Inet4Address &&
+            !remoteAddress.isLoopbackAddress &&
