@@ -1,0 +1,124 @@
+        return PresenceRegistrySnapshot(state.revision, groups, devices, memberships)
+    }
+
+    /**
+     * Non-mutating stable-identity lookup for the paired-LAN bootstrap lane.
+     *
+     * This method classifies registry truth only. The HTTP adapter must validate
+     * pairing and known-device proof before exposing a known lifecycle result.
+     */
+    @Synchronized
+    fun resolveDevice(input: DeviceResolutionInput): DeviceResolutionLookup {
+        requireAvailable()
+        val exact = state.devices.firstOrNull { it.deviceId == input.deviceId }
+        if (exact == null) {
+            val evidenceMatches = state.devices.filter { record -> identityEvidenceMatches(record, input) }
+            return DeviceResolutionLookup(
+                registryRevision = state.revision,
+                kind = if (evidenceMatches.isEmpty()) {
+                    DeviceResolutionKind.UNKNOWN
+                } else {
+                    DeviceResolutionKind.IDENTITY_CONFLICT
+                },
+                device = null,
+                membershipCount = 0,
+                successorDeviceId = null,
+            )
+        }
+
+        if (identityEvidenceConflicts(exact, input)) {
+            return DeviceResolutionLookup(
+                registryRevision = state.revision,
+                kind = DeviceResolutionKind.IDENTITY_CONFLICT,
+                device = null,
+                membershipCount = 0,
+                successorDeviceId = null,
+            )
+        }
+
+        val membershipCount = state.memberships.count {
+            it.deviceId == exact.deviceId && it.membershipState == ACTIVE
+        }
+        val kind = when {
+            exact.lifecycleState == ACTIVE -> DeviceResolutionKind.KNOWN_CANDIDATE
+            exact.lifecycleState == BLOCKED -> DeviceResolutionKind.BLOCKED_CANDIDATE
+            exact.lifecycleState == RETIRED && !exact.successorDeviceId.isNullOrBlank() -> {
+                DeviceResolutionKind.REPLACED_CANDIDATE
+            }
+            exact.lifecycleState == RETIRED -> DeviceResolutionKind.RETIRED_CANDIDATE
+            else -> DeviceResolutionKind.ACTION_REQUIRED
+        }
+        return DeviceResolutionLookup(
+            registryRevision = state.revision,
+            kind = kind,
+            device = exact.toView(isDeviceOnline(exact.deviceId)),
+            membershipCount = membershipCount,
+            successorDeviceId = exact.successorDeviceId,
+        )
+    }
+
+    /** Preserves Ghost Device lineage; no HTTP route is exposed by this checkpoint. */
+    @Synchronized
+    fun retireDevice(deviceId: String, successorDeviceId: String?, requestId: String) {
+        requireAvailable()
+        val device = state.devices.firstOrNull { it.deviceId == deviceId }
+            ?: throw PresenceRegistryFailure(404, "DEVICE_NOT_FOUND", "Device is not registered")
+        if (successorDeviceId == deviceId) throw PresenceRegistryFailure(400, "INVALID_FIELD", "successor_device_id must differ")
+        successorDeviceId?.let { successor ->
+            if (state.devices.none { it.deviceId == successor }) {
+                throw PresenceRegistryFailure(404, "DEVICE_NOT_FOUND", "Successor device is not registered")
+            }
+        }
+        val now = timestamp()
+        val retired = device.copy(lifecycleState = RETIRED, successorDeviceId = successorDeviceId, updatedAt = now)
+        val memberships = state.memberships.map {
+            if (it.deviceId == deviceId) it.copy(membershipState = REVOKED, updatedAt = now, leaseExpiresAt = null) else it
+        }
+        checkedInThisRuntime.removeIf { it.endsWith("\u0000$deviceId") }
+        commit(
+            state.copy(
+                revision = state.revision + 1,
+                devices = state.devices.map { if (it.deviceId == deviceId) retired else it },
+                memberships = memberships,
+                audit = appendAudit(state.audit, audit(requestId, "device_retire", deviceId, null, deviceId, "accepted", "LINEAGE_PRESERVED")),
+            ),
+        )
+    }
+
+    private fun activeGroup(groupId: String): GroupRecord {
+        val group = state.groups.firstOrNull { it.groupId == groupId }
+            ?: throw PresenceRegistryFailure(404, "GROUP_NOT_FOUND", "Group is not registered")
+        if (group.state != ACTIVE) throw PresenceRegistryFailure(403, "POLICY_BLOCKED", "Group is not active")
+        return group
+    }
+
+    private fun identityEvidenceConflicts(record: DeviceRecord, input: DeviceResolutionInput): Boolean = listOf(
+        record.deviceUuid to input.deviceUuid,
+        record.deviceAnchor to input.deviceAnchor,
+        record.fingerprintHash to input.fingerprintHash,
+        record.profileMergeKey to input.profileMergeKey,
+    ).any { (stored, supplied) ->
+        !stored.isNullOrBlank() && !supplied.isNullOrBlank() && stored != supplied
+    }
+
+    private fun identityEvidenceMatches(record: DeviceRecord, input: DeviceResolutionInput): Boolean = listOf(
+        record.deviceUuid to input.deviceUuid,
+        record.deviceAnchor to input.deviceAnchor,
+        record.fingerprintHash to input.fingerprintHash,
+        record.profileMergeKey to input.profileMergeKey,
+    ).any { (stored, supplied) ->
+        !stored.isNullOrBlank() && stored == supplied
+    }
+
+    private fun duplicateIdentityWarning(candidate: DeviceRecord, devices: List<DeviceRecord>): String? {
+        val duplicate = devices.firstOrNull { other ->
+            other.deviceId != candidate.deviceId && listOf(
+                candidate.deviceAnchor to other.deviceAnchor,
+                candidate.fingerprintHash to other.fingerprintHash,
+                candidate.profileMergeKey to other.profileMergeKey,
+            ).any { (left, right) -> !left.isNullOrBlank() && left == right }
+        }
+        return duplicate?.let { "Possible successor or duplicate of ${it.deviceId}; no automatic merge performed" }
+    }
+
+    private fun isDeviceOnline(deviceId: String, nowEpochMs: Long = System.currentTimeMillis()): Boolean =
