@@ -1,0 +1,136 @@
+--- /dev/null
++++ b/app/src/main/java/sh/swrlz/nodehost/service/PresenceRequestSecurity.kt
+@@ -0,0 +1,133 @@
++package sh.swrlz.nodehost.service
++
++import java.nio.charset.StandardCharsets
++import java.time.Instant
++import java.util.LinkedHashMap
++import kotlin.math.abs
++
++internal class PresenceSecurityFailure(
++    val httpStatus: Int,
++    val code: String,
++    override val message: String,
++    val retryable: Boolean = false,
++) : Exception(message)
++
++/** Local-link authorization and device-proof verification shared by bootstrap routes. */
++internal class PresenceRequestSecurity {
++    private val replayCache = LinkedHashMap<String, Long>()
++
++    fun requirePairing(request: DiscoveryHttpRequest, pairing: PresencePairingAuthority) {
++        val token = request.headers[PAIRING_HEADER]
++            ?: request.headers[LEGACY_PAIRING_HEADER]?.takeIf { request.isLoopback }
++        if (token.isNullOrBlank()) {
++            throw PresenceSecurityFailure(401, "PAIRING_REQUIRED", "Pairing token is required")
++        }
++        if (!pairing.validate(token)) {
++            throw PresenceSecurityFailure(401, "PAIRING_INVALID", "Pairing token was rejected")
++        }
++    }
++
++    fun requireResolveExposure(request: DiscoveryHttpRequest) {
++        if (!request.isLoopback && !request.isLocalLan) {
++            throw PresenceSecurityFailure(403, "LOCAL_NETWORK_REQUIRED", "Device resolution requires loopback or an approved local-LAN peer")
++        }
++    }
++
++    fun requireMutationExposure(request: DiscoveryHttpRequest) {
++        if (!request.isLoopback) {
++            throw PresenceSecurityFailure(403, "LAN_WRITE_DISABLED", "Presence mutations remain loopback-only in this candidate")
++        }
++    }
++
++    fun verifyKnownDeviceProof(
++        request: DiscoveryHttpRequest,
++        deviceId: String,
++        proofKey: ByteArray,
++        protocolVersion: Int,
++        schemaVersion: Int,
++        requestId: String,
++        nowEpochMs: Long = System.currentTimeMillis(),
++    ) {
++        val headerDeviceId = requiredHeader(request, DEVICE_ID_HEADER, "DEVICE_PROOF_REQUIRED")
++        if (headerDeviceId != deviceId) {
++            throw PresenceSecurityFailure(409, "IDENTITY_CONFLICT", "Device proof identity does not match the request body")
++        }
++        val timestampValue = requiredHeader(request, TIMESTAMP_HEADER, "DEVICE_PROOF_REQUIRED")
++        val timestampEpochMs = parseTimestamp(timestampValue)
++            ?: throw PresenceSecurityFailure(401, "DEVICE_PROOF_STALE", "Device proof timestamp is invalid")
++        if (abs(nowEpochMs - timestampEpochMs) > CLOCK_SKEW_MS) {
++            throw PresenceSecurityFailure(401, "DEVICE_PROOF_STALE", "Device proof timestamp is outside the accepted window")
++        }
++
++        val nonce = requiredHeader(request, NONCE_HEADER, "DEVICE_PROOF_REQUIRED")
++        if (nonce.length !in 16..128 || nonce.any { it.code !in 0x21..0x7E }) {
++            throw PresenceSecurityFailure(400, "DEVICE_PROOF_REQUIRED", "Device proof nonce is invalid")
++        }
++        if (requestId.length !in 1..128 || requestId.any { it.code !in 0x21..0x7E }) {
++            throw PresenceSecurityFailure(400, "REQUEST_ID_REQUIRED", "A valid request ID is required")
++        }
++        val suppliedProof = requiredHeader(request, PROOF_HEADER, "DEVICE_PROOF_REQUIRED")
++        if (!LOWER_HEX_64.matches(suppliedProof)) {
++            throw PresenceSecurityFailure(401, "DEVICE_PROOF_INVALID", "Device proof is invalid")
++        }
++
++        val canonical = buildString {
++            append(request.method).append('\n')
++            append(request.path).append('\n')
++            append(protocolVersion).append('\n')
++            append(schemaVersion).append('\n')
++            append(deviceId).append('\n')
++            append(timestampValue).append('\n')
++            append(nonce).append('\n')
++            append(requestId).append('\n')
++            append(request.bodySha256Hex)
++        }
++        if (!DeviceProofHmac.verify(proofKey, canonical, suppliedProof)) {
++            throw PresenceSecurityFailure(401, "DEVICE_PROOF_INVALID", "Device proof was rejected")
++        }
++
++        rememberNonce(deviceId, nonce, nowEpochMs)
++    }
++
++    @Synchronized
++    private fun rememberNonce(deviceId: String, nonce: String, nowEpochMs: Long) {
++        val oldestAllowed = nowEpochMs - REPLAY_WINDOW_MS
++        val iterator = replayCache.entries.iterator()
++        while (iterator.hasNext()) {
++            if (iterator.next().value < oldestAllowed) iterator.remove()
++        }
++        val key = "$deviceId\u0000$nonce"
++        if (replayCache.containsKey(key)) {
++            throw PresenceSecurityFailure(409, "DEVICE_PROOF_REPLAYED", "Device proof nonce was already used")
++        }
++        replayCache[key] = nowEpochMs
++        while (replayCache.size > MAX_REPLAY_ENTRIES) {
++            replayCache.entries.iterator().run {
++                if (hasNext()) {
++                    next()
++                    remove()
++                }
++            }
++        }
++    }
++
++    private fun requiredHeader(request: DiscoveryHttpRequest, name: String, code: String): String =
++        request.headers[name]?.takeIf(String::isNotBlank)
++            ?: throw PresenceSecurityFailure(401, code, "Required device proof header is missing")
++
++    private fun parseTimestamp(value: String): Long? = value.toLongOrNull()
++        ?: runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
++
++    companion object {
++        private const val PAIRING_HEADER = "x-swrlz-pairing-token"
++        private const val LEGACY_PAIRING_HEADER = "x-swurlz-pairing-token"
++        private const val DEVICE_ID_HEADER = "x-swrlz-device-id"
++        private const val TIMESTAMP_HEADER = "x-swrlz-device-timestamp"
++        private const val NONCE_HEADER = "x-swrlz-device-nonce"
++        private const val PROOF_HEADER = "x-swrlz-device-proof"
++        private const val CLOCK_SKEW_MS = 5 * 60 * 1_000L
++        private const val REPLAY_WINDOW_MS = 10 * 60 * 1_000L
++        private const val MAX_REPLAY_ENTRIES = 4_096
++        private val LOWER_HEX_64 = Regex("[0-9a-f]{64}")
++    }
++}
