@@ -1,0 +1,86 @@
+--- /dev/null
++++ b/INTEGRATION_FIX_011T_B_IMPLEMENTATION_REPORT.md
+@@ -0,0 +1,83 @@
++# INTEGRATION-FIX-011T-B Implementation Report
++
++## Status
++
++Implemented as a checksum-bound SERVER source candidate only. Static validation
++was run locally. Gradle, APK assembly, GitHub Actions, installation, release,
++and deployment were not invoked.
++
++## Base candidate
++
++```text
++SERVER_CFv1.1.0_SWRLZ.zip
++f1066675e7bccffac55bc56b8c5a5e4666ad4511c65bf84036a0a8d4bfc8a26f
++```
++
++## Successor candidate
++
++```text
++SERVER_CFv1.1.1_SWRLZ.zip
++Checksum recorded by the external candidate manifest and materializer.
++```
++
++Protocol and schema remain `1 / 1`. Application version advances to `1.1.1`
++with version code `4`.
++
++## Implemented slice
++
++- Android Keystore AES-GCM proof-key master wrapper using alias
++  `swrlz.device-proof.master.v1`;
++- application-private `AtomicFile` proof-binding sidecar outside the presence
++  registry schema;
++- proof states `BOUND`, `ENROLLMENT_REQUIRED`, `REVOKED`, `UNAVAILABLE`, and
++  `CONFLICT`;
++- HKDF-SHA256 proof-key derivation bound to SERVER installation ID and stable
++  device ID;
++- exact-body SHA-256 capture before JSON parsing;
++- HMAC-SHA256 canonical request verification;
++- timestamp, nonce, request-ID, device-ID, body-hash, and replay validation;
++- canonical `x-swrlz-pairing-token` support with the pre-existing misspelled
++  loopback header retained only as a compatibility alias;
++- same-prefix IPv4 local-LAN peer classification;
++- non-mutating `POST /devices/resolve`;
++- fail-closed `ACTION_REQUIRED / PROOF_ENROLLMENT_REQUIRED` for known active
++  devices without a proof binding;
++- minimal lineage-preserving outcomes for retired, replaced, blocked, unknown,
++  and identity-conflicted devices.
++
++## Authority and privacy boundaries
++
++A valid proof demonstrates possession of device-bound proof material only. It
++does not grant group membership, administrator authority, mission authority,
++trust-root authority, or Truth Firewall authority.
++
++Resolution does not expose registry enumeration. Unknown callers receive only
++`UNKNOWN`; unproven known callers receive only the minimum action/status data
++needed for recovery. Full known-device resolution requires a valid bound proof.
++
++## Explicitly unchanged
++
++- no CLIENT source change;
++- no registration-time proof binding;
++- no legacy proof-enrollment endpoint;
++- no membership restoration;
++- no atomic create-and-join;
++- no heartbeat/check-in behavior change;
++- no administrator/session routes;
++- no presence-registry migration;
++- existing mutations remain loopback-only;
++- no hosted/public-internet authentication model.
++
++## Legacy binding behavior
++
++The sidecar is empty for existing installations until a separately approved
++enrollment or registration-binding checkpoint runs. Therefore a known active
++legacy device resolves to `PROOF_ENROLLMENT_REQUIRED`, never `UNKNOWN`. Its
++existing record, memberships, and Ghost/Legacy lineage remain untouched.
++
++## Static validation
++
++The source-bound validator checks changed-path limits, versioning, Keystore and
++sidecar invariants, HKDF and HMAC vectors, exact-body hashing, same-prefix LAN
++classification, replay controls, non-mutating resolution, legacy enrollment
++behavior, and the absence of registration/enrollment integration.
