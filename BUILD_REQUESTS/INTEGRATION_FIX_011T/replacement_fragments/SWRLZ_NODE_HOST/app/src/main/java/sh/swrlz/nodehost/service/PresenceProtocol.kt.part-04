@@ -1,0 +1,73 @@
+            .put("error", JSONObject().put("code", code).put("message", message).put("retryable", retryable))
+        val headers = if (status == 405) noStoreHeaders() + ("Allow" to "POST") else noStoreHeaders()
+        return DiscoveryHttpResponse(status, reason(status), body.toString(), headers)
+    }
+
+    private fun groupJson(group: PresenceGroupView) = JSONObject()
+        .put("group_id", group.groupId).put("label", group.label)
+        .put("creator_device_id", group.creatorDeviceId).put("state", group.state)
+        .put("created_at", group.createdAt).put("updated_at", group.updatedAt)
+
+    internal fun deviceJson(device: PresenceDeviceView) = JSONObject()
+        .put("device_id", device.deviceId).put("device_label", device.deviceLabel).put("role", device.role)
+        .put("lifecycle_state", device.lifecycleState).put("trust_state", device.trustState)
+        .put("client_version", device.clientVersion ?: JSONObject.NULL)
+        .put("patch_label", device.patchLabel ?: JSONObject.NULL)
+        .put("capabilities", JSONArray(device.capabilities))
+        .put("successor_device_id", device.successorDeviceId ?: JSONObject.NULL)
+        .put("created_at", device.createdAt).put("updated_at", device.updatedAt)
+        .put("last_seen_at", device.lastSeenAt ?: JSONObject.NULL).put("online", device.online)
+
+    internal fun membershipJson(membership: PresenceMembershipView) = JSONObject()
+        .put("group_id", membership.groupId).put("device_id", membership.deviceId)
+        .put("membership_state", membership.membershipState).put("joined_at", membership.joinedAt)
+        .put("updated_at", membership.updatedAt).put("last_seen_at", membership.lastSeenAt ?: JSONObject.NULL)
+        .put("lease_expires_at", membership.leaseExpiresAt ?: JSONObject.NULL).put("online", membership.online)
+
+    private fun JSONObject.requiredString(name: String): String {
+        if (!has(name) || isNull(name) || opt(name) !is String) {
+            throw ProtocolFailure(400, "INVALID_FIELD", "$name is required")
+        }
+        return getString(name)
+    }
+
+    private fun JSONObject.optionalString(name: String): String? =
+        if (!has(name) || isNull(name)) null else (opt(name) as? String)?.trim()?.takeIf(String::isNotEmpty)
+            ?: throw ProtocolFailure(400, "INVALID_FIELD", "$name must be a string")
+
+    private fun validRequestId(value: String): Boolean = value.length in 1..128 &&
+        value.all { it.code in 0x21..0x7E }
+
+    private fun acceptsJson(value: String): Boolean = value.split(',').any { entry ->
+        val mediaType = entry.substringBefore(';').trim().lowercase()
+        val quality = entry.split(';').drop(1).map(String::trim)
+            .firstOrNull { it.startsWith("q=", ignoreCase = true) }
+            ?.substringAfter('=')?.toDoubleOrNull() ?: 1.0
+        quality > 0.0 && (mediaType == "application/json" || mediaType == "application/*" || mediaType == "*/*" || mediaType.endsWith("+json"))
+    }
+
+    private fun noStoreHeaders() = mapOf("Cache-Control" to "no-store")
+
+    private fun reason(status: Int): String = when (status) {
+        200 -> "OK"
+        400 -> "Bad Request"
+        401 -> "Unauthorized"
+        403 -> "Forbidden"
+        404 -> "Not Found"
+        405 -> "Method Not Allowed"
+        406 -> "Not Acceptable"
+        409 -> "Conflict"
+        413 -> "Payload Too Large"
+        415 -> "Unsupported Media Type"
+        422 -> "Unprocessable Entity"
+        429 -> "Too Many Requests"
+        else -> "Service Unavailable"
+    }
+
+    private data class ProtocolFailure(
+        val httpStatus: Int,
+        val code: String,
+        val safeMessage: String,
+        val retryable: Boolean = false,
+    ) : Exception(safeMessage)
+}
