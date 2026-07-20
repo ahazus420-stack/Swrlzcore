@@ -1,0 +1,135 @@
+    fun toJson() = JSONObject()
+        .put("protocolVersion", protocolVersion)
+        .put("schemaVersion", schemaVersion)
+        .put("revision", revision)
+        .put("groups", JSONArray().apply { groups.forEach { put(it.toJson()) } })
+        .put("devices", JSONArray().apply { devices.forEach { put(it.toJson()) } })
+        .put("memberships", JSONArray().apply { memberships.forEach { put(it.toJson()) } })
+        .put("audit", JSONArray().apply { audit.forEach { put(it.toJson()) } })
+
+    companion object {
+        fun fromJson(json: JSONObject): RegistryState {
+            require(json.optInt("protocolVersion", 1) == 1)
+            require(json.optInt("schemaVersion", 1) == 1)
+            return RegistryState(
+                revision = json.optLong("revision", 0),
+                groups = json.optJSONArray("groups").mapObjects(GroupRecord::fromJson),
+                devices = json.optJSONArray("devices").mapObjects(DeviceRecord::fromJson),
+                memberships = json.optJSONArray("memberships").mapObjects(MembershipRecord::fromJson),
+                audit = json.optJSONArray("audit").mapObjects(AuditRecord::fromJson).takeLast(256),
+            )
+        }
+    }
+}
+
+private data class GroupRecord(
+    val groupId: String,
+    val label: String,
+    val groupKeyVerifier: String,
+    val creatorDeviceId: String,
+    val state: String,
+    val createdAt: String,
+    val updatedAt: String,
+) {
+    fun toJson() = JSONObject()
+        .put("group_id", groupId).put("label", label).put("group_key_verifier", groupKeyVerifier)
+        .put("creator_device_id", creatorDeviceId).put("state", state)
+        .put("created_at", createdAt).put("updated_at", updatedAt)
+
+    companion object {
+        fun fromJson(json: JSONObject) = GroupRecord(
+            json.getString("group_id"), json.getString("label"), json.getString("group_key_verifier"),
+            json.getString("creator_device_id"), json.getString("state"),
+            json.getString("created_at"), json.getString("updated_at"),
+        )
+    }
+}
+
+private data class DeviceRecord(
+    val deviceId: String,
+    val deviceKeyVerifier: String,
+    val deviceLabel: String,
+    val role: String,
+    val lifecycleState: String,
+    val trustState: String,
+    val identitySchema: Int?,
+    val deviceUuid: String?,
+    val deviceAnchor: String?,
+    val fingerprintHash: String?,
+    val profileMergeKey: String?,
+    val clientVersion: String?,
+    val patchLabel: String?,
+    val capabilities: List<String>,
+    val successorDeviceId: String?,
+    val createdAt: String,
+    val updatedAt: String,
+    val lastSeenAt: String?,
+) {
+    fun toJson() = JSONObject()
+        .put("device_id", deviceId).put("device_key_verifier", deviceKeyVerifier)
+        .put("device_label", deviceLabel).put("role", role)
+        .put("lifecycle_state", lifecycleState).put("trust_state", trustState)
+        .putNullable("identity_schema", identitySchema).putNullable("device_uuid", deviceUuid)
+        .putNullable("device_anchor", deviceAnchor).putNullable("fingerprint_hash", fingerprintHash)
+        .putNullable("profile_merge_key", profileMergeKey).putNullable("client_version", clientVersion)
+        .putNullable("patch_label", patchLabel)
+        .put("capabilities", JSONArray().apply { capabilities.forEach(::put) })
+        .putNullable("successor_device_id", successorDeviceId)
+        .put("created_at", createdAt).put("updated_at", updatedAt).putNullable("last_seen_at", lastSeenAt)
+
+    companion object {
+        fun fromJson(json: JSONObject) = DeviceRecord(
+            json.getString("device_id"), json.getString("device_key_verifier"),
+            json.getString("device_label"), json.getString("role"), json.getString("lifecycle_state"),
+            json.getString("trust_state"), json.optNullableInt("identity_schema"),
+            json.optNullableString("device_uuid"), json.optNullableString("device_anchor"),
+            json.optNullableString("fingerprint_hash"), json.optNullableString("profile_merge_key"),
+            json.optNullableString("client_version"), json.optNullableString("patch_label"),
+            json.optJSONArray("capabilities").stringList(), json.optNullableString("successor_device_id"),
+            json.getString("created_at"), json.getString("updated_at"), json.optNullableString("last_seen_at"),
+        )
+    }
+}
+
+private data class MembershipRecord(
+    val groupId: String,
+    val deviceId: String,
+    val membershipState: String,
+    val joinedAt: String,
+    val updatedAt: String,
+    val lastSeenAt: String?,
+    val leaseExpiresAt: String?,
+) {
+    fun toJson() = JSONObject()
+        .put("group_id", groupId).put("device_id", deviceId).put("membership_state", membershipState)
+        .put("joined_at", joinedAt).put("updated_at", updatedAt)
+        .putNullable("last_seen_at", lastSeenAt).putNullable("lease_expires_at", leaseExpiresAt)
+
+    companion object {
+        fun fromJson(json: JSONObject) = MembershipRecord(
+            json.getString("group_id"), json.getString("device_id"), json.getString("membership_state"),
+            json.getString("joined_at"), json.getString("updated_at"),
+            json.optNullableString("last_seen_at"), json.optNullableString("lease_expires_at"),
+        )
+    }
+}
+
+private data class AuditRecord(
+    val auditId: String,
+    val requestId: String,
+    val eventType: String,
+    val actorDeviceId: String?,
+    val groupId: String?,
+    val deviceId: String?,
+    val timestamp: String,
+    val result: String,
+    val reasonCode: String,
+) {
+    fun toJson() = JSONObject()
+        .put("audit_id", auditId).put("request_id", requestId).put("event_type", eventType)
+        .putNullable("actor_device_id", actorDeviceId).putNullable("group_id", groupId)
+        .putNullable("device_id", deviceId).put("timestamp", timestamp)
+        .put("result", result).put("reason_code", reasonCode)
+
+    companion object {
+        fun fromJson(json: JSONObject) = AuditRecord(
