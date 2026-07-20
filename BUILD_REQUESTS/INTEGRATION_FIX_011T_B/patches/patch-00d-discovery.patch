@@ -1,0 +1,27 @@
+--- a/app/src/main/java/sh/swrlz/nodehost/service/DiscoveryProtocol.kt
++++ b/app/src/main/java/sh/swrlz/nodehost/service/DiscoveryProtocol.kt
+@@ -7,7 +7,9 @@
+     val headers: Map<String, String>,
+     val contentLength: Long,
+     val body: String,
++    val bodySha256Hex: String,
+     val isLoopback: Boolean,
++    val isLocalLan: Boolean,
+ )
+ 
+ internal data class DiscoveryHttpResponse(
+@@ -91,10 +93,14 @@
+         append("\"presence.group.join.v1\",")
+         append("\"presence.device.register.v1\",")
+         append("\"presence.device.checkin.v1\",")
++        append("\"presence.device.resolve.v1\",")
++        append("\"presence.device.proof.hmac.v1\",")
+         append("\"presence.write.v1\"],")
+         append("\"presenceContractVersion\":1,")
+         append("\"presenceWriteTransport\":\"local-link-paired\",")
+         append("\"presenceWriteExposure\":\"loopback-only\",")
++        append("\"presenceResolveTransport\":\"local-link-paired-device-proof\",")
++        append("\"presenceResolveExposure\":\"loopback-and-approved-lan\",")
+         append("\"trust\":{")
+         append("\"policy\":\"pairing_required\",")
+         append("\"missionAuthorization\":\"trusted_only\"")
