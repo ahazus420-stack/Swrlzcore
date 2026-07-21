@@ -1,137 +1,167 @@
-# CORE Integrator Architecture v1
+# Portable Feature Capsule Architecture v1
 
 - **Status:** Proposed architecture guide
-- **Checkpoint:** CORE-ARCH-003
+- **Checkpoint:** CORE-ARCH-003A
 - **Governing ADR:** `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`
 - **Normative contract:** `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
 
 ## Purpose
 
-This guide explains how SWRLZ can implement Phoenix Firewall and future shared capabilities once, then compose approved subsets into Core, Keyboard, Launcher, CLIENT, NODE_HOST, and future app shells.
+This guide explains how a useful feature can originate in any SWRLZ project, become a canonical portable package, and then attach to any compatible current or future project through a small adapter.
 
 ## Core rule
 
-Build shared capability modules, not copies of complete applications.
-
 ```text
-shared platform APIs
-        +
-versioned integrator implementation
-        +
-host-specific adapter
-        +
-explicit composition manifest
-        =
-role-correct app shell
+features declare requirements
+hosts declare provided services
+integration succeeds when requirements are satisfied
 ```
 
-## Proposed module boundaries
+A feature must not require every possible consumer to be predefined.
+
+## Neutral canonical lane
+
+Proposed future structure:
 
 ```text
-:core-api
-:core-runtime
-:integrator-api
-:integrator-runtime
-:integrator-phoenix-firewall
-:app-core
-:app-keyboard
-:app-launcher
+SOURCES/SHARED_FEATURES/
+└── <FEATURE>/
+    ├── source/
+    ├── packages/
+    ├── OLD_PATCHES/
+    ├── <FEATURE>_<VERSION>.zip
+    ├── <FEATURE>_<VERSION>.sha256
+    ├── docs/
+    └── integrations/
 ```
 
-These names are conceptual until an implementation checkpoint audits the actual Gradle graph.
+This lane is proposed only; creating it requires a separate implementation authorization.
 
-### `integrator-api`
+## Capsule structure
 
-Defines stable types only:
+```text
+feature-capsule/
+├── portable-core/
+│   ├── domain/
+│   ├── models/
+│   ├── state-machines/
+│   ├── validation/
+│   ├── serialization/
+│   ├── migrations/
+│   └── tests/
+├── runtime-adapters/
+│   ├── android/
+│   ├── jvm/
+│   └── server/
+├── optional-ui/
+├── contract/
+├── docs/
+├── manifest.yaml
+└── checksum
+```
 
-- integrator descriptor;
-- host type and host-capability identifiers;
-- lifecycle contract;
-- compatibility result and reason codes;
-- host profile identity;
-- typed UI contribution descriptors;
-- audit and failure-state interfaces.
+### Portable core
 
-### `integrator-runtime`
+Contains host-neutral rules and behavior. It must not depend directly on a host Activity, IME service, launcher surface, CLIENT UI, server endpoint, or navigation framework.
 
-Provides host-neutral orchestration:
+### Runtime adapters
 
-- descriptor validation;
-- compatibility checks;
-- lifecycle sequencing;
-- capability and policy gating;
-- failure isolation;
-- migration coordination;
-- audit events without user-content telemetry.
+Map platform facilities such as Android Keystore, JVM filesystem, WorkManager, server scheduling, notification systems, logging, or networking.
 
-### Integrator implementation
+### Optional presentation
 
-Contains reusable behavior such as Phoenix Firewall. It depends on the stable API and narrowly defined platform services, never directly on a host Activity, IME service, launcher surface, or host navigation framework.
+Contains host-selectable surfaces such as Compose settings, launcher tiles, keyboard warning strips, CLIENT diagnostics, or server admin views.
 
-### Host adapter
+### Receiving-project adapter
 
-Maps one app shell's approved services into the integrator API. It is the least-authority boundary and must not expose unrelated host powers.
+Implements only the services the capsule requires. The adapter belongs to the receiving project and remains the least-authority boundary.
 
-### Composition manifest
+### Integration manifest
 
-Declares which integrators and profiles are packaged in one shell. It should eventually record:
+Records:
 
-- host identity and role;
-- integrator ID and version;
-- selected profile;
-- required contract version;
-- included and excluded capabilities;
-- required manifest components and permissions;
+- feature ID and version;
+- ZIP/SHA identity or repository module reference;
+- runtime adapter;
+- required and optional service mappings;
+- enabled and disabled components;
+- accepted permissions and platform components;
 - storage namespace;
-- expected route classes;
-- build-time lineage and checksums.
+- route classes;
+- compatibility result;
+- source and integration lineage.
 
-## Phoenix Firewall composition
+## Two supported integration paths
 
-One engine, multiple profiles:
+### Same repository
 
 ```text
-Phoenix Firewall engine
-├── CORE_FULL
-├── KEYBOARD_RESTRICTED
-├── LAUNCHER_RESTRICTED
-├── CLIENT_SCOPED
-└── NODE_HOST_SCOPED
+implementation(project(":shared-features:<feature>"))
 ```
 
-The restricted profiles must be additive allowlists, not full authority followed by ad hoc disabling.
-
-### Core
-
-May expose full local policy administration, diagnostics, profile inspection, and evidence views.
-
-### Keyboard
-
-May expose only input-path protections required for the IME role. It must not gain unrelated content capture, unrestricted networking, overlay, CLIENT administration, or NODE_HOST authority.
-
-### Launcher
-
-May expose app-launch, intent, and surface-policy protections appropriate to the HOME role.
-
-### CLIENT
-
-May apply firewall policy to enrollment, user approvals, trust routes, and CLIENT-owned communication boundaries.
-
-### NODE_HOST
-
-May apply firewall policy to node execution, request authorization, and NODE_HOST-owned route boundaries.
-
-## Execution decision
-
-An integrator may execute only when all applicable gates pass:
+### Separate repository or source ZIP
 
 ```text
-packaged
-AND descriptor compatible
-AND host type supported
-AND selected profile valid
-AND required host capabilities present
-AND entitled
+<FEATURE>_<VERSION>.zip
+<FEATURE>_<VERSION>.sha256
+```
+
+The receiving project verifies the checksum, imports the capsule into a controlled location, supplies an adapter, and records the integration manifest.
+
+## Extraction workflow
+
+```text
+feature exists inside CLIENT, CORE_BASE, SERVER, or another project
+    ↓
+bounded extraction checkpoint
+    ↓
+portable core + runtime adapters + descriptor
+    ↓
+canonical shared ZIP and sibling SHA
+    ↓
+originating project reintegrates canonical package
+    ↓
+other projects attach through local adapters
+```
+
+The canonical package becomes the reusable source of truth. The originating project must not silently continue maintaining a divergent private copy.
+
+## Phoenix Firewall example
+
+Phoenix Firewall may originate in one project but should be separated into:
+
+- portable policy engine;
+- Android adapter;
+- JVM/server adapter;
+- optional UI surfaces;
+- required host services such as secure storage, audit sink, policy clock, scheduler, and optional network inspection.
+
+A receiving project selects components by available services rather than by a hard-coded project name.
+
+Example descriptor concepts:
+
+```yaml
+feature_id: swrlz.phoenix_firewall
+version: 1.0.0
+contract_version: 1
+runtime_targets: [android, jvm]
+required_services: [secure_storage, audit_sink, policy_clock]
+optional_services: [network_inspector, notification_surface]
+storage_namespace: phoenix_firewall
+offline_mode: supported
+remote_required: false
+```
+
+## Compatibility decision
+
+```text
+capsule packaged or imported
+AND archive/checksum valid
+AND runtime target supported
+AND contract compatible
+AND required host services mapped
+AND required permissions/components accepted
+AND migrations compatible
 AND configured
 AND available
 AND trust-authorized
@@ -140,35 +170,35 @@ AND protocol compatible
 = executable
 ```
 
-Every failure must preserve its reason.
+Every failed gate must preserve its reason.
 
-## Security model
+## Security rules
 
-- No initial runtime download or arbitrary executable plugin loading.
-- No authority inferred from package inclusion, common signature, or shared device identity.
-- No direct integrator-to-integrator storage mutation.
-- No silent permission or Android-component additions.
+- No authority inferred from package inclusion, app identity, signature, source origin, or shared device identity.
+- No silent permissions or platform components.
+- No direct cross-capsule storage mutation.
 - No silent local-to-remote fallback.
 - No weakening of Truth Firewall objection, refusal, pause, or safer-alternative behavior.
-- Optional integrator failure must not crash unrelated host startup.
+- Optional feature failure must not crash unrelated host startup.
+- Arbitrary runtime-downloaded executable code remains out of scope.
 
-## Implementation sequence recommendation
+## Recommended implementation sequence
 
-1. Accept ADR and contract.
-2. Audit existing Gradle and package dependencies.
-3. Define `integrator-api` types only.
-4. Add composition-manifest schema and validation tests.
-5. Implement a no-op reference integrator to verify lifecycle and failure isolation.
-6. Define Phoenix Firewall engine boundaries and profile matrix.
-7. Integrate Phoenix into Core first.
-8. Verify Core build and on-device behavior.
-9. Add Keyboard and Launcher adapters in separate checkpoints with role-specific evidence.
-10. Preserve per-shell identity, signing lineage, version progression, and rollback evidence.
+1. Accept the revised ADR and contract.
+2. Define the capsule descriptor and host-service identifiers.
+3. Define the integration-manifest schema.
+4. Define canonical ZIP/SHA packaging and lineage rules.
+5. Implement a tiny no-op portable capsule.
+6. Attach it to two independent test hosts through separate adapters.
+7. Verify extraction, transfer, compatibility failure reasons, lifecycle, and failure isolation.
+8. Authorize `SOURCES/SHARED_FEATURES/` only after the reference flow is accepted.
+9. Extract Phoenix Firewall in a separate checkpoint.
+10. Reintegrate Phoenix into its originating project before attaching it elsewhere.
 
 ## Documentation and evidence gate
 
-Every implementation checkpoint must update the ADR/contract traceability, dependency graph, composition manifest, permissions, checksums, build evidence, on-device evidence, handoff, and operating skill. Implementation is not complete merely because one host compiles.
+Each feature checkpoint must document origin, extraction commit, canonical ZIP/SHA, descriptor, adapters, integration manifests, permissions, migrations, compatibility results, build evidence, device/runtime evidence, rollback, and handoff state.
 
 ## Non-authorization
 
-This guide does not authorize source modules, Gradle edits, app-lane changes, permissions, builds, workflows, releases, deployment, installation, dynamic plugins, or merge.
+This guide does not authorize shared-feature directories, extraction, source modules, Gradle edits, app-lane changes, permissions, builds, workflows, releases, deployment, installation, dynamic plugins, or merge.
