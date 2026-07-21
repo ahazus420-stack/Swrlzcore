@@ -6,7 +6,11 @@
 - Branch: `checkpoint/keyboard-imp-011a`
 - Parent planning branch: `checkpoint/app-shell-gate-010`
 - Planning commit: `2fdc76cd8f8e4a6619a5a61eb5c2dcca2a99a0d8`
+- Source implementation commit: `db97ac1e4af254f7754cff5538f0eecbe7ac849b`
 - Main baseline inherited by the planning branch: `961e92907acb6a3158f6da982902f07acbfba019`
+- Current main at closing reconciliation: `a03a572a25695c78c5fa9c91970183fb664d7d1b`
+
+Current `main` advanced through separately authorized build-workflow consolidation after the implementation commit. This branch remains unrebased and unmerged. Closing evidence records that current repository truth without importing workflow changes.
 
 ## Preserved predecessor seed
 
@@ -25,9 +29,14 @@ SOURCES/KEYBOARD/source/
 SOURCES/KEYBOARD/SWRLZ_KEYBOARD_IME_CFv0.1.0_SOURCE.zip
 SOURCES/KEYBOARD/SWRLZ_KEYBOARD_IME_CFv0.1.0_SOURCE.sha256
 SHA-256: 7281f083e4776004bd59f4973cc33a25e788b36c8175f42a15a4fc90ccd50442
+Git blob: dd05d88b8bb9a60f3153db0f25f6fe88a771b73d
 ```
 
 The successor is a new role-specific Keyboard source project. It derives compatible toolchain settings from CORE_BASE but does not copy Core's app shell, application ID, activity, label, manifest role, or retired demonstration modules.
+
+## Build-router relationship
+
+Current `main` uses `.github/workflows/swrlz-apk-router.yml`. The former dedicated Keyboard workflow is retired. The unified router's current `KEYBOARD_BASE` source resolver accepts the predecessor naming family but not the new `SWRLZ_KEYBOARD_IME_CFvX.Y.Z_SOURCE` naming family. A separately approved verification checkpoint must extend that resolver contract and manually select the exact successor source before building.
 
 ## Retirement boundary
 
