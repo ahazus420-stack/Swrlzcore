@@ -1,11 +1,12 @@
 # CORE Integrator Host-Capability Contract v1
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Version:** 1
-- **Checkpoint:** CORE-ARCH-003 / CORE-ARCH-003A / CORE-ARCH-003B-LANGUAGE
+- **Checkpoint:** CORE-ARCH-003 / CORE-ARCH-003A / CORE-ARCH-003B-LANGUAGE / CORE-GATE-004B-CONSTITUTION-SKILL
 - **Related ADR:** `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`
 - **Extraction guide:** `docs/architecture/PORTABLE_FEATURE_EXTRACTION_AND_EXISTING_APP_INTEGRATION_V1.md`
 - **Constitutional authority:** `docs/governance/SWRLZ_CONSTITUTION.md`
+- **Acceptance approval:** `Approve CORE-GATE-004B-CONSTITUTION-SKILL — Add the SWRLZ Constitution Guardian skill to the repository and accept the constitutionally aligned portable feature-capsule architecture without creating source modules, changing app code, triggering builds, or merging`
 
 ## 1. Purpose
 
@@ -192,4 +193,4 @@ Implementation checkpoints MUST produce, as applicable:
 
 ## 18. Non-authorization
 
-This contract does not authorize implementation, source extraction, shared-feature directories, Gradle changes, permissions, app-lane changes, builds, workflow runs, releases, deployments, installations, dynamic executable loading, or merge.
+This accepted contract does not authorize implementation, source extraction, shared-feature directories, Gradle changes, permissions, app-lane changes, builds, workflow runs, releases, deployments, installations, dynamic executable loading, or merge.
