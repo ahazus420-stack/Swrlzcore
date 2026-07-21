@@ -17,7 +17,5 @@ dependencyResolutionManagement {
 rootProject.name = "Swrlzing-core"
 include(
     ":app",
-    ":core",
-    ":designsystem",
-    ":featurehome"
+    ":core"
 )

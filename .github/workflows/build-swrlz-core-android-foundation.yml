@@ -3,18 +3,39 @@ name: Build SWRLZ Core Android Foundation
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
+      - 'checkpoint/**'
     paths:
       - 'SOURCES/CORE_BASE/source/**'
+      - 'SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.zip'
+      - 'SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.sha256'
+      - 'SOURCES/CORE_BASE/OLD_PATCHES/**'
       - 'BUILD_REQUESTS/000_CURRENT.request'
       - '.github/workflows/build-swrlz-core-android-foundation.yml'
 
 permissions:
   contents: write
 
+concurrency:
+  group: swrlz-core-base-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  build:
+  build-core-base:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      REQUEST_FILE: BUILD_REQUESTS/000_CURRENT.request
+      SOURCE_DIR: SOURCES/CORE_BASE/source
+      SOURCE_ZIP: SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.zip
+      CHECKSUM_FILE: SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.sha256
+      BUILD_WORK_DIR: BUILD_WORK/CORE_BASE
+      ARTIFACT_DIR: CORE_BASE_ARTIFACT
 
     steps:
       - name: Checkout repository
@@ -28,94 +49,134 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle 8.6
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.6'
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Regenerate Gradle wrapper
-        working-directory: SOURCES/CORE_BASE/source
-        run: gradle wrapper --gradle-version 8.6 --distribution-type bin
-
-      - name: Build debug APK
-        working-directory: SOURCES/CORE_BASE/source
-        run: ./gradlew --no-daemon --stacktrace clean :app:assembleDebug
-
-      - name: Package canonical and inheritance source archives
+      - name: Package canonical CORE_BASE source and generate checksum
         run: |
           set -euo pipefail
-          CORE_DIR="SOURCES/CORE_BASE"
-          CORE_ZIP="SWRLZ_CORE_ANDROID_CFv1.0.1.zip"
-          KEYBOARD_ZIP="SWRLZ_KEYBOARD_BASE_CFv1.0.1.zip"
-          LAUNCHER_ZIP="SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip"
-
-          rm -f "$CORE_DIR/packages/$CORE_ZIP" \
-                "SOURCES/KEYBOARD/$KEYBOARD_ZIP" \
-                "SOURCES/LAUNCHER/$LAUNCHER_ZIP"
-          mkdir -p "$CORE_DIR/packages" SOURCES/KEYBOARD SOURCES/LAUNCHER
-
+          test -d "$SOURCE_DIR"
+          rm -f "$SOURCE_ZIP" "$CHECKSUM_FILE"
           (
-            cd "$CORE_DIR/source"
-            zip -qr "../packages/$CORE_ZIP" . \
+            cd "$SOURCE_DIR"
+            zip -qr "../$(basename "$SOURCE_ZIP")" . \
               -x '*/build/*' '.gradle/*' 'local.properties'
           )
-
-          cp "$CORE_DIR/packages/$CORE_ZIP" "SOURCES/KEYBOARD/$KEYBOARD_ZIP"
-          cp "$CORE_DIR/packages/$CORE_ZIP" "SOURCES/LAUNCHER/$LAUNCHER_ZIP"
-
           (
-            cd "$CORE_DIR/packages"
-            sha256sum "$CORE_ZIP" > "SWRLZ_CORE_ANDROID_CFv1.0.1.sha256"
-          )
-          (
-            cd SOURCES/KEYBOARD
-            sha256sum "$KEYBOARD_ZIP" > "SWRLZ_KEYBOARD_BASE_CFv1.0.1.sha256"
-          )
-          (
-            cd SOURCES/LAUNCHER
-            sha256sum "$LAUNCHER_ZIP" > "SWRLZ_LAUNCHER_BASE_CFv1.0.1.sha256"
+            cd SOURCES/CORE_BASE
+            sha256sum "$(basename "$SOURCE_ZIP")" > "$(basename "$CHECKSUM_FILE")"
           )
 
-      - name: Record generated canonical artifacts
+      - name: Validate CORE_BASE build request
+        run: |
+          set -euo pipefail
+          test -f "$REQUEST_FILE"
+          grep -Fxq '[core_base]' "$REQUEST_FILE"
+          grep -Fxq 'enabled=true' "$REQUEST_FILE"
+          grep -Fxq "source_archive=$SOURCE_ZIP" "$REQUEST_FILE"
+          grep -Fxq "checksum_file=$CHECKSUM_FILE" "$REQUEST_FILE"
+          grep -Fxq 'gradle_task=:app:assembleDebug' "$REQUEST_FILE"
+          grep -Fxq 'application_id=com.swrlz.core.app' "$REQUEST_FILE"
+
+      - name: Verify canonical source archive
+        id: source
+        run: |
+          set -euo pipefail
+          test -f "$SOURCE_ZIP"
+          test -f "$CHECKSUM_FILE"
+          unzip -tq "$SOURCE_ZIP"
+          (cd SOURCES/CORE_BASE && sha256sum --check "$(basename "$CHECKSUM_FILE")")
+          echo "source_sha256=$(sha256sum "$SOURCE_ZIP" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Extract source and discover Gradle root
+        id: project
+        run: |
+          set -euo pipefail
+          rm -rf "$BUILD_WORK_DIR" "$ARTIFACT_DIR"
+          mkdir -p "$BUILD_WORK_DIR/extracted" "$ARTIFACT_DIR"
+          unzip -q "$SOURCE_ZIP" -d "$BUILD_WORK_DIR/extracted"
+          mapfile -t WRAPPERS < <(find "$BUILD_WORK_DIR/extracted" -type f -name gradlew -not -path '*/.gradle/*' -print | sort)
+          test "${#WRAPPERS[@]}" -gt 0
+          PROJECT_ROOT=""
+          for WRAPPER in "${WRAPPERS[@]}"; do
+            CANDIDATE="$(dirname "$WRAPPER")"
+            if [[ -f "$CANDIDATE/settings.gradle" || -f "$CANDIDATE/settings.gradle.kts" ]]; then PROJECT_ROOT="$CANDIDATE"; break; fi
+          done
+          test -n "$PROJECT_ROOT"
+          chmod +x "$PROJECT_ROOT/gradlew"
+          echo "project_root=$PROJECT_ROOT" >> "$GITHUB_OUTPUT"
+
+      - name: Verify CORE_REDUCE_003 invariants
+        run: |
+          set -euo pipefail
+          ROOT='${{ steps.project.outputs.project_root }}'
+          test -d "$ROOT/app"
+          test -d "$ROOT/core"
+          test ! -e "$ROOT/featurehome"
+          test ! -e "$ROOT/designsystem"
+          if grep -RInE 'HomeScreen|FeatureRepository|CoreFeature' "$ROOT" --exclude-dir=.gradle --exclude-dir=build; then
+            echo 'Removed demonstration symbol found.' >&2
+            exit 1
+          fi
+
+      - name: Build CORE_BASE debug APK
+        run: |
+          set -euo pipefail
+          ROOT='${{ steps.project.outputs.project_root }}'
+          pushd "$ROOT" >/dev/null
+          ./gradlew --no-daemon --stacktrace clean :app:assembleDebug 2>&1 | tee "$GITHUB_WORKSPACE/$ARTIFACT_DIR/BUILD_LOG.txt"
+          popd >/dev/null
+
+      - name: Collect APK and provenance
+        run: |
+          set -euo pipefail
+          ROOT='${{ steps.project.outputs.project_root }}'
+          EXPECTED="$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$EXPECTED"
+          APK="$ARTIFACT_DIR/SWRLZ_CORE_BASE_CORE_REDUCE_003_DEBUG.apk"
+          cp "$EXPECTED" "$APK"
+          sha256sum "$APK" > "$APK.sha256"
+          sha256sum "$SOURCE_ZIP" > "$ARTIFACT_DIR/SOURCE_ARCHIVE.sha256"
+          java -version > "$ARTIFACT_DIR/JAVA_VERSION.txt" 2>&1
+          "$ROOT/gradlew" --version > "$ARTIFACT_DIR/GRADLE_VERSION.txt" 2>&1
+          find "$ROOT" -type f -path '*/build/outputs/apk/*/*.apk' -print > "$ARTIFACT_DIR/APK_PATHS.txt"
+          printf '%s\n' featurehome_absent=PASS designsystem_absent=PASS HomeScreen_absent=PASS FeatureRepository_absent=PASS CoreFeature_absent=PASS > "$ARTIFACT_DIR/REDUCTION_INVARIANTS.txt"
+          {
+            echo '# SWRLZ CORE_BASE Build Provenance'
+            echo
+            echo '- Status: succeeded'
+            echo "- Repository: $GITHUB_REPOSITORY"
+            echo "- Source commit: $GITHUB_SHA"
+            echo "- Source archive: $SOURCE_ZIP"
+            echo "- Source SHA-256: ${{ steps.source.outputs.source_sha256 }}"
+            echo '- Gradle task: :app:assembleDebug'
+            echo '- Application ID: com.swrlz.core.app'
+            echo '- Version name: 1.0.0'
+            echo '- Version code: 1'
+            echo "- APK SHA-256: $(sha256sum "$APK" | awk '{print $1}')"
+          } > "$ARTIFACT_DIR/BUILD_PROVENANCE_REPORT.md"
+          zip -q -r SWRLZ_CORE_BASE_CORE_REDUCE_003_BUILD_ARTIFACT.zip "$ARTIFACT_DIR"
+          sha256sum SWRLZ_CORE_BASE_CORE_REDUCE_003_BUILD_ARTIFACT.zip > SWRLZ_CORE_BASE_CORE_REDUCE_003_BUILD_ARTIFACT.zip.sha256
+
+      - name: Record verified canonical source package on checkpoint branch
+        if: success()
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            SOURCES/CORE_BASE/source/gradle/wrapper/gradle-wrapper.jar \
-            SOURCES/CORE_BASE/packages/SWRLZ_CORE_ANDROID_CFv1.0.1.zip \
-            SOURCES/CORE_BASE/packages/SWRLZ_CORE_ANDROID_CFv1.0.1.sha256 \
-            SOURCES/KEYBOARD/SWRLZ_KEYBOARD_BASE_CFv1.0.1.zip \
-            SOURCES/KEYBOARD/SWRLZ_KEYBOARD_BASE_CFv1.0.1.sha256 \
-            SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip \
-            SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.sha256
+          git add "$SOURCE_ZIP" "$CHECKSUM_FILE"
           if ! git diff --cached --quiet; then
-            git commit -m "core-base: record CI-verified v1.0.1 packages [skip ci]"
+            git commit -m "core-base: record CORE_REDUCE_003 source package [skip ci]"
             git push
           fi
 
-      - name: Collect build evidence
-        if: always()
-        run: |
-          mkdir -p build-evidence
-          gradle --version > build-evidence/gradle-version.txt 2>&1 || true
-          find SOURCES/CORE_BASE/source -type f -path '*/build/outputs/apk/*/*.apk' -print > build-evidence/apk-paths.txt || true
-
-      - name: Upload debug APK
-        if: success()
+      - name: Upload CORE_BASE APK and evidence
         uses: actions/upload-artifact@v4
         with:
-          name: SWRLZ_CORE_ANDROID_CFv1.0.1_DEBUG_APK
-          path: SOURCES/CORE_BASE/source/app/build/outputs/apk/debug/*.apk
+          name: SWRLZ_CORE_BASE_CORE_REDUCE_003_BUILD_EVIDENCE
+          path: |
+            CORE_BASE_ARTIFACT/
+            SWRLZ_CORE_BASE_CORE_REDUCE_003_BUILD_ARTIFACT.zip
+            SWRLZ_CORE_BASE_CORE_REDUCE_003_BUILD_ARTIFACT.zip.sha256
           if-no-files-found: error
-
-      - name: Upload build evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: SWRLZ_CORE_ANDROID_CFv1.0.1_BUILD_EVIDENCE
-          path: build-evidence/
-          if-no-files-found: warn
+          retention-days: 30
