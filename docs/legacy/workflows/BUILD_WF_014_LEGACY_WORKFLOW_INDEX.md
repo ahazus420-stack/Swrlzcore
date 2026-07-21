@@ -18,4 +18,4 @@ The files below are removed from the active `.github/workflows/` surface. Their 
 | `locate-stale-ui-source.yml` | `35ba2e24eacd433edf7d7266f84cffe9869c26d2` | Completed checkpoint-specific forensic workflow retired. |
 | `server-contract-catchup-010d-promote-v103.yml` | `e484ca9d7c50879428d8c52cc5da9fd57736369a` | Invalid/superseded one-shot promotion workflow retired. |
 
-No workflow was dispatched by BUILD-WF-014. No APK was built.
+BUILD-WF-014 did not manually dispatch a workflow or perform a local APK build. An early checkpoint commit changed `BUILD_REQUESTS/000_CURRENT.request` while some legacy path-triggered workflows still existed on the branch. The available connector returned no commit statuses for that commit but cannot conclusively enumerate push-triggered workflow runs, so this index does not claim that zero automatic runs occurred.
