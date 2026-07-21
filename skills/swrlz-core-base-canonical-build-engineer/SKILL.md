@@ -20,12 +20,15 @@ Operate canonical CORE_BASE work and portable feature-capsule architecture while
 5. `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`;
 6. `docs/architecture/CORE_INTEGRATOR_ARCHITECTURE_V1.md`;
 7. `docs/architecture/PORTABLE_FEATURE_EXTRACTION_AND_EXISTING_APP_INTEGRATION_V1.md`;
-8. current build request, workflow, source lineage, reports, and handoff.
+8. `docs/implementation/CORE_PLAN_005_NOOP_REFERENCE_CAPSULE_IMPLEMENTATION_PLAN.md` when planning or implementing the reference capsule;
+9. `docs/contracts/NOOP_REFERENCE_CAPSULE_EVIDENCE_CONTRACT_V1.md` when planning or verifying the reference capsule;
+10. current build request, workflow, source lineage, reports, and handoff.
 
 ## Modes
 
 - **REVIEW:** inspect facts, contracts, lineage, source, requests, workflows, and evidence.
 - **ARCHITECT:** document bounded decisions without silently implementing them.
+- **PLAN:** define implementation boundaries, schemas, service contracts, tests, evidence, rollback, and approval gates without creating source.
 - **ATTACH:** plan or perform an explicitly authorized attachment of a canonical capsule to an established compatible project.
 - **EXTRACT:** plan or perform an explicitly authorized separation of portable behavior from a project-local feature.
 - **REINTEGRATE:** plan or perform an explicitly authorized migration of the origin project to the canonical extracted capsule.
@@ -72,6 +75,21 @@ Before every documentation or code stop, scan changed language for inaccurate re
 - Runtime-downloaded arbitrary executable code remains out of scope unless a future accepted contract authorizes it.
 - No silent permissions, components, storage sharing, authority expansion, or local-to-remote fallback.
 - Optional capsule failure must not crash unrelated host startup.
+
+## No-op reference capsule planning rules
+
+Before implementing `swrlz.reference.noop`:
+
+1. read the accepted capsule ADR and Host-Capability Contract;
+2. read `CORE_PLAN_005_NOOP_REFERENCE_CAPSULE_IMPLEMENTATION_PLAN.md`;
+3. read `NOOP_REFERENCE_CAPSULE_EVIDENCE_CONTRACT_V1.md`;
+4. preserve the planned capsule identity, contract version, service identifiers, reason codes, package naming, and two-host boundary unless a new bounded decision explicitly changes them;
+5. keep the capsule free of networking, permissions, privileged operations, identity mutation, trust decisions, and remote fallback;
+6. attach one canonical capsule to two independent reference hosts through distinct adapters;
+7. require both hosts to reference the same ZIP/SHA lineage;
+8. prove lifecycle, deterministic invocation, compatibility rejection, failure isolation, rollback, and terminology compliance;
+9. do not involve mature CLIENT, SERVER, NODE_HOST, CORE_BASE, Keyboard, or Launcher lanes without separate approval;
+10. do not claim Phoenix Firewall or production-feature readiness from no-op evidence.
 
 ## ATTACH workflow
 
@@ -136,7 +154,7 @@ Record, where applicable:
 - Verify `unzip -tq` and SHA-256 before extraction.
 - Build only in isolated workspaces.
 - Require deterministic artifact naming, checksums, logs, tool versions, invariants, and provenance.
-- Never claim build, install, launch, release, deployment, extraction, attachment, or reintegration without evidence.
+- Never claim build, install, launch, release, deployment, extraction, attachment, reintegration, or reference-capsule verification without evidence.
 
 ## Stop contract
 
