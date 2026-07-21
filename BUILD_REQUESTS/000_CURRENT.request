@@ -1,25 +1,28 @@
 # BUILD REQUEST: 000_CURRENT.request
-# Checkpoint: CORE-BASE-BUILD-001B
-# Purpose: Enable independent GitHub Actions verification for the Core Base,
-# Keyboard inheritance lane, and Launcher inheritance lane.
+# Checkpoint: CORE-BUILD-002A
+# Purpose: Checksum-gated verification of canonical CORE_BASE and independent inheritance lanes.
 
-request_id=CORE-BASE-BUILD-001B
+request_id=CORE-BUILD-002A
 build_variant=debug
 gradle_task=:app:assembleDebug
 java_version=17
 targets=universal
 
-# Independent build lanes.
-# Each lane has its own workflow, source archive or source directory,
-# expected APK path, and uploaded artifact identity.
-
 [core_base]
 enabled=true
-source_lane=SOURCES/CORE_BASE/source
+component=CORE_BASE
+source_type=archive
+source_archive=SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.zip
+checksum_file=SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.sha256
+old_patches_dir=SOURCES/CORE_BASE/OLD_PATCHES
 workflow=.github/workflows/build-swrlz-core-android-foundation.yml
-expected_apk=SOURCES/CORE_BASE/source/app/build/outputs/apk/debug/app-debug.apk
-artifact_name=SWRLZ_CORE_ANDROID_CFv1.0.1_DEBUG_APK
-package_name=SWRLZ_CORE_ANDROID_CFv1.0.1.zip
+workspace=BUILD_WORK/CORE_BASE
+expected_apk=BUILD_WORK/CORE_BASE/extracted/app/build/outputs/apk/debug/app-debug.apk
+artifact_name=SWRLZ_CORE_BASE_CORE_REDUCE_003_DEBUG_APK
+evidence_name=SWRLZ_CORE_BASE_CORE_REDUCE_003_BUILD_EVIDENCE
+application_id=com.swrlz.core.app
+version_name=1.0.0
+version_code=1
 
 [keyboard_base]
 enabled=true
@@ -41,10 +44,8 @@ expected_apk=build-work/launcher/app/build/outputs/apk/debug/app-debug.apk
 artifact_name=SWRLZ_LAUNCHER_BASE_CFv1.0.1_DEBUG_APK
 package_name=SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip
 
-# Scope guardrails:
-# - Build verification only.
-# - Keyboard and Launcher remain independent inheritance lineages.
-# - Do not modify canonical CLIENT or NODE_HOST implementation sources.
-# - Do not publish a release, deploy, or install any APK.
-# - A successful base build does not prove Keyboard or Launcher behavior beyond
-#   compilation of the inherited foundation source.
+# Guardrails:
+# - Verification only; no release, deployment, installation, or merge.
+# - Build CORE_BASE from the checksum-verified immutable source archive.
+# - OLD_PATCHES is lineage storage and is never an automatic build-input search path.
+# - CLIENT and NODE_HOST implementation sources are outside this request.
