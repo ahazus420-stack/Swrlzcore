@@ -1,6 +1,6 @@
-# CORE-ARCH-003 Current Handoff
+# CORE-ARCH-003A Current Handoff
 
-- **Status:** Architecture documented; implementation not authorized
+- **Status:** Portable feature-capsule architecture documented; implementation not authorized
 - **Date:** 2026-07-21
 - **Repository:** `ahazus420-stack/Swrlzcore`
 - **Authoritative branch:** `main`
@@ -17,57 +17,73 @@
 7. `skills/swrlz-core-base-canonical-build-engineer/SKILL.md`
 8. `docs/handoffs/CORE_BUILD_002A_CURRENT_HANDOFF.md`
 
-## Confirmed architecture direction
+## Corrected architecture direction
 
-- Shared capabilities are versioned compile-time integrator modules.
-- Distinct app shells keep distinct package, signer, lifecycle, role, and authority boundaries.
-- Each host packages integrators through an explicit composition manifest.
-- Each integrator declares identity, version, contract compatibility, host requirements, permissions, storage, lifecycle, routing, failure behavior, lineage, and Truth Firewall impact.
-- Each app shell supplies a least-authority host adapter and selects a role-specific profile.
-- Package inclusion does not grant trust, enrollment, entitlement, or execution authority.
-- Runtime-downloaded arbitrary executable plugins are outside the initial architecture.
+- Reusable capabilities are project-agnostic portable feature capsules.
+- Capsules target runtime classes and required host services, not a closed list of named apps.
+- A feature may originate in any project and later become a canonical shared package.
+- The proposed neutral lane is `SOURCES/SHARED_FEATURES/<FEATURE>/`; it does not yet exist by authorization.
+- Portable ZIP plus sibling SHA-256 supports transfer between separate repositories or canonical source ZIPs.
+- Same-repository projects may use direct module dependencies.
+- Each receiving project owns a small adapter and integration manifest.
+- Portable core logic, runtime adapters, and optional presentation remain separate.
+- The originating project should reintegrate the canonical shared package after extraction to prevent drift.
+- Packaging never grants trust, entitlement, enrollment, or execution authority.
+- Runtime-downloaded arbitrary executable plugins remain outside the initial architecture.
 
-## Phoenix Firewall first-integrator proposal
+## Core compatibility rule
 
-One shared Phoenix Firewall engine with profiles:
+```text
+feature requirements
+    + host-provided services
+    + receiving-project manifest
+    + compatibility and policy gates
+    = attached capability
+```
 
-- `CORE_FULL`
-- `KEYBOARD_RESTRICTED`
-- `LAUNCHER_RESTRICTED`
-- `CLIENT_SCOPED`
-- `NODE_HOST_SCOPED`
+Named projects such as CORE_BASE, CLIENT, SERVER, Launcher, Keyboard, and NODE_HOST are examples only.
 
-Profiles are allowlisted authority surfaces, not divergent source forks.
+## Phoenix Firewall example
+
+Phoenix Firewall should eventually separate into:
+
+- portable policy engine;
+- Android adapter;
+- JVM/server adapter;
+- optional UI surfaces;
+- descriptor, migrations, tests, documentation, ZIP, and SHA-256.
+
+A receiving project maps services such as secure storage, audit sink, policy clock, scheduling, network inspection, and notifications. It should not require Phoenix Firewall source changes merely because a new project wants to attach it.
 
 ## Documentation created or changed
 
-- New ADR: `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`
-- New normative contract: `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
-- New architecture guide: `docs/architecture/CORE_INTEGRATOR_ARCHITECTURE_V1.md`
-- Updated ADR index: `docs/architecture/adr/README.md`
-- Updated CORE_BASE operating skill: `skills/swrlz-core-base-canonical-build-engineer/SKILL.md`
-- New handoff: `docs/handoffs/CORE_ARCH_003_CURRENT_HANDOFF.md`
+- Revised ADR: `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`
+- Revised contract: `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
+- Revised architecture guide: `docs/architecture/CORE_INTEGRATOR_ARCHITECTURE_V1.md`
+- ADR index: `docs/architecture/adr/README.md`
+- Updated operating skill: `skills/swrlz-core-base-canonical-build-engineer/SKILL.md`
+- Updated handoff: `docs/handoffs/CORE_ARCH_003_CURRENT_HANDOFF.md`
 
 ## Explicit non-implementation state
 
-No source module, Gradle configuration, composition manifest, Phoenix Firewall implementation, app permission, app-lane source, build request, workflow, APK, release, deployment, or installation was created or changed by CORE-ARCH-003.
+No `SOURCES/SHARED_FEATURES/` lane, source module, feature extraction, Gradle configuration, integration manifest, adapter, permission, app-lane source, build request, workflow, APK, release, deployment, or installation was created or changed.
 
 ## Recommended next checkpoint
 
-The next bounded checkpoint should be contract acceptance and implementation planning only. It should decide:
+The next bounded checkpoint should accept the revised ADR and contract, then define only:
 
-- whether ADR-0003 and Contract v1 are accepted;
-- the first implementation-grade `IntegratorDescriptor` schema;
-- the first host-capability identifier set;
-- the composition-manifest format;
-- whether a no-op reference integrator precedes Phoenix Firewall;
-- module naming after a repository dependency audit;
-- exact implementation, test, build, and documentation boundaries.
+- capsule descriptor schema;
+- host-service identifier set;
+- receiving-project integration-manifest schema;
+- canonical ZIP/SHA naming and lineage rules;
+- a tiny no-op portable reference capsule;
+- two independent test-host criteria;
+- exact implementation, testing, build, evidence, and documentation boundaries.
 
 ## Approval state
 
-Approval already granted authorized architecture review and documentation only. It did not authorize implementation, app-lane changes, builds, workflows, merge, or release.
+CORE-ARCH-003A authorized documentation-only correction. It did not authorize implementation, shared-feature directories, source extraction, app changes, builds, workflows, merge, or release.
 
 ## Exact next approval phrase
 
-`Approve CORE-GATE-004 — Accept ADR-0003 and the CORE Integrator Host-Capability Contract v1, then define the bounded implementation plan without modifying source code, app lanes, workflows, or builds`
+`Approve CORE-GATE-004A — Accept the project-agnostic portable feature-capsule ADR and contract, then define the bounded no-op reference implementation plan without creating source modules, shared-feature lanes, app changes, workflows, or builds`
