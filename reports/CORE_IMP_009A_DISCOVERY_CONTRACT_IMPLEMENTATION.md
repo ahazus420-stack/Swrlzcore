@@ -4,7 +4,8 @@
 - **Date:** 2026-07-21
 - **Repository:** `ahazus420-stack/Swrlzcore`
 - **Branch:** `checkpoint/core-imp-009a`
-- **Base:** `00bb23d7f4fed389a7b24e7ec2127399da0d924f`
+- **Implementation base:** `00bb23d7f4fed389a7b24e7ec2127399da0d924f`
+- **Current main at close:** `961e92907acb6a3158f6da982902f07acbfba019`
 - **Capsule:** `swrlz.discovery.contract`
 - **Version:** `0.1.0`
 - **Contract version:** `1`
@@ -38,8 +39,19 @@ The complete production source surface passed an API-shape compile check. Offici
 
 ## Boundary preservation
 
-No CLIENT, SERVER/NODE_HOST, Keyboard, Launcher, or CORE_BASE source was modified. No Android API, networking, route selection, storage, identity generation, trust mutation, authorization, mission execution, UI, workflow, build, release, deployment, or installation behavior was added.
+No CLIENT, SERVER/NODE_HOST, Keyboard, Launcher, or CORE_BASE source was modified. No Android API, networking, route selection, storage, identity generation, trust mutation, authorization, mission execution, UI, workflow, mature-app build, release, deployment, or installation behavior was added.
 
 ## Package
 
-The exact package filename and SHA-256 are recorded in the sibling checksum and package-integrity evidence generated after this report.
+- Filename: `SWRLZ_DISCOVERY_CONTRACT_CAPSULE_v0.1.0.zip`
+- SHA-256: `e0b139a84aaf5a5ea470fbea03c6f42dca987620c8459a3577d27c91058e484e`
+- Archive integrity: PASS
+- Unsafe paths: none
+- Duplicate entries: none
+- Deterministic rebuild: PASS
+
+## Concurrent repository truth
+
+While this checkpoint was in progress, separately authorized work advanced `main` and canonicalized SERVER v1.0.4 as the active source pair with SHA-256 `32114c2658a315dddc86d2ce2f0f790cc7d7e6a5bea506e1ef909aea404125e6`; SERVER v1.0.3 was preserved under `OLD_PATCHES/`.
+
+The capsule branch was not rebased or merged. Only this checkpoint's evidence and handoff were reconciled to current repository truth.

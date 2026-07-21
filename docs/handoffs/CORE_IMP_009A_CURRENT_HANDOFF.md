@@ -4,9 +4,15 @@
 - **Date:** 2026-07-21
 - **Repository:** `ahazus420-stack/Swrlzcore`
 - **Branch:** `checkpoint/core-imp-009a`
-- **Base commit:** `00bb23d7f4fed389a7b24e7ec2127399da0d924f`
-- **Required ancestor:** `ef62e870e30143912be992972aed89849f186448`
+- **Implementation base:** `00bb23d7f4fed389a7b24e7ec2127399da0d924f`
+- **Current main at checkpoint close:** `961e92907acb6a3158f6da982902f07acbfba019`
+- **Required accepted ancestor:** `ef62e870e30143912be992972aed89849f186448`
+- **Implementation commit:** `4c32c298c9ad680403cd59501daa90f838cfc11f`
 - **Capsule:** `swrlz.discovery.contract` version `0.1.0`
+
+## Repository relationship
+
+`main` advanced through separately authorized SERVER source-lineage work while this checkpoint was executing. This branch remains intentionally unmerged and was not rebased. The closing evidence records current repository truth without importing or modifying mature source.
 
 ## Implemented lane
 
@@ -16,20 +22,14 @@ The lane contains pure Kotlin/JVM source, public domain API, internal JSON backe
 
 ## Canonical package
 
-`SWRLZ_DISCOVERY_CONTRACT_CAPSULE_v0.1.0.zip`
+- ZIP: `SWRLZ_DISCOVERY_CONTRACT_CAPSULE_v0.1.0.zip`
+- SHA-256: `e0b139a84aaf5a5ea470fbea03c6f42dca987620c8459a3577d27c91058e484e`
+- deterministic rebuild: PASS
+- archive integrity: PASS
+- unsafe paths: none
+- duplicate entries: none
 
-SHA-256:
-
-`e0b139a84aaf5a5ea470fbea03c6f42dca987620c8459a3577d27c91058e484e`
-
-Package verification:
-
-- deterministic rebuild: PASS;
-- archive integrity: PASS;
-- unsafe paths: none;
-- duplicate entries: none.
-
-## Test result
+## Verification
 
 `43 passed / 0 failed`
 
@@ -45,14 +45,13 @@ Verified behavior includes canonical success/error bytes, positive warning vecto
 
 The local environment executed the portable codec and strict backend tests and performed a complete production-source API-shape compile. The official Maven artifact could not be downloaded in the execution environment, so an official dependency-backed Gradle build is not claimed.
 
-## Mature source lineage
+## Current mature source lineage
 
-Current repository declarations remain:
+- CLIENT v1.0.1 ZIP SHA-256: `9f567523ad184bfc14751d1aeaf527233a41a8e2a3e82378a68292a2e6a922f7`;
+- SERVER v1.0.4 ZIP SHA-256: `32114c2658a315dddc86d2ce2f0f790cc7d7e6a5bea506e1ef909aea404125e6`;
+- SERVER v1.0.3 predecessor ZIP SHA-256: `127705a321127a05bd4c556016de4bf726fbaaa4e255f256a00e7564f44095c5`, preserved under `SOURCES/SERVER/OLD_PATCHES/`.
 
-- CLIENT v1.0.1: `9f567523ad184bfc14751d1aeaf527233a41a8e2a3e82378a68292a2e6a922f7`;
-- SERVER v1.0.3: `127705a321127a05bd4c556016de4bf726fbaaa4e255f256a00e7564f44095c5`.
-
-The unpaired SERVER v1.0.4 checksum anomaly remains preserved and unresolved. No mature source was copied, modified, attached, built, or invoked.
+The prior SERVER v1.0.4 ambiguity is resolved in current `main` through accepted duplicate-download suffix normalization and byte-preserving canonicalization. No mature source was copied, modified, attached, built, or invoked by CORE-IMP-009A.
 
 ## Explicitly not performed
 
@@ -69,9 +68,9 @@ The unpaired SERVER v1.0.4 checksum anomaly remains preserved and unresolved. No
 
 The planned next discovery checkpoint remains `SERVER-REINT-009B`, but it is not authorized. It must repeat exact SERVER byte-level source verification before any mature-source change.
 
-## User-proposed next direction
+## User-proposed app-shell direction
 
-The proposed removal of nested ZIPs from Keyboard and Launcher, packaging of CORE source, and creation of distinct Keyboard and Launcher applications is not authorized by CORE-IMP-009A. Direct copying would risk collapsing package identity, signer lineage, manifests, app roles, storage ownership, and version boundaries.
+The proposed removal of nested ZIPs from Keyboard and Launcher, packaging of CORE source, and creation of distinct Keyboard and Launcher applications is not authorized by CORE-IMP-009A. Direct copying could collapse package identity, signer lineage, manifests, app roles, storage ownership, and version boundaries.
 
 The safe next bounded checkpoint is a read-only topology and lineage audit followed by a separation plan.
 
