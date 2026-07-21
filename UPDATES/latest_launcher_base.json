@@ -1,0 +1,13 @@
+{
+  "artifact_folder": "RELEASES/SWRLZ_LAUNCHER_BASE_CFv1.0.1_APK",
+  "built_at_utc": "2026-07-21T17:58:53+00:00",
+  "canonical_source": "SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip",
+  "component": "LAUNCHER_BASE",
+  "repository_commit": "452dc3b2e727e546c7ae501594e506683a80e258",
+  "schema": 2,
+  "selected_source": "SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip",
+  "signing_mode": "debug-runner-default",
+  "source_sha256": "8fcf9a29a4dc0b75e166da2b5522b8fab90274353d610fd52b80dcc7c1bc5d40",
+  "variant": "debug",
+  "workflow_run": "29854823586"
+}

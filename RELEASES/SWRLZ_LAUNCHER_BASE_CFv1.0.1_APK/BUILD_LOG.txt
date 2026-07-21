@@ -1,0 +1,144 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.6/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:clean UP-TO-DATE
+> Task :core:clean UP-TO-DATE
+> Task :designsystem:clean UP-TO-DATE
+> Task :featurehome:clean UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :core:preBuild UP-TO-DATE
+> Task :core:preDebugBuild UP-TO-DATE
+> Task :designsystem:preBuild UP-TO-DATE
+> Task :designsystem:preDebugBuild UP-TO-DATE
+> Task :featurehome:preBuild UP-TO-DATE
+> Task :featurehome:preDebugBuild UP-TO-DATE
+> Task :core:writeDebugAarMetadata
+> Task :designsystem:writeDebugAarMetadata
+> Task :app:generateDebugResValues
+> Task :featurehome:writeDebugAarMetadata
+> Task :core:generateDebugResValues
+> Task :core:generateDebugResources
+> Task :app:checkDebugAarMetadata
+> Task :core:packageDebugResources
+> Task :designsystem:generateDebugResValues
+> Task :designsystem:generateDebugResources
+> Task :designsystem:packageDebugResources
+> Task :featurehome:generateDebugResValues
+> Task :featurehome:generateDebugResources
+> Task :featurehome:packageDebugResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :core:extractDeepLinksDebug
+> Task :designsystem:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :featurehome:extractDeepLinksDebug
+> Task :app:mergeDebugResources
+> Task :core:compileDebugLibraryResources
+> Task :core:processDebugManifest
+> Task :designsystem:processDebugManifest
+> Task :featurehome:processDebugManifest
+> Task :designsystem:compileDebugLibraryResources
+> Task :core:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :designsystem:parseDebugLocalResources
+> Task :featurehome:compileDebugLibraryResources
+> Task :app:processDebugManifestForPackage
+> Task :core:checkKotlinGradlePluginConfigurationErrors
+> Task :featurehome:parseDebugLocalResources
+> Task :core:generateDebugRFile
+> Task :designsystem:generateDebugRFile
+> Task :core:javaPreCompileDebug
+> Task :featurehome:generateDebugRFile
+> Task :designsystem:checkKotlinGradlePluginConfigurationErrors
+> Task :app:processDebugResources
+> Task :featurehome:checkKotlinGradlePluginConfigurationErrors
+> Task :designsystem:javaPreCompileDebug
+> Task :featurehome:javaPreCompileDebug
+> Task :app:javaPreCompileDebug
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :core:mergeDebugShaders
+> Task :core:compileDebugShaders NO-SOURCE
+> Task :core:generateDebugAssets UP-TO-DATE
+> Task :core:packageDebugAssets
+> Task :designsystem:mergeDebugShaders
+> Task :designsystem:compileDebugShaders NO-SOURCE
+> Task :designsystem:generateDebugAssets UP-TO-DATE
+> Task :designsystem:packageDebugAssets
+> Task :featurehome:mergeDebugShaders
+> Task :featurehome:compileDebugShaders NO-SOURCE
+> Task :featurehome:generateDebugAssets UP-TO-DATE
+> Task :featurehome:packageDebugAssets
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:mergeDebugJniLibFolders
+> Task :core:mergeDebugJniLibFolders
+> Task :core:mergeDebugNativeLibs NO-SOURCE
+> Task :app:checkDebugDuplicateClasses
+> Task :core:copyDebugJniLibsProjectOnly
+> Task :designsystem:mergeDebugJniLibFolders
+> Task :designsystem:mergeDebugNativeLibs NO-SOURCE
+> Task :designsystem:copyDebugJniLibsProjectOnly
+> Task :featurehome:mergeDebugJniLibFolders
+> Task :featurehome:mergeDebugNativeLibs NO-SOURCE
+> Task :featurehome:copyDebugJniLibsProjectOnly
+> Task :core:kspDebugKotlin
+> Task :app:mergeDebugNativeLibs NO-SOURCE
+> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :designsystem:compileDebugKotlin
+> Task :designsystem:compileDebugJavaWithJavac NO-SOURCE
+> Task :designsystem:bundleLibCompileToJarDebug
+> Task :designsystem:bundleLibRuntimeToJarDebug
+> Task :core:compileDebugKotlin
+> Task :designsystem:processDebugJavaRes
+> Task :core:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:bundleLibCompileToJarDebug
+> Task :core:bundleLibRuntimeToJarDebug
+> Task :core:processDebugJavaRes
+> Task :core:bundleLibRuntimeToDirDebug
+> Task :designsystem:bundleLibRuntimeToDirDebug
+> Task :app:mergeExtDexDebug
+> Task :featurehome:compileDebugKotlin
+> Task :featurehome:compileDebugJavaWithJavac NO-SOURCE
+> Task :featurehome:bundleLibCompileToJarDebug
+> Task :featurehome:bundleLibRuntimeToJarDebug
+> Task :featurehome:processDebugJavaRes
+> Task :featurehome:bundleLibRuntimeToDirDebug
+> Task :app:mergeLibDexDebug
+> Task :app:kaptGenerateStubsDebugKotlin
+
+> Task :app:kaptDebugKotlin
+warning: The following options were not recognized by any processor: '[dagger.fastInit, kapt.kotlin.generated]'
+
+> Task :app:compileDebugKotlin
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltAggregateDepsDebug
+
+> Task :app:hiltJavaCompileDebug
+Note: /home/runner/work/Swrlzcore/Swrlzcore/BUILD_WORK/ROUTER/LAUNCHER_BASE/extracted/app/build/generated/hilt/component_sources/debug/com/swrlz/core/app/Hilt_SwrlzApplication.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :app:processDebugJavaRes
+> Task :app:transformDebugClassesWithAsm
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/build-1784656703745.json
+
+BUILD SUCCESSFUL in 29s
+101 actionable tasks: 97 executed, 4 up-to-date
