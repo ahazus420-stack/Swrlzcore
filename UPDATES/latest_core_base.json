@@ -1,0 +1,13 @@
+{
+  "artifact_folder": "RELEASES/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE_APK",
+  "built_at_utc": "2026-07-21T18:04:43+00:00",
+  "canonical_source": "SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.zip",
+  "component": "CORE_BASE",
+  "repository_commit": "9a69a86ae5da1d58bc40a5566eaae85aa6072501",
+  "schema": 2,
+  "selected_source": "SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.zip",
+  "signing_mode": "debug-runner-default",
+  "source_sha256": "bd4909fce635d60d4a984a521503ed1b53ecb451f41281885112d92f9ce528e1",
+  "variant": "debug",
+  "workflow_run": "29855426157"
+}
