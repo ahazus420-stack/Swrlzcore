@@ -40,6 +40,6 @@ Do not delete lineage by default. Archived files retain their original canonical
 
 ## Build selection
 
-`.github/workflows/build-swrlz-server-apk.yml` is responsible for selecting and verifying the active SERVER archive. Workflow behavior may evolve through separately bounded checkpoints; this source-lineage checkpoint does not modify that workflow.
+`.github/workflows/swrlz-apk-router.yml` selects and verifies the active SERVER archive through the shared suffix-aware resolver. Manual runs select `SERVER`; automatic runs are limited to active SERVER lane-root source/checksum paths on `main`. `OLD_PATCHES` is lineage storage and is never searched as an automatic build-input lane.
 
 Core law: integrate, do not overwrite.
