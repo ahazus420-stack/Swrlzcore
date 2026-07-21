@@ -1,27 +1,32 @@
 # Portable Feature Capsule Architecture v1
 
 - **Status:** Proposed architecture guide
-- **Checkpoint:** CORE-ARCH-003A
+- **Checkpoint:** CORE-ARCH-003 / CORE-ARCH-003A / CORE-ARCH-003B-LANGUAGE
 - **Governing ADR:** `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`
 - **Normative contract:** `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
+- **Existing-app guide:** `docs/architecture/PORTABLE_FEATURE_EXTRACTION_AND_EXISTING_APP_INTEGRATION_V1.md`
 
 ## Purpose
 
-This guide explains how a useful feature can originate in any SWRLZ project, become a canonical portable package, and then attach to any compatible current or future project through a small adapter.
+This guide explains how SWRLZ can design a useful feature once, package it as a project-agnostic capsule, attach it to compatible existing or future projects, and extract already-crafted CLIENT or SERVER features without discarding prior work.
 
 ## Core rule
 
 ```text
-features declare requirements
-hosts declare provided services
-integration succeeds when requirements are satisfied
+feature declares requirements
+        +
+host exposes services
+        +
+thin adapter translates services
+        +
+integration manifest records attachment
+        =
+feature composed into a compatible project
 ```
 
-A feature must not require every possible consumer to be predefined.
+Named projects are examples and evidence targets, not the complete compatibility boundary.
 
-## Neutral canonical lane
-
-Proposed future structure:
+## Proposed neutral canonical lane
 
 ```text
 SOURCES/SHARED_FEATURES/
@@ -35,133 +40,117 @@ SOURCES/SHARED_FEATURES/
     └── integrations/
 ```
 
-This lane is proposed only; creating it requires a separate implementation authorization.
+This lane is proposed only and is not created by the architecture checkpoint.
 
-## Capsule structure
+## Capsule contents
 
-```text
-feature-capsule/
-├── portable-core/
-│   ├── domain/
-│   ├── models/
-│   ├── state-machines/
-│   ├── validation/
-│   ├── serialization/
-│   ├── migrations/
-│   └── tests/
-├── runtime-adapters/
-│   ├── android/
-│   ├── jvm/
-│   └── server/
-├── optional-ui/
-├── contract/
-├── docs/
-├── manifest.yaml
-└── checksum
-```
+A portable capsule may contain:
 
-### Portable core
+- portable domain logic and deterministic state machines;
+- stable service contracts;
+- descriptor and compatibility metadata;
+- runtime-neutral orchestration;
+- optional Android, JVM, server, or other adapters;
+- optional typed UI contributions;
+- migrations, tests, documentation, lineage, ZIP, and SHA-256 evidence.
 
-Contains host-neutral rules and behavior. It must not depend directly on a host Activity, IME service, launcher surface, CLIENT UI, server endpoint, or navigation framework.
+It should not directly depend on an Activity, IME service, launcher surface, host navigation, server framework, project-local database, or package name unless isolated behind a runtime or receiving-project adapter.
 
-### Runtime adapters
+## Host-service model
 
-Map platform facilities such as Android Keystore, JVM filesystem, WorkManager, server scheduling, notification systems, logging, or networking.
+A capsule asks whether services exist, not whether it is inside a particular named project.
 
-### Optional presentation
+Typical services include:
 
-Contains host-selectable surfaces such as Compose settings, launcher tiles, keyboard warning strips, CLIENT diagnostics, or server admin views.
+- secure storage;
+- audit output;
+- policy clock;
+- scheduler or background execution;
+- route inspection;
+- notifications;
+- diagnostics;
+- local, LAN, or remote networking;
+- identity and trust references;
+- Android-role or server-runtime facilities.
 
-### Receiving-project adapter
+The host exposes only the services and authority approved for that integration.
 
-Implements only the services the capsule requires. The adapter belongs to the receiving project and remains the least-authority boundary.
-
-### Integration manifest
-
-Records:
-
-- feature ID and version;
-- ZIP/SHA identity or repository module reference;
-- runtime adapter;
-- required and optional service mappings;
-- enabled and disabled components;
-- accepted permissions and platform components;
-- storage namespace;
-- route classes;
-- compatibility result;
-- source and integration lineage.
-
-## Two supported integration paths
+## Attachment methods
 
 ### Same repository
 
-```text
-implementation(project(":shared-features:<feature>"))
-```
+A project may reference a shared module directly through its build graph.
 
-### Separate repository or source ZIP
+### Separate repository or canonical source package
 
-```text
-<FEATURE>_<VERSION>.zip
-<FEATURE>_<VERSION>.sha256
-```
+A project may import a checksum-verified source ZIP and attach it through a local adapter and integration manifest.
 
-The receiving project verifies the checksum, imports the capsule into a controlled location, supplies an adapter, and records the integration manifest.
+Both methods must preserve capsule identity, version, source lineage, checksum, contract compatibility, and rollback evidence.
 
-## Extraction workflow
+## Mature application integration
 
-```text
-feature exists inside CLIENT, CORE_BASE, SERVER, or another project
-    ↓
-bounded extraction checkpoint
-    ↓
-portable core + runtime adapters + descriptor
-    ↓
-canonical shared ZIP and sibling SHA
-    ↓
-originating project reintegrates canonical package
-    ↓
-other projects attach through local adapters
-```
+Established CLIENT, SERVER, NODE_HOST, Core, Keyboard, Launcher, or future projects do not need wholesale redesign. They retain their accepted identities, workflows, protocols, storage, lifecycle, and contracts. Attachment adds only:
 
-The canonical package becomes the reusable source of truth. The originating project must not silently continue maintaining a divergent private copy.
+- the capsule package or module reference;
+- a thin compatibility adapter;
+- an integration manifest;
+- explicit permission, component, storage, route, and lifecycle changes;
+- verification and rollback evidence.
 
-## Phoenix Firewall example
-
-Phoenix Firewall may originate in one project but should be separated into:
-
-- portable policy engine;
-- Android adapter;
-- JVM/server adapter;
-- optional UI surfaces;
-- required host services such as secure storage, audit sink, policy clock, scheduler, and optional network inspection.
-
-A receiving project selects components by available services rather than by a hard-coded project name.
-
-Example descriptor concepts:
-
-```yaml
-feature_id: swrlz.phoenix_firewall
-version: 1.0.0
-contract_version: 1
-runtime_targets: [android, jvm]
-required_services: [secure_storage, audit_sink, policy_clock]
-optional_services: [network_inspector, notification_surface]
-storage_namespace: phoenix_firewall
-offline_mode: supported
-remote_required: false
-```
-
-## Compatibility decision
+## Existing-feature extraction
 
 ```text
-capsule packaged or imported
-AND archive/checksum valid
-AND runtime target supported
-AND contract compatible
-AND required host services mapped
-AND required permissions/components accepted
-AND migrations compatible
+project-local feature
+        ↓ dependency and authority audit
+portable core + host-owned boundaries
+        ↓ service contracts
+canonical capsule package
+        ↓ origin adapter
+origin project reintegrates capsule
+        ↓
+other compatible projects attach capsule
+```
+
+The origin project must become the first verified host of the extracted canonical capsule, or follow a clearly temporary bounded delegation path.
+
+## ATTACH, EXTRACT, and REINTEGRATE
+
+- **ATTACH** adds a canonical capsule to an established compatible project.
+- **EXTRACT** separates portable behavior from an established project-local feature.
+- **REINTEGRATE** makes the origin project reference and compose the canonical capsule.
+
+Detailed procedures are defined in `PORTABLE_FEATURE_EXTRACTION_AND_EXISTING_APP_INTEGRATION_V1.md`.
+
+## Migration strategies
+
+- **Clean extraction:** direct separation where boundaries already exist.
+- **Strangler extraction:** gradual movement from mature code while existing entry points delegate to the capsule.
+- **Wrapper-first transition:** establish a stable interface first, then move implementation behind it through later checkpoints.
+
+Transitional states must remain documented, bounded, and recoverable.
+
+## Constitutional relationship language
+
+Use accurate verbs:
+
+- projects **attach**, **import**, **reference**, or **compose** capsules;
+- hosts **expose** services and **host** lifecycle;
+- adapters **translate** host services;
+- registries **register** availability;
+- runtimes **invoke** behavior;
+- origin projects **reintegrate** canonical capsules;
+- packages and records **preserve** lineage.
+
+Do not use `consume` for reusable software composition. The Constitution reserves it for genuinely depleting or irreversible operations.
+
+## Execution decision
+
+```text
+attached or packaged
+AND descriptor compatible
+AND required services exposed
+AND integration manifest valid
+AND entitled
 AND configured
 AND available
 AND trust-authorized
@@ -170,35 +159,35 @@ AND protocol compatible
 = executable
 ```
 
-Every failed gate must preserve its reason.
+Every failure preserves a reason code.
 
-## Security rules
+## Security model
 
-- No authority inferred from package inclusion, app identity, signature, source origin, or shared device identity.
-- No silent permissions or platform components.
-- No direct cross-capsule storage mutation.
+- No initial arbitrary runtime executable loading.
+- No authority inferred from attachment, package inclusion, common signature, or shared device identity.
+- No silent permission or component additions.
+- No direct capsule-to-capsule storage mutation.
 - No silent local-to-remote fallback.
 - No weakening of Truth Firewall objection, refusal, pause, or safer-alternative behavior.
-- Optional feature failure must not crash unrelated host startup.
-- Arbitrary runtime-downloaded executable code remains out of scope.
+- Optional capsule failure must not crash unrelated host startup.
 
 ## Recommended implementation sequence
 
-1. Accept the revised ADR and contract.
-2. Define the capsule descriptor and host-service identifiers.
-3. Define the integration-manifest schema.
-4. Define canonical ZIP/SHA packaging and lineage rules.
-5. Implement a tiny no-op portable capsule.
-6. Attach it to two independent test hosts through separate adapters.
-7. Verify extraction, transfer, compatibility failure reasons, lifecycle, and failure isolation.
-8. Authorize `SOURCES/SHARED_FEATURES/` only after the reference flow is accepted.
-9. Extract Phoenix Firewall in a separate checkpoint.
-10. Reintegrate Phoenix into its originating project before attaching it elsewhere.
+1. accept ADR, contract, extraction guide, and terminology rules;
+2. audit existing repository and project dependency graphs;
+3. define descriptor and integration-manifest schemas;
+4. define host-service contracts;
+5. implement a tiny no-op reference capsule;
+6. attach it to two independent test hosts through distinct adapters;
+7. verify compatibility, lifecycle, failure isolation, ZIP/SHA portability, and terminology checks;
+8. select one mature CLIENT or SERVER feature for extraction planning;
+9. perform EXTRACT and REINTEGRATE in separate approved checkpoints;
+10. attach the resulting capsule to another compatible project.
 
 ## Documentation and evidence gate
 
-Each feature checkpoint must document origin, extraction commit, canonical ZIP/SHA, descriptor, adapters, integration manifests, permissions, migrations, compatibility results, build evidence, device/runtime evidence, rollback, and handoff state.
+Every implementation checkpoint updates contracts, manifests, dependency graphs, permissions, checksums, lineage, migration state, behavioral-equivalence evidence, build/device evidence, handoffs, and skills. One successful compile is not sufficient.
 
 ## Non-authorization
 
-This guide does not authorize shared-feature directories, extraction, source modules, Gradle edits, app-lane changes, permissions, builds, workflows, releases, deployment, installation, dynamic plugins, or merge.
+This guide does not authorize source modules, extraction, shared-feature directories, Gradle edits, app changes, permissions, builds, workflows, merge, release, deployment, or installation.
