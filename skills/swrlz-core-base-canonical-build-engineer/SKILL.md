@@ -1,3 +1,8 @@
+---
+name: swrlz-core-base-canonical-build-engineer
+description: Governs canonical SWRLZ CORE_BASE Android source ZIP lineage, checksum-gated GitHub builds, evidence, and handoffs.
+---
+
 # SWRLZ CORE_BASE Canonical Build Engineer
 
 Manual invocation: `$swrlz-core-base-canonical-build-engineer`
