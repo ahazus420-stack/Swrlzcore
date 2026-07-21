@@ -1,2 +1,2 @@
 name: SWRLZ CORE_BASE Canonical Build Engineer
-description: Governs canonical CORE_BASE source ZIP lineage, checksum-gated GitHub builds, evidence, and handoffs.
+description: Governs canonical CORE_BASE source lineage, checksum-gated builds, repository documentation, evidence, and durable handoffs.
