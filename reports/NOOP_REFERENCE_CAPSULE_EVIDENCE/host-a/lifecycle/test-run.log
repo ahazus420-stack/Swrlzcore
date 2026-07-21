@@ -1,0 +1,11 @@
+PASS android host deterministic invocation
+PASS jvm host deterministic invocation without optional state
+PASS missing required service rejects capsule only
+PASS unsupported service version is explicit
+PASS runtime mismatch is explicit
+PASS contract mismatch is explicit
+PASS malformed descriptor rejects capsule only
+PASS invocation before initialization is rejected
+PASS adapter exception quarantines capsule
+PASS no permissions components or routes declared
+RESULT 10/10 passed

@@ -1,0 +1,17 @@
+integration_id: noop-jvm-reference-v1
+host_identity: swrlz.reference.host.plain-jvm
+capsule_id: swrlz.reference.noop
+capsule_version: 0.1.0
+capsule_source_sha256: 0152ba8a32424d7161ade33359de9d633cb0ae3b8a3b402973f71c585029ddef
+contract_version: 1
+adapter_path: integrations/jvm-reference/src/main/kotlin/swrlz/host/jvmref/JvmReferenceHost.kt
+service_mappings:
+  swrlz.audit_sink.v1: JvmReferenceAuditSink
+  swrlz.clock.v1: JvmReferenceClock
+optional_service_mappings: {}
+permissions_added: []
+components_added: []
+route_classes: []
+storage_namespace: swrlz.reference.noop
+rollback:
+  detach_steps: remove module reference, adapter, and manifest

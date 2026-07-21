@@ -1,0 +1,4 @@
+$ kotlinc /tmp/core-imp-006/SOURCES/SHARED_FEATURES/NOOP_REFERENCE/integrations/android-reference/src/main/kotlin/swrlz/host/androidref/AndroidReferenceHost.kt /tmp/core-imp-006/SOURCES/SHARED_FEATURES/NOOP_REFERENCE/integrations/jvm-reference/src/main/kotlin/swrlz/host/jvmref/JvmReferenceHost.kt /tmp/core-imp-006/SOURCES/SHARED_FEATURES/NOOP_REFERENCE/source/src/main/kotlin/swrlz/capsule/api/Contracts.kt /tmp/core-imp-006/SOURCES/SHARED_FEATURES/NOOP_REFERENCE/source/src/main/kotlin/swrlz/capsule/noop/NoOpCapsule.kt /tmp/core-imp-006/SOURCES/SHARED_FEATURES/NOOP_REFERENCE/source/src/test/kotlin/swrlz/capsule/tests/ReferenceTestRunner.kt -include-runtime -d /tmp/core-imp-006/build-local/noop-reference-tests.jar
+tmp/core-imp-006/SOURCES/SHARED_FEATURES/NOOP_REFERENCE/source/src/main/kotlin/swrlz/capsule/noop/NoOpCapsule.kt:64:16: warning: parameter 'request' is never used
+    fun invoke(request: NoOpRequest): NoOpResult {
+               ^
