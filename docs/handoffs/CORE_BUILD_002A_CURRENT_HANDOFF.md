@@ -1,17 +1,18 @@
 # CORE-BUILD-002A Current Handoff
 
-Status: verification build succeeded; draft PR remains unmerged
+Status: merged to `main`; CI build, physical-device installation, first launch, and minimal UI render verified
 Date (UTC): 2026-07-21
 
 ## Read first
 
 1. `docs/build/CORE_BASE_CANONICAL_BUILD_AND_HANDOFF_PROCESS.md`
 2. `reports/CORE_BUILD_002A_FINAL_VERIFICATION.md`
-3. `BUILD_REQUESTS/000_CURRENT.request`
-4. `.github/workflows/build-swrlz-core-android-foundation.yml`
-5. `SOURCES/CORE_BASE/OLD_PATCHES/README.md`
-6. `skills/swrlz-core-base-canonical-build-engineer/SKILL.md`
-7. `docs/handoffs/CORE_BASE_NEW_CHAT_HANDOFF_TEMPLATE.md`
+3. `reports/CORE_BUILD_002A_DEVICE_INSTALL_AND_LAUNCH_VERIFICATION.md`
+4. `BUILD_REQUESTS/000_CURRENT.request`
+5. `.github/workflows/build-swrlz-core-android-foundation.yml`
+6. `SOURCES/CORE_BASE/OLD_PATCHES/README.md`
+7. `skills/swrlz-core-base-canonical-build-engineer/SKILL.md`
+8. `docs/handoffs/CORE_BASE_NEW_CHAT_HANDOFF_TEMPLATE.md`
 
 ## Scope
 
@@ -21,11 +22,10 @@ This handoff is dedicated to canonical CORE_BASE. Do not modify CLIENT, NODE_HOS
 
 - Repository: `ahazus420-stack/Swrlzcore`
 - Authoritative branch: `main`
-- Checkpoint branch: `checkpoint/core-build-002a`
-- Draft PR: `#15`
-- PR state: open, draft, unmerged
-- Verified workflow head source: PR merge reference for checkpoint head `60863df8acbc35a98bb59b0644599593ab66f351`
-- Latest documentation commits follow the successful build and do not alter CORE_BASE source or workflow logic.
+- Completed checkpoint: `CORE-BUILD-002A`
+- Merged PR: `#15`
+- Merge commit: `56bf5eecc4388a3a47e81cd866448cb0c1b0a210`
+- Device-evidence documentation commit: `f3d3c34fbdf87f3cea2001a5de2ab47d9cdf42b7`
 
 ## Canonical source and build contract
 
@@ -54,6 +54,15 @@ This handoff is dedicated to canonical CORE_BASE. Do not modify CLIENT, NODE_HOS
 - Gradle: `8.6`
 - JVM: Temurin OpenJDK `17.0.19`
 
+## Verified physical-device evidence
+
+- APK installation: verified
+- Launcher registration as `SWRLZ Core`: verified
+- First launch: verified
+- Immediate startup crash: not observed
+- Minimal Compose UI render with centered `SWRLZ Core` text: verified
+- Evidence report: `reports/CORE_BUILD_002A_DEVICE_INSTALL_AND_LAUNCH_VERIFICATION.md`
+
 ## Reduction invariants
 
 - `featurehome_absent=PASS`
@@ -65,7 +74,8 @@ This handoff is dedicated to canonical CORE_BASE. Do not modify CLIENT, NODE_HOS
 ## Documentation inventory
 
 - Build process: `docs/build/CORE_BASE_CANONICAL_BUILD_AND_HANDOFF_PROCESS.md`
-- Final verification report: `reports/CORE_BUILD_002A_FINAL_VERIFICATION.md`
+- CI verification report: `reports/CORE_BUILD_002A_FINAL_VERIFICATION.md`
+- Device verification report: `reports/CORE_BUILD_002A_DEVICE_INSTALL_AND_LAUNCH_VERIFICATION.md`
 - Current handoff: `docs/handoffs/CORE_BUILD_002A_CURRENT_HANDOFF.md`
 - New-chat template: `docs/handoffs/CORE_BASE_NEW_CHAT_HANDOFF_TEMPLATE.md`
 - Skill: `skills/swrlz-core-base-canonical-build-engineer/SKILL.md`
@@ -81,21 +91,27 @@ This handoff is dedicated to canonical CORE_BASE. Do not modify CLIENT, NODE_HOS
 
 ## Claims that remain unverified
 
-- device installation;
-- launch success;
-- runtime UI behavior;
+- extended runtime stability;
+- process recreation and lifecycle recovery;
+- background execution;
+- upgrade/downgrade compatibility;
+- permission flows;
 - release build;
 - release signing continuity;
 - deployment or publication.
 
 ## Approval state
 
-Approval already granted covered reduction, bounded branch integration, workflow verification, documentation, and evidence inspection. It did not authorize merge, release, publication, deployment, installation, or another application lane.
+CORE-BUILD-002A is complete and authoritative on `main`. No release, publication, deployment, or installation automation was authorized. The manual installation and launch performed by the repository owner are documented as device evidence.
+
+## Current architectural question
+
+The next proposed checkpoint is a review-only architectural decision for a reusable CORE integrator/capability-module system that would let capabilities such as Phoenix Firewall be implemented once and composed into CORE_BASE, Keyboard, Launcher, and future SWRLZ applications without copying implementation code.
 
 ## Current gate
 
-The technical verification build succeeded. The next repository-state decision is whether to merge draft PR #15 into `main`. That is a separate authorization.
+No implementation is authorized for the integrator architecture. The next bounded step should define and accept the module contract, host capability declarations, trust boundaries, lifecycle, version compatibility, storage ownership, UI contribution rules, and build composition model.
 
 ## Exact next approval phrase
 
-`Approve CORE-BUILD-002A-MERGE — Merge verified draft PR #15 into main without releasing, publishing, deploying, or installing the APK`
+`Approve CORE-ARCH-003 — Review and document the reusable CORE integrator architecture for shared capabilities such as Phoenix Firewall without implementing source code, modifying app lanes, or triggering builds`
