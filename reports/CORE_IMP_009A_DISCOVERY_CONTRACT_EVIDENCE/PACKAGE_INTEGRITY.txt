@@ -1,0 +1,8 @@
+archive=SWRLZ_DISCOVERY_CONTRACT_CAPSULE_v0.1.0.zip
+sha256=e0b139a84aaf5a5ea470fbea03c6f42dca987620c8459a3577d27c91058e484e
+entry_count=12
+package_scope=standalone-source-project
+testzip=PASS
+unsafe_paths=NONE
+duplicate_entries=NONE
+deterministic_rebuild=PASS

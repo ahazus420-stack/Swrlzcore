@@ -1,0 +1,10 @@
+{"vectorId":"PRODUCER_NODE_ID","expectedReasonCode":"NODE_ID_INVALID","actualReasonCode":"NODE_ID_INVALID","pass":true}
+{"vectorId":"PRODUCER_INSTALL_ID","expectedReasonCode":"INSTALLATION_ID_INVALID","actualReasonCode":"INSTALLATION_ID_INVALID","pass":true}
+{"vectorId":"PRODUCER_DISPLAY_NAME","expectedReasonCode":"DISPLAY_NAME_INVALID","actualReasonCode":"DISPLAY_NAME_INVALID","pass":true}
+{"vectorId":"PRODUCER_HOST_VERSION","expectedReasonCode":"HOST_VERSION_INVALID","actualReasonCode":"HOST_VERSION_INVALID","pass":true}
+{"vectorId":"PRODUCER_PORT","expectedReasonCode":"PORT_OUT_OF_RANGE","actualReasonCode":"PORT_OUT_OF_RANGE","pass":true}
+{"vectorId":"PRODUCER_CAPABILITY","expectedReasonCode":"DISCOVERY_CAPABILITY_MISSING","actualReasonCode":"DISCOVERY_CAPABILITY_MISSING","pass":true}
+{"vectorId":"PRODUCER_TRUST","expectedReasonCode":"TRUST_POLICY_UNSUPPORTED","actualReasonCode":"TRUST_POLICY_UNSUPPORTED","pass":true}
+{"vectorId":"PRODUCER_MISSION_AUTH","expectedReasonCode":"MISSION_AUTHORIZATION_UNSUPPORTED","actualReasonCode":"MISSION_AUTHORIZATION_UNSUPPORTED","pass":true}
+{"vectorId":"PRODUCER_PROTOCOL","expectedReasonCode":"PROTOCOL_VERSION_UNSUPPORTED","actualReasonCode":"PROTOCOL_VERSION_UNSUPPORTED","pass":true}
+{"vectorId":"PRODUCER_SCHEMA","expectedReasonCode":"SCHEMA_VERSION_INVALID","actualReasonCode":"SCHEMA_VERSION_INVALID","pass":true}

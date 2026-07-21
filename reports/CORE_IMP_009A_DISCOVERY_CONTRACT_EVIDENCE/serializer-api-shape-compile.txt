@@ -1,0 +1,20 @@
+stubs/kotlinx/serialization/Stubs.kt:4:41: warning: extension is shadowed by a member: public final fun <T> encodeToString(serializer: KSerializer<T>, value: T): String
+fun <T> kotlinx.serialization.json.Json.encodeToString(serializer: KSerializer<T>, value: T): String = ""
+                                        ^
+stubs/kotlinx/serialization/Stubs.kt:4:56: warning: parameter 'serializer' is never used
+fun <T> kotlinx.serialization.json.Json.encodeToString(serializer: KSerializer<T>, value: T): String = ""
+                                                       ^
+stubs/kotlinx/serialization/Stubs.kt:4:84: warning: parameter 'value' is never used
+fun <T> kotlinx.serialization.json.Json.encodeToString(serializer: KSerializer<T>, value: T): String = ""
+                                                                                   ^
+stubs/kotlinx/serialization/json/Stubs.kt:28:28: warning: parameter 'text' is never used
+    fun parseToJsonElement(text: String): JsonElement = JsonNull
+                           ^
+stubs/kotlinx/serialization/json/Stubs.kt:29:28: warning: parameter 'serializer' is never used
+    fun <T> encodeToString(serializer: KSerializer<T>, value: T): String = ""
+                           ^
+stubs/kotlinx/serialization/json/Stubs.kt:29:56: warning: parameter 'value' is never used
+    fun <T> encodeToString(serializer: KSerializer<T>, value: T): String = ""
+                                                       ^
+
+API_SHAPE_COMPILE_PASS

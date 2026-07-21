@@ -1,0 +1,27 @@
+capsule_id: swrlz.discovery.contract
+capsule_version: 0.1.0
+contract_version: 1
+runtime_targets:
+  - kotlin-jvm
+required_services: []
+optional_services: []
+permissions: []
+components: []
+network_routes: []
+storage:
+  namespace: null
+  schema_version: null
+lifecycle:
+  initialize: stateless
+  invoke: supported
+  stop: stateless
+failure_policy: isolated
+truth_firewall_impact: none
+identity_authority: none
+trust_authority: none
+authorization_authority: none
+protocol:
+  discovery: 1
+schema:
+  base: 1
+  compatibility: higher-additive-only-with-valid-v1-fields

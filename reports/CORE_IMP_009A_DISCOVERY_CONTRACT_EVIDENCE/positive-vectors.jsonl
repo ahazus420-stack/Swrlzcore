@@ -1,0 +1,6 @@
+{"vectorId":"DISCOVERY_V1_SUCCESS_CANONICAL","expected":"Compatible","actual":"Compatible","warnings":[],"pass":true}
+{"vectorId":"DISCOVERY_V1_UNKNOWN_TOP_LEVEL_FIELD","expected":"Compatible","actual":"Compatible","warnings":["UNKNOWN_TOP_LEVEL_FIELDS_IGNORED"],"pass":true}
+{"vectorId":"DISCOVERY_V1_UNKNOWN_NESTED_TRUST_FIELD","expected":"Compatible","actual":"Compatible","warnings":["UNKNOWN_NESTED_FIELDS_IGNORED"],"pass":true}
+{"vectorId":"DISCOVERY_V1_SCHEMA_2_ADDITIVE","expected":"Compatible","actual":"Compatible","warnings":["HIGHER_ADDITIVE_SCHEMA_ACCEPTED","UNKNOWN_TOP_LEVEL_FIELDS_IGNORED"],"pass":true}
+{"vectorId":"DISCOVERY_V1_UNKNOWN_CAPABILITY","expected":"Compatible","actual":"Compatible","warnings":["UNKNOWN_CAPABILITIES_IGNORED_FOR_EXECUTION"],"pass":true}
+{"vectorId":"DISCOVERY_V1_DUPLICATE_CAPABILITY","expected":"Compatible","actual":"Compatible","warnings":["DUPLICATE_CAPABILITIES_NORMALIZED"],"pass":true}

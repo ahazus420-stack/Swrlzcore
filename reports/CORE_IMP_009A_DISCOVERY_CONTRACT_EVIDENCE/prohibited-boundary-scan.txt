@@ -1,0 +1,17 @@
+SWRLZ discovery contract prohibited-boundary scan
+Generated: 2026-07-21
+
+Android imports:
+NONE
+
+Network APIs/imports:
+NONE
+
+Persistence/storage APIs/imports:
+NONE
+
+Clock/random/identity generation:
+NONE
+
+Secrets/trust mutation/mission execution:
+NONE
