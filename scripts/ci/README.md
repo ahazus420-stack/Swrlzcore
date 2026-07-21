@@ -22,3 +22,9 @@ Static unit tests for normalization, version selection, checksum pairing, proven
 ## `build_swrlz_component.sh`
 
 Shared build dispatcher. It preserves CLIENT's project build script, standard Gradle builds for SERVER/CORE_BASE, wrapper regeneration for KEYBOARD_BASE/LAUNCHER_BASE, and CORE_REDUCE_003 reduction checks.
+
+The dispatcher normalizes the source, work, and artifact arguments to absolute paths before changing directories. APK download bundles are created in a temporary staging directory under `RUNNER_TEMP`, or the platform temporary directory when `RUNNER_TEMP` is unavailable, and are then moved into the component artifact directory.
+
+## `test_build_swrlz_component_packaging.sh`
+
+Focused synthetic regression test for the post-build packaging path. It invokes the real dispatcher with relative workflow-style paths, uses a fake Gradle wrapper to create a synthetic SERVER APK, and verifies APK copying, provenance, ZIP creation, checksums, absolute GitHub outputs, and the absence of nested artifact directories.
