@@ -26,7 +26,6 @@ on:
     paths:
       - "SOURCES/SERVER/SERVER_CFv*_SWRLZ.zip"
       - "SOURCES/SERVER/SERVER_CFv*_SWRLZ.sha256"
-      - "SOURCES/SERVER/SWRLZ_NODE_HOST_COMPLETE.zip"
       - ".github/workflows/build-swrlz-server-apk.yml"
 
 permissions:
@@ -77,9 +76,6 @@ jobs:
             SOURCE_ZIP="$REQUESTED"
           else
             SOURCE_ZIP="$(find "$SERVER_SOURCE_DIR" -maxdepth 1 -type f -name 'SERVER_CFv*_SWRLZ.zip' -print | sort -V | tail -n 1)"
-            if [[ -z "$SOURCE_ZIP" && -f "$SERVER_SOURCE_DIR/SWRLZ_NODE_HOST_COMPLETE.zip" ]]; then
-              SOURCE_ZIP="$SERVER_SOURCE_DIR/SWRLZ_NODE_HOST_COMPLETE.zip"
-            fi
           fi
 
           if [[ -z "${SOURCE_ZIP:-}" || ! -f "$SOURCE_ZIP" ]]; then
@@ -129,17 +125,6 @@ jobs:
               exit 1
             fi
             CHECKSUM_STATUS="verified"
-          elif [[ "$SOURCE_ZIP" == "$SERVER_SOURCE_DIR/SWRLZ_NODE_HOST_COMPLETE.zip" ]]; then
-            VERSIONED_ZIP="$(find "$SERVER_SOURCE_DIR" -maxdepth 1 -type f -name 'SERVER_CFv*_SWRLZ.zip' -print | sort -V | tail -n 1)"
-            VERSIONED_SHA_FILE="${VERSIONED_ZIP%.zip}.sha256"
-            if [[ -n "$VERSIONED_ZIP" && -f "$VERSIONED_SHA_FILE" ]] && cmp -s "$SOURCE_ZIP" "$VERSIONED_ZIP"; then
-              EXPECTED_SHA="$(awk 'NF {print $1; exit}' "$VERSIONED_SHA_FILE")"
-              if [[ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]]; then
-                echo "NODE_HOST duplicate does not match the versioned SERVER checksum." >&2
-                exit 1
-              fi
-              CHECKSUM_STATUS="verified-via-identical-versioned-archive"
-            fi
           fi
 
           echo "source_sha256=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
