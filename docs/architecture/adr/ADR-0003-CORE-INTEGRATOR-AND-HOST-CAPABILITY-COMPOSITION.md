@@ -1,12 +1,13 @@
 # ADR-0003: Project-Agnostic Portable Feature Capsules and Host-Service Composition
 
-- **Status:** Proposed for acceptance
+- **Status:** Accepted
 - **Date:** 2026-07-21
-- **Checkpoint:** CORE-ARCH-003 / CORE-ARCH-003A / CORE-ARCH-003B-LANGUAGE
+- **Checkpoint:** CORE-ARCH-003 / CORE-ARCH-003A / CORE-ARCH-003B-LANGUAGE / CORE-GATE-004B-CONSTITUTION-SKILL
 - **Constitutional basis:** Integrate; do not overwrite. Preserve offline-first behavior, Truth Firewall dissent, lineage, local-versus-remote distinctions, protocol-version discipline, and accurate relationship semantics.
 - **Related decisions:** ADR-0001 Shared Core Capabilities and Distinct Android App Shells; ADR-0002 Modular Capability and Entitlement Gates
 - **Normative contract:** `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
 - **Extraction guide:** `docs/architecture/PORTABLE_FEATURE_EXTRACTION_AND_EXISTING_APP_INTEGRATION_V1.md`
+- **Acceptance approval:** `Approve CORE-GATE-004B-CONSTITUTION-SKILL — Add the SWRLZ Constitution Guardian skill to the repository and accept the constitutionally aligned portable feature-capsule architecture without creating source modules, changing app code, triggering builds, or merging`
 
 ## Context
 
@@ -124,7 +125,7 @@ Rejected because it leaves two candidate canonical implementations.
 
 ## Implementation boundary
 
-This ADR documents architecture only. It does not authorize source extraction, module creation, shared-feature directories, Gradle changes, app changes, permissions, builds, workflow runs, merge, release, deployment, or installation.
+This ADR documents accepted architecture only. It does not authorize source extraction, module creation, shared-feature directories, Gradle changes, app changes, permissions, builds, workflow runs, merge, release, deployment, or installation.
 
 ## Verification expectations
 
