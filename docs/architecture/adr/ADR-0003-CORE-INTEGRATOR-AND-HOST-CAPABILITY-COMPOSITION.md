@@ -1,110 +1,131 @@
-# ADR-0003: Portable Feature Capsules and Host-Service Composition
+# ADR-0003: Project-Agnostic Portable Feature Capsules and Host-Service Composition
 
 - **Status:** Proposed for acceptance
 - **Date:** 2026-07-21
-- **Checkpoint:** CORE-ARCH-003A
-- **Constitutional basis:** Integrate; do not overwrite. Preserve offline-first behavior, Truth Firewall dissent, lineage, local-versus-remote distinctions, and protocol-version discipline.
+- **Checkpoint:** CORE-ARCH-003 / CORE-ARCH-003A / CORE-ARCH-003B-LANGUAGE
+- **Constitutional basis:** Integrate; do not overwrite. Preserve offline-first behavior, Truth Firewall dissent, lineage, local-versus-remote distinctions, protocol-version discipline, and accurate relationship semantics.
 - **Related decisions:** ADR-0001 Shared Core Capabilities and Distinct Android App Shells; ADR-0002 Modular Capability and Entitlement Gates
 - **Normative contract:** `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
+- **Extraction guide:** `docs/architecture/PORTABLE_FEATURE_EXTRACTION_AND_EXISTING_APP_INTEGRATION_V1.md`
 
 ## Context
 
-SWRLZ needs to move useful features between independently evolving projects without copying entire applications or requiring every future consumer to be predefined. A feature may originate in CLIENT, CORE_BASE, SERVER, Launcher, Keyboard, NODE_HOST, or a future project. Once extracted, its canonical reusable form must be portable and attachable to any compatible host.
+SWRLZ needs to move useful capabilities between mature projects such as CLIENT, SERVER, NODE_HOST, Core, Keyboard, Launcher, and future applications without requiring every host to be predefined and without cloning entire application source trees. Existing features also need a controlled path to become reusable modules while preserving the work, contracts, storage, trust boundaries, and behavior already established in their origin projects.
+
+Unrestricted runtime code loading remains outside the initial architecture because it introduces signing, class-loading, permission, lifecycle, supply-chain, and trust risks.
 
 ## Decision
 
-SWRLZ will use **portable feature capsules**: versioned reusable source packages that declare runtime targets, required and optional host services, permissions, storage, lifecycle, routing, compatibility, lineage, migrations, and evidence requirements.
+SWRLZ will use **project-agnostic portable feature capsules**. A capsule is a versioned reusable package that declares runtime targets, required and optional host services, lineage, lifecycle, storage, routing, permission, protocol, failure, and Truth Firewall requirements.
 
-Features declare requirements. Hosts declare provided services. Integration succeeds when those requirements are satisfied.
-
-A capsule MUST target runtime classes and service contracts rather than a closed list of named applications. Named SWRLZ projects are examples, not a registry of allowed consumers.
+Compatibility is determined by requirements and exposed services, not by a closed list of named applications.
 
 ```text
-feature capsule
-    + receiving-project adapter
-    + receiving-project integration manifest
-    = attached capability
+capsule declares requirements
+        +
+host exposes services
+        +
+receiving-project adapter
+        +
+integration manifest
+        =
+portable feature attached to a compatible project
 ```
 
-A neutral canonical lane is proposed:
+A capsule is not an APK, app identity, trust grant, enrollment, entitlement, or unrestricted authority grant.
 
-```text
-SOURCES/SHARED_FEATURES/<FEATURE>/
-├── source/
-├── packages/
-├── OLD_PATCHES/
-├── <FEATURE>_<VERSION>.zip
-├── <FEATURE>_<VERSION>.sha256
-├── docs/
-└── integrations/
-```
+## Existing-project workflows
 
-Creation of that lane is not authorized by this ADR.
+The architecture defines three first-class workflows:
+
+- **ATTACH** — add a canonical capsule to an established compatible project through a thin adapter and local integration manifest.
+- **EXTRACT** — separate portable behavior from an established project-local feature after dependency, authority, storage, lifecycle, route, and protocol audit.
+- **REINTEGRATE** — make the origin project reference and compose the accepted canonical capsule so extraction does not leave two drifting implementations.
+
+Mature applications do not need wholesale restructuring. They retain their package or service identity, signer lineage where applicable, workflows, protocols, storage ownership, lifecycle, and accepted contracts.
 
 ## Requirements
 
-1. A capsule MUST be project-agnostic and MUST NOT require the originating project to remain present.
-2. A capsule MUST declare `featureId`, semantic version, contract version, runtime targets, source lineage, checksum, required services, optional services, permissions/components, storage namespace, migration version, lifecycle, routing, failure policy, protocol compatibility, Truth Firewall impact, and audit impact.
-3. A host MUST provide a local integration manifest mapping capsule requirements to host-provided services.
-4. A capsule MUST NOT infer authority from package name, app identity, signing key, device identity, reflection, or source origin.
-5. Portable core logic MUST remain separate from runtime adapters and host-specific presentation.
-6. A feature extracted from an existing project MUST receive a canonical shared package; the originating project SHOULD then reintegrate that canonical implementation rather than retain a divergent copy.
-7. ZIP plus sibling SHA-256 is the initial portable distribution format. Repository module integration MAY be used when projects share a repository.
-8. Runtime-downloaded arbitrary executable code remains outside the initial architecture.
-9. Optional capsule failure MUST be isolated from unrelated host startup unless an accepted contract marks the capsule mandatory and fail-closed.
-10. Local, LAN, and remote routes MUST remain explicit; no silent remote fallback is allowed.
-11. Truth Firewall behavior MUST remain active and MUST NOT be weakened by composition, entitlement, or host selection.
-12. Storage MUST be namespaced and migration-controlled.
+1. Capsules MUST depend on stable service contracts rather than project-specific UI or lifecycle classes.
+2. Capsules MUST declare supported runtime classes and required services rather than a complete list of project names.
+3. Named apps MAY appear as examples, tested adapters, or evidence targets only.
+4. Every attachment MUST use an explicit receiving-project adapter and integration manifest.
+5. Packaging or attachment MUST NOT imply authorization.
+6. Host adapters MUST expose least authority.
+7. Optional capsule failure MUST be isolated from unrelated host startup.
+8. Capsules MUST preserve explicit local, LAN, and remote route distinctions and MUST NOT add silent remote fallback.
+9. Truth Firewall behavior MUST remain available and MUST NOT be weakened by composition, entitlement, or host integration.
+10. Capsule storage MUST be namespaced and migration-controlled.
+11. Protocol incompatibility MUST produce an explicit incompatible state.
+12. Extraction MUST preserve origin lineage, accepted behavior, rollback, and supersession evidence.
+13. Extraction MUST NOT create a second undocumented canonical implementation.
+14. The origin project MUST REINTEGRATE the accepted capsule or follow an explicitly temporary, bounded delegation path.
+15. Runtime-downloaded arbitrary executable code remains outside the initial architecture.
 
-## Feature structure
+## Relationship semantics
 
-A capsule SHOULD separate:
+Architecture must use the most accurate relationship verb:
 
-- portable domain logic, models, state machines, validation, serialization, migrations, and tests;
-- runtime adapters such as Android Keystore, JVM filesystem, WorkManager, server scheduling, notifications, and logging;
-- optional host presentation such as Compose screens, launcher tiles, keyboard warnings, CLIENT diagnostics, or server admin surfaces.
+- projects **attach**, **import**, **reference**, or **compose** capsules;
+- hosts **expose** services and **host** lifecycle;
+- adapters **translate** services;
+- registries **register** availability;
+- runtimes **invoke** behavior;
+- origin projects **reintegrate** accepted capsules;
+- packages **preserve** lineage.
 
-## Extraction and reintegration
+`Consume` is reserved for genuinely depleting or irreversible operations. Reusable software composition does not deplete the referenced module.
 
-```text
-project-local implementation
-    → bounded extraction checkpoint
-    → canonical SHARED_FEATURES package + SHA
-    → receiving-project adapter and manifest
-    → originating project reintegrates canonical package
-```
+## Migration strategies
 
-The extracted canonical package becomes the source of truth. Independent copied descendants are not accepted as the normal maintenance model.
+- **Clean extraction** for already modular features.
+- **Strangler extraction** for mature CLIENT and SERVER features that must move gradually.
+- **Wrapper-first transition** when immediate movement is too risky and a stable interface must precede extraction.
+
+Strangler and wrapper-first states are transitional and must remain checkpoint-bound and documented.
 
 ## Consequences
 
 ### Positive
 
-- features can move between current and future projects without predeclaring consumers;
-- one canonical implementation can serve Android and JVM hosts through adapters;
-- fixes, migrations, and trust requirements propagate through versioned packages;
-- receiving projects retain their own identity, lifecycle, permissions, and authority;
-- offline ZIP/SHA transfer remains supported.
+- useful features can originate in any project;
+- established applications retain prior work and accepted boundaries;
+- one canonical implementation can attach to multiple compatible projects;
+- fixes and trust requirements propagate through versioned packages;
+- app and service identities remain distinct;
+- extraction and reintegration prevent implementation drift;
+- portable ZIP/SHA packages support separate repositories and offline workflows.
 
 ### Costs and risks
 
-- service contracts and compatibility validation require discipline;
-- runtime adapters and receiving-project manifests require maintenance;
-- extraction from legacy project-local code may require refactoring;
-- careless adapters could expose excessive host authority;
-- canonicalization and reintegration must be documented to prevent drift.
+- stable service contracts and compatibility discipline are required;
+- mature-feature extraction requires dependency and authority audits;
+- adapters and integration manifests require maintenance;
+- storage migration and behavioral-equivalence evidence can be substantial;
+- transitional wrapper states must not become permanent duplicate implementations.
 
 ## Rejected alternatives
 
-- **Whole-project cloning:** rejected because fixes and trust behavior drift.
-- **Closed host registry:** rejected because future projects should not require edits to the feature package merely to become consumers.
-- **One unrestricted profile per named app:** rejected because requirements should be capability-based.
-- **Runtime-downloaded executable plugins:** rejected initially because of signing, loading, permission, supply-chain, lifecycle, and policy complexity.
+### Full source-tree cloning
+
+Rejected because fixes, contracts, lineage, and trust behavior drift.
+
+### Closed host-name registry
+
+Rejected because future compatible projects should not require capsule modification merely to add their names.
+
+### Runtime-downloaded executable plugins
+
+Rejected for the initial architecture due to signing, code-loading, permission, supply-chain, lifecycle, and policy complexity.
+
+### Extraction without origin reintegration
+
+Rejected because it leaves two candidate canonical implementations.
 
 ## Implementation boundary
 
-This ADR documents architecture only. It does not authorize `SOURCES/SHARED_FEATURES/`, source extraction, Gradle changes, app-lane changes, permissions, builds, workflows, releases, deployment, installation, or merge.
+This ADR documents architecture only. It does not authorize source extraction, module creation, shared-feature directories, Gradle changes, app changes, permissions, builds, workflow runs, merge, release, deployment, or installation.
 
 ## Verification expectations
 
-Future evidence should demonstrate portable ZIP/SHA packaging, project-agnostic descriptors, receiving-project manifests, service compatibility validation, adapter least authority, source-lineage traceability, originating-project reintegration, failure isolation, migration tests, offline behavior, Truth Firewall preservation, and no silent authority expansion.
+Future evidence should demonstrate descriptors, integration and extraction manifests, service mappings, dependency direction, protocol compatibility, storage isolation, migration recovery, failure isolation, Truth Firewall preservation, behavioral equivalence, terminology compliance, source ZIP/checksum lineage, and independent build/on-device evidence for each attached host.
