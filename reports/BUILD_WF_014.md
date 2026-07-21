@@ -2,7 +2,7 @@
 
 ## Status
 
-Staged on checkpoint branch only. No workflow dispatch, APK build, merge, release, publication, deployment, or installation is authorized or performed by this checkpoint.
+Staged on checkpoint branch only. No manual workflow dispatch, local APK build, merge, release, publication, deployment, or installation was performed by this checkpoint.
 
 ## Base
 
@@ -80,6 +80,12 @@ OK
 
 YAML parsing and Bash syntax validation also passed locally. These are static authoring checks, not GitHub Actions execution and not an APK build.
 
+## Workflow-execution evidence boundary
+
+No workflow was manually dispatched and no APK was built in the local checkpoint-authoring environment.
+
+An early checkpoint commit changed `BUILD_REQUESTS/000_CURRENT.request` before every legacy path-triggered workflow had been removed from the checkpoint branch. A combined-status query for that request-change commit returned no statuses. However, the available connector cannot conclusively enumerate push-triggered GitHub Actions runs for the branch. Therefore this report does not claim that zero automatic runs occurred. The Actions UI should be checked for branch `checkpoint/build-wf-014` before any refreshed staging or promotion decision.
+
 ## Concurrent main advancement
 
 While BUILD-WF-014 was being staged, `main` advanced from the recorded base to `961e92907acb6a3158f6da982902f07acbfba019` through SERVER-LINEAGE-FIX-014. That separate work canonicalized SERVER v1.0.4 and archived v1.0.3 without modifying workflows.
@@ -88,9 +94,8 @@ The checkpoint branch is intentionally not merged or rebased because BUILD-WF-01
 
 ## Explicitly not performed
 
-- No workflow dispatch.
-- No GitHub Actions run triggered from the checkpoint branch; the router push trigger is restricted to `main`.
-- No APK compilation or packaging.
+- No manual workflow dispatch.
+- No local APK compilation or packaging.
 - No source ZIP content change.
 - No canonical source/checksum rename or movement.
 - No application ID, package, version, signer, protocol, identity, runtime, trust, or update-policy change.
