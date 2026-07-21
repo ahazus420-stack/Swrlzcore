@@ -1,6 +1,6 @@
 ---
 name: swrlz-core-base-canonical-build-engineer
-description: Governs canonical SWRLZ CORE_BASE builds, portable feature capsules, checksum lineage, repository documentation, evidence, and handoffs.
+description: Governs canonical SWRLZ CORE_BASE lineage, portable feature capsules, constitutional relationship semantics, checksum-gated builds, documentation, evidence, and handoffs.
 ---
 
 # SWRLZ CORE_BASE Canonical Build Engineer
@@ -9,157 +9,141 @@ Manual invocation: `$swrlz-core-base-canonical-build-engineer`
 
 ## Mission
 
-Operate canonical CORE_BASE source and builds while governing project-agnostic portable feature capsules that can originate in any SWRLZ project and attach to any compatible current or future host through narrow service adapters.
+Operate canonical CORE_BASE work and portable feature-capsule architecture while preserving the SWRLZ Constitution, identity, trust, Truth Firewall dissent, offline-first behavior, lineage, local-versus-remote distinctions, protocol discipline, documentation, and evidence.
 
-## Scope
+## Required reading order
 
-In scope:
-
-- `SOURCES/CORE_BASE/`;
-- CORE_BASE build requests and workflows;
-- architecture, lineage, evidence, and handoffs;
-- portable feature-capsule ADRs, contracts, package rules, adapters, manifests, and documentation;
-- future `SOURCES/SHARED_FEATURES/` planning when explicitly authorized.
-
-Out of scope unless separately approved: CLIENT, SERVER, NODE_HOST, Keyboard, Launcher or other app implementation; shared-feature directories; source extraction; Gradle changes; builds; release; deployment; installation; merge; signing changes.
+1. `docs/governance/SWRLZ_CONSTITUTION.md`
+2. relevant accepted contracts and ADRs;
+3. `docs/architecture/SWRLZ_PLATFORM_MAP_V1.md`;
+4. `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`;
+5. `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`;
+6. `docs/architecture/CORE_INTEGRATOR_ARCHITECTURE_V1.md`;
+7. `docs/architecture/PORTABLE_FEATURE_EXTRACTION_AND_EXISTING_APP_INTEGRATION_V1.md`;
+8. current build request, workflow, source lineage, reports, and handoff.
 
 ## Modes
 
-- **REVIEW** — inspect repository, lineage, documentation, requests, workflows, archives, checksums, and feature origins.
-- **PACKAGE** — create approved immutable ZIP/SHA packages.
-- **ARCHITECT** — define project-agnostic feature contracts and service boundaries without implementing them.
-- **EXTRACT** — separate portable logic from an originating project only when explicitly authorized.
-- **INTEGRATE** — attach an accepted capsule to a receiving project through a bounded adapter and manifest only when explicitly authorized.
-- **VERIFY** — inspect compatibility, builds, logs, checksums, runtime evidence, and provenance.
-- **DOCUMENT** — update all durable documentation for every repository change.
-- **HANDOFF** — produce continuation instructions that do not depend on verbal reconstruction.
+- **REVIEW:** inspect facts, contracts, lineage, source, requests, workflows, and evidence.
+- **ARCHITECT:** document bounded decisions without silently implementing them.
+- **ATTACH:** plan or perform an explicitly authorized attachment of a canonical capsule to an established compatible project.
+- **EXTRACT:** plan or perform an explicitly authorized separation of portable behavior from a project-local feature.
+- **REINTEGRATE:** plan or perform an explicitly authorized migration of the origin project to the canonical extracted capsule.
+- **PACKAGE:** create an approved immutable source ZIP and sibling SHA-256.
+- **IMPLEMENT:** modify only explicitly approved bounded source paths.
+- **VERIFY:** inspect builds, logs, artifacts, checksums, provenance, and device evidence.
+- **DOCUMENT:** update every required durable documentation location.
+- **HANDOFF:** preserve continuation state and exact approval boundaries.
 
-## Mandatory process
+## Constitutional relationship-language gate
 
-1. Read the current build and architecture handoffs.
-2. Read the governing ADRs and contracts before proposing implementation.
-3. Improve accepted systems rather than create duplicate mechanisms.
-4. Preserve canonical source, checksums, lineage, offline-first behavior, Truth Firewall behavior, local-versus-remote distinctions, and protocol discipline.
-5. Never claim build, installation, launch, extraction, canonicalization, or integration without evidence.
-6. Integrate; do not overwrite unrelated lanes or authoritative history.
+Use the most accurate relationship verb available.
 
-## Portable feature-capsule governance
+Preferred verbs:
 
-Before proposing a reusable feature, read:
+- **inherits** for receiving lineage, rules, or a base model;
+- **composes** for assembling reusable behavior without depletion;
+- **attaches** or **imports** for adding a portable capsule to a project;
+- **hosts** for providing lifecycle or execution environment;
+- **exposes** for making a service or contract available;
+- **requires** for declaring prerequisites;
+- **references** or **links** for artifacts, identities, contracts, and lineage;
+- **registers** for recording participation or availability;
+- **invokes** for initiating behavior;
+- **delegates to** for bounded authority transfer;
+- **authenticates** for identity verification;
+- **authorizes** for policy permission;
+- **extracts** for separating portable behavior from host-owned code;
+- **reintegrates** for making the origin project use the canonical capsule;
+- **preserves** for maintaining identity, lineage, evidence, or invariants.
 
-1. `docs/architecture/adr/ADR-0001-SHARED-CORE-AND-DISTINCT-APP-SHELLS.md`;
-2. `docs/architecture/adr/ADR-0002-CAPABILITY-AND-ENTITLEMENT-GATES.md`;
-3. `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`;
-4. `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`;
-5. `docs/architecture/CORE_INTEGRATOR_ARCHITECTURE_V1.md`.
+Use `consume` only when an operation genuinely advances, exhausts, depletes, spends, removes, or irreversibly transforms a resource. Do not describe reusable software composition as consumption.
 
-Apply these rules:
+Before every documentation or code stop, scan changed language for inaccurate relationship verbs.
 
-- Features declare requirements; hosts declare provided services.
-- Capsules target runtime classes and host-service contracts, not a closed list of named applications.
-- CORE_BASE, CLIENT, SERVER, NODE_HOST, Keyboard, Launcher, and future projects are examples, not required descriptor entries.
-- A capsule may originate in any project.
-- Once extracted and accepted, its canonical reusable implementation should live in an authorized neutral shared-feature lane rather than remain owned by the originating app.
-- The originating project should reintegrate the canonical capsule to prevent source drift.
-- ZIP plus sibling SHA-256 is the initial cross-repository transport format.
-- Same-repository projects may use direct module integration.
-- Every receiving project supplies its own narrow adapter and integration manifest.
-- Portable core logic, runtime adapters, and optional host presentation must remain separate.
-- Package inclusion never grants trust, entitlement, enrollment, permissions, or execution authority.
-- Required permissions and platform components must be declared and reviewed.
-- Missing host services must produce explicit incompatibility reasons.
-- Optional feature failure must not crash unrelated host startup.
-- No silent storage sharing, authority escalation, permission addition, or local-to-remote fallback.
-- Runtime-downloaded arbitrary executable plugins remain outside the initial model.
+## Portable feature-capsule rules
 
-## Capsule descriptor requirements
+- Capsules target runtime classes and required host services, not a closed list of project names.
+- Named SWRLZ projects are examples or verified adapters, not the complete compatibility boundary.
+- Features declare requirements; hosts expose services; adapters translate services; projects attach or compose capsules; runtimes invoke behavior.
+- A host adapter exposes least authority.
+- Attachment, packaging, registration, common signing, or shared identity never grants unrelated authority.
+- Same-repository module references and checksum-verified ZIP/SHA packages are both valid when documented.
+- Runtime-downloaded arbitrary executable code remains out of scope unless a future accepted contract authorizes it.
+- No silent permissions, components, storage sharing, authority expansion, or local-to-remote fallback.
+- Optional capsule failure must not crash unrelated host startup.
 
-A capsule descriptor must record, where applicable:
+## ATTACH workflow
 
-- feature ID and semantic version;
-- contract version;
-- source lineage, ZIP name, and SHA-256;
-- runtime targets;
-- required and optional host services;
-- permissions and platform components;
-- storage namespace and migration version;
-- lifecycle and restart behavior;
-- local, LAN, and remote behavior;
-- protocol compatibility;
-- failure policy;
-- Truth Firewall and audit impact;
-- portable-core, runtime-adapter, and optional-UI components.
+1. Verify canonical ZIP integrity and SHA-256.
+2. Inspect descriptor, runtime targets, service requirements, lineage, and compatibility.
+3. Preserve the existing project's identity, signer lineage, protocols, lifecycle, workflows, and storage ownership.
+4. Create a thin receiving-project adapter.
+5. Create an integration manifest.
+6. Document permissions, components, routes, storage, lifecycle, rollback, and exclusions.
+7. Build and verify only under separate explicit authorization.
 
-It must not require edits whenever an unanticipated compatible project becomes a consumer.
+## EXTRACT workflow
 
-## Extraction gate
+1. Record origin project, checkpoint, commit, paths, contracts, and accepted behavior.
+2. Audit dependencies, identity, trust, authority, storage, lifecycle, UI, protocols, and routes.
+3. Separate portable logic from host-owned implementation.
+4. Define required and optional host-service contracts.
+5. Preserve source lineage, migrations, and rollback.
+6. Package the canonical feature only under separate implementation authorization.
+7. Proceed to REINTEGRATE before claiming extraction complete.
 
-Before extracting a feature from an existing project:
+## REINTEGRATE workflow
 
-1. identify the originating repository path and commit;
-2. classify portable logic, runtime adapters, and project-specific presentation;
-3. define the capsule descriptor and migration boundary;
-4. define canonical ZIP/SHA names and destination;
-5. define reintegration into the originating project;
-6. define rollback and retirement lineage;
-7. obtain explicit source-modification authorization.
+- Make the origin project reference and compose the accepted canonical capsule through an origin adapter.
+- Preserve host-specific UI and lifecycle bridges where appropriate.
+- Verify behavioral equivalence or document and approve intentional differences.
+- Do not leave two undocumented canonical implementations active.
+- Retire superseded source through explicit lineage rather than deletion.
 
-An extraction is incomplete until the originating project no longer maintains an undocumented divergent implementation.
+## Migration strategies
 
-## Receiving-project integration gate
+- **Clean extraction** when boundaries are already modular.
+- **Strangler extraction** for mature CLIENT or SERVER features that must move gradually.
+- **Wrapper-first transition** when a stable interface must precede movement.
 
-Before attaching a capsule:
-
-1. verify ZIP integrity and SHA-256 or exact module lineage;
-2. validate runtime and contract compatibility;
-3. map required host services;
-4. declare optional services and enabled components;
-5. review permissions and platform components;
-6. assign storage namespace and migration plan;
-7. preserve route distinctions and policy gates;
-8. create the receiving-project integration manifest;
-9. produce build and runtime evidence;
-10. document the integration and rollback path.
+Transitional states must remain bounded, visible, documented, and recoverable.
 
 ## Documentation gate
 
-Every file, directory, archive, checksum, workflow, request, skill, script, contract, generated artifact, adapter, integration manifest, migration, or materially changed path MUST be documented before completion.
+Every file, directory, archive, checksum, workflow, request, skill, script, contract, manifest, migration, generated artifact, or materially changed path must be documented before checkpoint completion.
 
-Documentation must record:
+Record, where applicable:
 
-- checkpoint, purpose, scope, exclusions, and approvals;
-- exact repository paths;
-- source origin and canonical lineage;
-- ZIP/SHA identity;
-- feature descriptor and host-service requirements;
-- receiving-project adapter and integration manifest;
-- permissions, components, storage, migrations, and routes;
+- checkpoint, purpose, scope, and exclusions;
+- exact paths;
+- canonical source, ZIP, and SHA-256;
+- origin and receiving-project lineage;
+- extraction and integration manifests;
+- adapters and mapped services;
+- package, app, installation, surface, or service identity;
+- permissions, components, storage, lifecycle, routes, and protocols;
+- Truth Firewall and authority impact;
+- migration, behavioral-equivalence, build, device, and rollback evidence;
 - verified and unverified claims;
-- evidence and recovery locations;
-- handoff impact and cross-links.
+- handoff impact and exact next approval phrase.
 
-## Documentation placement
+## Core build discipline
 
-- `docs/architecture/` — structural guides;
-- `docs/architecture/adr/` — durable decisions;
-- `docs/contracts/` — normative contracts;
-- `docs/build/` — package, checksum, workflow, and artifact procedures;
-- `docs/handoffs/` — continuation state;
-- `reports/` — implementation and verification evidence;
-- `SOURCES/CORE_BASE/OLD_PATCHES/` — CORE_BASE retirement lineage;
-- future authorized `SOURCES/SHARED_FEATURES/<FEATURE>/OLD_PATCHES/` — feature retirement lineage;
-- `skills/` — reusable operating procedures.
-
-## Completion criteria
-
-A checkpoint is not complete unless implementation or architecture deliverables, checksums where applicable, lineage, compatibility evidence, documentation, current handoff instructions, and skill guidance are present and no claim exceeds the evidence.
+- Integrate; do not overwrite.
+- Work one bounded checkpoint at a time.
+- Keep active canonical archives and sibling checksums in accepted locations.
+- Verify `unzip -tq` and SHA-256 before extraction.
+- Build only in isolated workspaces.
+- Require deterministic artifact naming, checksums, logs, tool versions, invariants, and provenance.
+- Never claim build, install, launch, release, deployment, extraction, attachment, or reintegration without evidence.
 
 ## Stop contract
 
 Before every stop, state:
 
 - what approval is waiting;
-- what it authorizes;
-- what it does not authorize;
+- what it would authorize;
+- what it would not authorize;
 - the expected result;
 - the exact approval phrase.
