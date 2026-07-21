@@ -1,102 +1,110 @@
-# ADR-0003: CORE Integrator and Host-Capability Composition
+# ADR-0003: Portable Feature Capsules and Host-Service Composition
 
 - **Status:** Proposed for acceptance
 - **Date:** 2026-07-21
-- **Checkpoint:** CORE-ARCH-003
+- **Checkpoint:** CORE-ARCH-003A
 - **Constitutional basis:** Integrate; do not overwrite. Preserve offline-first behavior, Truth Firewall dissent, lineage, local-versus-remote distinctions, and protocol-version discipline.
 - **Related decisions:** ADR-0001 Shared Core Capabilities and Distinct Android App Shells; ADR-0002 Modular Capability and Entitlement Gates
 - **Normative contract:** `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
 
 ## Context
 
-SWRLZ needs to implement shared capabilities such as Phoenix Firewall once and compose them safely into Core, Keyboard, Launcher, CLIENT, NODE_HOST, and future app shells. Copying an entire application source tree into each descendant would create drift, identity confusion, and repeated security fixes. Unrestricted runtime plugin loading would introduce code-signing, class-loading, permission, lifecycle, and trust risks.
+SWRLZ needs to move useful features between independently evolving projects without copying entire applications or requiring every future consumer to be predefined. A feature may originate in CLIENT, CORE_BASE, SERVER, Launcher, Keyboard, NODE_HOST, or a future project. Once extracted, its canonical reusable form must be portable and attachable to any compatible host.
 
 ## Decision
 
-SWRLZ will use **compile-time integrators**: versioned reusable capability modules that implement a stable integrator contract and are assembled into distinct app shells through explicit host composition manifests.
+SWRLZ will use **portable feature capsules**: versioned reusable source packages that declare runtime targets, required and optional host services, permissions, storage, lifecycle, routing, compatibility, lineage, migrations, and evidence requirements.
 
-An integrator is not an APK, Android application identity, or authority grant. It is a reusable implementation module whose execution remains subject to host capability declarations, build-time packaging, runtime policy, entitlement, configuration, availability, trust, protocol compatibility, and Truth Firewall evaluation.
+Features declare requirements. Hosts declare provided services. Integration succeeds when those requirements are satisfied.
 
-Conceptual structure:
+A capsule MUST target runtime classes and service contracts rather than a closed list of named applications. Named SWRLZ projects are examples, not a registry of allowed consumers.
 
 ```text
-integrator-api
-    ↑
-integrator-runtime
-    ↑
-integrator-phoenix-firewall
-    ↑
-explicit host adapters and composition manifests
-    ├── Core
-    ├── Keyboard
-    ├── Launcher
-    ├── CLIENT
-    └── NODE_HOST
+feature capsule
+    + receiving-project adapter
+    + receiving-project integration manifest
+    = attached capability
 ```
+
+A neutral canonical lane is proposed:
+
+```text
+SOURCES/SHARED_FEATURES/<FEATURE>/
+├── source/
+├── packages/
+├── OLD_PATCHES/
+├── <FEATURE>_<VERSION>.zip
+├── <FEATURE>_<VERSION>.sha256
+├── docs/
+└── integrations/
+```
+
+Creation of that lane is not authorized by this ADR.
 
 ## Requirements
 
-1. Integrators MUST depend on stable platform interfaces, not app-shell UI or role-specific lifecycle classes.
-2. Each app shell MUST declare packaged integrators explicitly.
-3. Each integrator MUST declare identity, semantic version, contract version, supported host types, required capabilities, permissions, storage scope, network behavior, lifecycle needs, failure mode, lineage, and migration requirements.
-4. Package inclusion MUST NOT imply authorization.
-5. Host adapters MUST expose only the minimum capabilities needed by the integrator.
-6. Keyboard and Launcher MUST use restricted host profiles and MUST NOT inherit unrestricted Core authority.
-7. Integrator failure MUST be isolated so one capability cannot prevent unrelated host startup unless an accepted contract marks it as mandatory and fail-closed.
-8. Integrators MUST preserve explicit local, LAN, and remote route distinctions and MUST NOT add silent remote fallback.
-9. Truth Firewall behavior MUST remain available across all executable host surfaces and MUST NOT be weakened by entitlement or host composition.
-10. Integrator storage MUST be namespaced and migration-controlled.
-11. Integrator protocol incompatibility MUST produce an explicit unavailable or incompatible state, not undefined behavior.
-12. Dynamic third-party code loading is outside the initial architecture.
+1. A capsule MUST be project-agnostic and MUST NOT require the originating project to remain present.
+2. A capsule MUST declare `featureId`, semantic version, contract version, runtime targets, source lineage, checksum, required services, optional services, permissions/components, storage namespace, migration version, lifecycle, routing, failure policy, protocol compatibility, Truth Firewall impact, and audit impact.
+3. A host MUST provide a local integration manifest mapping capsule requirements to host-provided services.
+4. A capsule MUST NOT infer authority from package name, app identity, signing key, device identity, reflection, or source origin.
+5. Portable core logic MUST remain separate from runtime adapters and host-specific presentation.
+6. A feature extracted from an existing project MUST receive a canonical shared package; the originating project SHOULD then reintegrate that canonical implementation rather than retain a divergent copy.
+7. ZIP plus sibling SHA-256 is the initial portable distribution format. Repository module integration MAY be used when projects share a repository.
+8. Runtime-downloaded arbitrary executable code remains outside the initial architecture.
+9. Optional capsule failure MUST be isolated from unrelated host startup unless an accepted contract marks the capsule mandatory and fail-closed.
+10. Local, LAN, and remote routes MUST remain explicit; no silent remote fallback is allowed.
+11. Truth Firewall behavior MUST remain active and MUST NOT be weakened by composition, entitlement, or host selection.
+12. Storage MUST be namespaced and migration-controlled.
 
-## Phoenix Firewall first-profile model
+## Feature structure
 
-Phoenix Firewall is the first proposed integrator and SHOULD define host profiles rather than one unrestricted mode:
+A capsule SHOULD separate:
 
-- `CORE_FULL`
-- `KEYBOARD_RESTRICTED`
-- `LAUNCHER_RESTRICTED`
-- `CLIENT_SCOPED`
-- `NODE_HOST_SCOPED`
+- portable domain logic, models, state machines, validation, serialization, migrations, and tests;
+- runtime adapters such as Android Keystore, JVM filesystem, WorkManager, server scheduling, notifications, and logging;
+- optional host presentation such as Compose screens, launcher tiles, keyboard warnings, CLIENT diagnostics, or server admin surfaces.
 
-Profiles select approved surfaces and policy behavior; they do not fork the firewall engine.
+## Extraction and reintegration
+
+```text
+project-local implementation
+    → bounded extraction checkpoint
+    → canonical SHARED_FEATURES package + SHA
+    → receiving-project adapter and manifest
+    → originating project reintegrates canonical package
+```
+
+The extracted canonical package becomes the source of truth. Independent copied descendants are not accepted as the normal maintenance model.
 
 ## Consequences
 
 ### Positive
 
-- one implementation can serve multiple shells;
-- fixes and trust requirements propagate through versioned modules;
-- app identities and Android roles remain distinct;
-- host-specific least-authority behavior is explicit;
-- composition can be evidenced and tested per shell.
+- features can move between current and future projects without predeclaring consumers;
+- one canonical implementation can serve Android and JVM hosts through adapters;
+- fixes, migrations, and trust requirements propagate through versioned packages;
+- receiving projects retain their own identity, lifecycle, permissions, and authority;
+- offline ZIP/SHA transfer remains supported.
 
 ### Costs and risks
 
-- stable APIs and compatibility discipline are required;
-- Gradle dependency boundaries become more deliberate;
-- composition manifests and host adapters require maintenance;
-- profile design must avoid accidental capability escalation;
-- migration and storage ownership must be defined before implementation.
+- service contracts and compatibility validation require discipline;
+- runtime adapters and receiving-project manifests require maintenance;
+- extraction from legacy project-local code may require refactoring;
+- careless adapters could expose excessive host authority;
+- canonicalization and reintegration must be documented to prevent drift.
 
 ## Rejected alternatives
 
-### Full source-tree cloning
-
-Rejected because fixes, contracts, and trust behavior would drift.
-
-### Runtime-downloaded executable plugins
-
-Rejected for the initial architecture because they add signing, code-loading, permission, supply-chain, lifecycle, and policy complexity.
-
-### One unrestricted integrator configuration for every host
-
-Rejected because Keyboard, Launcher, CLIENT, NODE_HOST, and Core have different Android roles and trust boundaries.
+- **Whole-project cloning:** rejected because fixes and trust behavior drift.
+- **Closed host registry:** rejected because future projects should not require edits to the feature package merely to become consumers.
+- **One unrestricted profile per named app:** rejected because requirements should be capability-based.
+- **Runtime-downloaded executable plugins:** rejected initially because of signing, loading, permission, supply-chain, lifecycle, and policy complexity.
 
 ## Implementation boundary
 
-This ADR documents architecture only. It does not authorize source modules, Gradle changes, app-lane changes, permissions, builds, workflow runs, release, deployment, installation, or merge.
+This ADR documents architecture only. It does not authorize `SOURCES/SHARED_FEATURES/`, source extraction, Gradle changes, app-lane changes, permissions, builds, workflows, releases, deployment, installation, or merge.
 
 ## Verification expectations
 
-Future implementation evidence should demonstrate explicit composition manifests, dependency direction, host-profile restrictions, protocol compatibility, storage isolation, failure isolation, Truth Firewall preservation, per-shell build evidence, and no silent authority expansion.
+Future evidence should demonstrate portable ZIP/SHA packaging, project-agnostic descriptors, receiving-project manifests, service compatibility validation, adapter least authority, source-lineage traceability, originating-project reintegration, failure isolation, migration tests, offline behavior, Truth Firewall preservation, and no silent authority expansion.
