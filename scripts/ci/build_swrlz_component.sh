@@ -31,6 +31,10 @@ case "$VARIANT" in
   *) echo "Unsupported build variant: $VARIANT" >&2; exit 64 ;;
 esac
 
+SOURCE_ZIP="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$SOURCE_ZIP")"
+WORK_DIR="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$WORK_DIR")"
+ARTIFACT_DIR="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$ARTIFACT_DIR")"
+
 [[ -f "$SOURCE_ZIP" ]] || { echo "Source ZIP not found: $SOURCE_ZIP" >&2; exit 66; }
 
 rm -rf "$WORK_DIR" "$ARTIFACT_DIR"
@@ -171,13 +175,22 @@ PROVENANCE="$ARTIFACT_DIR/BUILD_PROVENANCE_REPORT.md"
 sha256sum "$PROVENANCE" > "$PROVENANCE.sha256"
 
 BUNDLE_NAME="${CANONICAL_STEM}_${VARIANT^^}_APK_DOWNLOAD.zip"
-BUNDLE_TEMP="$(dirname "$ARTIFACT_DIR")/$BUNDLE_NAME"
-rm -f "$BUNDLE_TEMP"
+TEMP_ROOT="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+TEMP_ROOT="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$TEMP_ROOT")"
+mkdir -p "$TEMP_ROOT"
+BUNDLE_STAGE_DIR="$(mktemp -d "$TEMP_ROOT/swrlz-apk-bundle.XXXXXX")"
+cleanup_bundle_stage() {
+  rm -rf "$BUNDLE_STAGE_DIR"
+}
+trap cleanup_bundle_stage EXIT
+BUNDLE_TEMP="$BUNDLE_STAGE_DIR/$BUNDLE_NAME"
 (
   cd "$ARTIFACT_DIR"
   zip -qr "$BUNDLE_TEMP" .
 )
 mv "$BUNDLE_TEMP" "$ARTIFACT_DIR/$BUNDLE_NAME"
+cleanup_bundle_stage
+trap - EXIT
 sha256sum "$ARTIFACT_DIR/$BUNDLE_NAME" > "$ARTIFACT_DIR/$BUNDLE_NAME.sha256"
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
