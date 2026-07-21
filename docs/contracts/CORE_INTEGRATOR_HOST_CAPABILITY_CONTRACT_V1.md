@@ -1,137 +1,156 @@
-# CORE Integrator Host-Capability Contract v1
+# Portable Feature Capsule and Host-Service Contract v1
 
 - **Status:** Proposed
 - **Version:** 1
-- **Checkpoint:** CORE-ARCH-003
+- **Checkpoint:** CORE-ARCH-003A
 - **Related ADR:** `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`
 
 ## 1. Purpose
 
-This contract defines how reusable SWRLZ capability modules are packaged into distinct Android app shells without copying whole applications, merging identities, or inheriting unrestricted authority.
+This contract defines how reusable SWRLZ features are packaged, transferred, and attached to compatible projects without copying whole applications, predefining every consumer, merging identities, or inheriting unrestricted authority.
 
 ## 2. Definitions
 
-- **Integrator:** a reusable compile-time capability module implementing this contract.
-- **Host:** an installable SWRLZ app shell such as Core, Keyboard, Launcher, CLIENT, or NODE_HOST.
-- **Host adapter:** the narrow bridge exposing host services to an integrator.
-- **Composition manifest:** the authoritative build-time declaration of integrators packaged by one host.
-- **Host profile:** a named, restricted integrator configuration approved for one host role.
+- **Feature capsule:** a portable versioned source package implementing this contract.
+- **Host:** any compatible current or future project that attaches a capsule.
+- **Host service:** a narrow capability supplied by a host, such as secure storage, audit, scheduling, networking, notifications, or policy evaluation.
+- **Host adapter:** the receiving-project bridge that implements required host-service contracts.
+- **Integration manifest:** the receiving-project declaration that selects a capsule version, maps required services, and enables optional components.
+- **Runtime adapter:** capsule code specific to Android, JVM, server, or another accepted runtime.
 
-## 3. Required integrator descriptor
+## 3. Required capsule descriptor
 
-Every integrator MUST declare:
+Every capsule MUST declare:
 
-- `integratorId`;
-- semantic `integratorVersion`;
+- `featureId`;
+- semantic `featureVersion`;
 - `contractVersion`;
-- source lineage and checksum identity;
-- supported host types;
-- required host capabilities;
-- optional host capabilities;
-- required Android permissions and components;
+- source lineage and archive checksum identity;
+- supported runtime targets;
+- required host services;
+- optional host services;
+- required permissions and platform components;
 - storage namespace and migration version;
-- local, LAN, and remote network behavior;
+- local, LAN, and remote behavior;
 - lifecycle requirements;
 - failure policy;
 - protocol/schema compatibility range;
 - Truth Firewall and audit impact;
-- supported host profiles.
+- portable-core, runtime-adapter, and optional-UI components.
 
-## 4. Host capability declaration
+The descriptor MUST NOT require a closed list of named SWRLZ applications.
 
-A host MUST expose an explicit capability set. Capabilities MAY include foreground service support, background work, VPN service, accessibility integration, IME context, HOME role, overlay UI, secure storage, IPC, local networking, LAN networking, remote networking, notifications, and diagnostics.
+## 4. Host-service declaration
 
-Absence of a capability MUST produce an explicit unsupported or unavailable result. Integrators MUST NOT infer availability from Android context, package name, signature matching, or reflection.
+A host MUST expose an explicit set of services. Examples include secure storage, audit sink, policy clock, background scheduler, local networking, LAN networking, remote networking, notification surface, diagnostics, cryptographic operations, IPC, and platform-role services.
 
-## 5. Composition rules
+Absence of a required service MUST produce an explicit incompatible, unsupported, or unavailable result. A capsule MUST NOT infer a service from package name, signature matching, source origin, reflection, or device identity.
 
-1. Integrators are packaged only through an explicit composition manifest.
+## 5. Integration rules
+
+1. A capsule is attached only through an explicit receiving-project integration manifest.
 2. Build-time inclusion and runtime authorization remain separate decisions.
-3. A host MUST reject startup of an integrator whose contract, protocol, host type, profile, permission, or storage requirements are incompatible.
-4. A host MUST expose the reason for rejection.
-5. Integrators MUST NOT add Android components or permissions silently; required manifest contributions must be declared and reviewed.
-6. A descendant app shell MUST consume shared modules rather than copy and mutate the canonical implementation.
+3. The host MUST reject activation when contract, runtime, service, permission, storage, migration, or protocol requirements are incompatible.
+4. The host MUST preserve the reason for rejection.
+5. Permissions and components MUST be declared and reviewed; they MUST NOT appear silently.
+6. The receiving project owns its adapter and presentation choices.
+7. The capsule remains unaware of the receiving project name except for optional diagnostics supplied by the host.
+8. Shared-repository consumers MAY use module dependencies; separate repositories or canonical ZIP lanes MUST support ZIP plus sibling SHA-256.
 
-## 6. Lifecycle
+## 6. Capsule separation
 
-The initial lifecycle contract is:
+A capsule SHOULD separate:
+
+- portable logic and tests;
+- runtime adapters;
+- optional host-specific presentation;
+- migrations;
+- descriptor and documentation.
+
+Portable logic MUST NOT depend directly on an Android Activity, IME service, launcher surface, CLIENT screen, server admin endpoint, or host navigation framework.
+
+## 7. Lifecycle
 
 ```text
 inspect descriptor
-→ validate compatibility
+→ verify archive and checksum
+→ validate runtime and host services
 → initialize
 → start
-→ pause/resume as applicable
+→ pause/resume where applicable
 → stop
-→ migrate or retire explicitly
+→ migrate, update, or retire explicitly
 ```
 
-Initialization MUST be idempotent or return an explicit conflict. Stop MUST release owned resources. Host process death and restart behavior MUST be documented per integrator.
+Initialization MUST be idempotent or return an explicit conflict. Stop MUST release owned resources. Restart and process-death behavior MUST be documented.
 
-## 7. Storage and migration
+## 8. Storage and migration
 
-- Storage MUST be namespaced by integrator identity and host installation identity.
-- Shared storage across app shells is prohibited unless an accepted IPC or provider contract explicitly authorizes it.
+- Storage MUST be namespaced by feature identity and host installation identity.
+- Cross-project storage sharing requires a separate accepted IPC or provider contract.
 - Schema changes require versioned migrations.
 - Failed migration MUST fail closed for protected data and preserve recovery evidence.
-- Removal or retirement MUST preserve lineage and rollback instructions.
+- Retirement MUST preserve lineage, checksums, superseded-by references, and rollback instructions.
 
-## 8. Trust and authority
+## 9. Trust, routing, and offline behavior
 
-- Packaging does not grant trust, enrollment, entitlement, or execution authority.
-- Shared device identity does not grant shared unrestricted authorization.
-- Keyboard, Launcher, CLIENT, NODE_HOST, and Core remain separate surfaces.
-- Host profiles MUST implement least authority.
-- Entitlement cannot override safety, privacy, identity, trust, protocol, or Truth Firewall requirements.
-
-## 9. Routing and offline behavior
-
-- Offline-first operation is mandatory where the capability can function locally.
+- Packaging does not grant trust, entitlement, enrollment, or execution authority.
+- Shared device identity or signing lineage does not grant unrestricted authorization.
+- Offline-first operation is mandatory where the feature can function locally.
 - Route classes MUST remain explicit: local, LAN, or remote.
 - No silent local-to-remote fallback is allowed.
-- Remote dependencies, cost implications, trust requirements, and failure behavior MUST be declared.
-- A network failure MUST NOT create an obedience-only or policy-bypass mode.
+- Entitlement cannot override privacy, identity, trust, protocol, or Truth Firewall requirements.
 
 ## 10. Failure isolation
 
-- Optional integrator failure MUST NOT crash unrelated host startup.
-- Mandatory integrators require an accepted fail-closed declaration.
-- Repeated failure SHOULD enter a quarantined or unavailable state with reason code and audit evidence.
-- One integrator MUST NOT mutate another integrator's storage, lifecycle, or policy state directly.
+- Optional capsule failure MUST NOT crash unrelated host startup.
+- Mandatory fail-closed capsules require a separate accepted declaration.
+- Repeated failure SHOULD enter quarantine or unavailable state with reason code and audit evidence.
+- One capsule MUST NOT directly mutate another capsule's storage, lifecycle, or policy state.
 
-## 11. UI contributions
+## 11. Extraction and canonicalization
 
-Integrators MAY expose typed UI contributions, but MUST NOT own host navigation or assume a specific shell layout. The host decides placement, visibility, accessibility, and role-appropriate presentation. UI hiding is not an authorization boundary.
+When a reusable feature originates inside an existing project:
 
-## 12. Phoenix Firewall profiles
+1. document the originating source and commit;
+2. extract portable logic and required adapters in a bounded checkpoint;
+3. create a canonical feature ZIP and sibling SHA-256;
+4. place the accepted package in the neutral `SOURCES/SHARED_FEATURES/<FEATURE>/` lane when that lane is authorized;
+5. create a receiving-project adapter and integration manifest;
+6. reintegrate the canonical package into the originating project;
+7. retire divergent local copies through documented lineage rather than deletion without evidence.
 
-The initial proposed profiles are:
+## 12. Integration manifest minimum
 
-| Profile | Intended host | Boundary |
-|---|---|---|
-| `CORE_FULL` | Core | full local policy administration and diagnostics |
-| `KEYBOARD_RESTRICTED` | Keyboard | input-path protections only; no unrelated content capture or unrestricted network authority |
-| `LAUNCHER_RESTRICTED` | Launcher | app-launch, intent, and surface policy only |
-| `CLIENT_SCOPED` | CLIENT | enrollment, route, and user-approval policy within CLIENT authority |
-| `NODE_HOST_SCOPED` | NODE_HOST | node execution and route policy within NODE_HOST authority |
+A receiving-project manifest MUST record:
 
-Profiles MUST configure one shared engine; they MUST NOT become divergent source forks.
+- feature ID and version;
+- archive and checksum identity or repository module reference;
+- runtime adapter;
+- required-service mappings;
+- optional-service mappings;
+- enabled and disabled components;
+- permissions/components accepted by the host;
+- storage namespace;
+- route classes;
+- compatibility result;
+- source and integration lineage.
 
 ## 13. Evidence requirements
 
 Implementation checkpoints MUST produce:
 
-- module and dependency graph;
-- composition manifest per host;
-- descriptor and profile evidence;
-- source lineage and checksums;
-- permission and manifest diff;
-- compatibility and failure-isolation tests;
-- storage migration tests;
+- source archive and SHA-256;
+- descriptor and integration manifest;
+- portable-core/runtime-adapter dependency graph;
+- service compatibility results;
+- permission and platform-component diff;
+- extraction and reintegration lineage;
+- failure-isolation and migration tests;
 - offline and routing tests;
 - Truth Firewall preservation evidence;
-- build and on-device evidence per host.
+- build and on-device evidence for each receiving project.
 
 ## 14. Non-authorization
 
-This contract does not authorize implementation, Gradle changes, permissions, app-lane changes, builds, workflow runs, releases, deployments, installations, or dynamic executable plugin loading.
+This contract does not authorize creation of `SOURCES/SHARED_FEATURES/`, source extraction, Gradle changes, app changes, permissions, builds, workflow runs, releases, deployments, installations, or dynamic executable plugin loading.
