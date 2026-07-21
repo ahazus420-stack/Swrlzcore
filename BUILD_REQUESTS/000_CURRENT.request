@@ -1,51 +1,12 @@
-# BUILD REQUEST: 000_CURRENT.request
-# Checkpoint: CORE-BUILD-002A
-# Purpose: Checksum-gated verification of canonical CORE_BASE and independent inheritance lanes.
+# SWRLZ unified Android build request
+# Schema 2 is consumed only by .github/workflows/swrlz-apk-router.yml.
+# Keep enabled=false unless an automatic request-triggered build is explicitly authorized.
 
-request_id=CORE-BUILD-002A
+schema=2
+enabled=false
+request_id=
+target=CLIENT
+source_mode=lane_latest
+source_zip=
 build_variant=debug
-gradle_task=:app:assembleDebug
-java_version=17
-targets=universal
-
-[core_base]
-enabled=true
-component=CORE_BASE
-source_type=archive
-source_archive=SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.zip
-checksum_file=SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.sha256
-old_patches_dir=SOURCES/CORE_BASE/OLD_PATCHES
-workflow=.github/workflows/build-swrlz-core-android-foundation.yml
-workspace=BUILD_WORK/CORE_BASE
-expected_apk=BUILD_WORK/CORE_BASE/extracted/app/build/outputs/apk/debug/app-debug.apk
-artifact_name=SWRLZ_CORE_BASE_CORE_REDUCE_003_DEBUG_APK
-evidence_name=SWRLZ_CORE_BASE_CORE_REDUCE_003_BUILD_EVIDENCE
-application_id=com.swrlz.core.app
-version_name=1.0.0
-version_code=1
-
-[keyboard_base]
-enabled=true
-source_archive=SOURCES/KEYBOARD/SWRLZ_KEYBOARD_BASE_CFv1.0.1.zip
-checksum_file=SOURCES/KEYBOARD/SWRLZ_KEYBOARD_BASE_CFv1.0.1.sha256
-workflow=.github/workflows/build-swrlz-keyboard-base.yml
-workspace=build-work/keyboard
-expected_apk=build-work/keyboard/app/build/outputs/apk/debug/app-debug.apk
-artifact_name=SWRLZ_KEYBOARD_BASE_CFv1.0.1_DEBUG_APK
-package_name=SWRLZ_KEYBOARD_BASE_CFv1.0.1.zip
-
-[launcher_base]
-enabled=true
-source_archive=SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip
-checksum_file=SOURCES/LAUNCHER/SWRLZ_LAUNCHER_BASE_CFv1.0.1.sha256
-workflow=.github/workflows/build-swrlz-launcher-base.yml
-workspace=build-work/launcher
-expected_apk=build-work/launcher/app/build/outputs/apk/debug/app-debug.apk
-artifact_name=SWRLZ_LAUNCHER_BASE_CFv1.0.1_DEBUG_APK
-package_name=SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip
-
-# Guardrails:
-# - Verification only; no release, deployment, installation, or merge.
-# - Build CORE_BASE from the checksum-verified immutable source archive.
-# - OLD_PATCHES is lineage storage and is never an automatic build-input search path.
-# - CLIENT and NODE_HOST implementation sources are outside this request.
+commit_release_artifacts=false
