@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">SWRLZ Keyboard</string>
+    <string name="ime_name">SWRLZ Keyboard</string>
+    <string name="subtype_en_us">English (US)</string>
+    <string name="setup_title">SWRLZ Keyboard</string>
+    <string name="setup_body">Enable SWRLZ Keyboard in Android input settings, then select it from the keyboard picker. This checkpoint provides offline typing only.</string>
+    <string name="open_input_settings">Open input settings</string>
+    <string name="show_keyboard_picker">Show keyboard picker</string>
+    <string name="ordinary_mode">Offline typing</string>
+    <string name="protected_mode">Protected editor — SWRLZ actions disabled</string>
+</resources>

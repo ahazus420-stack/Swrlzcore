@@ -1,0 +1,17 @@
+PASS ordinary text
+PASS multiline text
+PASS email
+PASS web email
+PASS url
+PASS search hint
+PASS numeric
+PASS phone
+PASS text password
+PASS visible password
+PASS web password
+PASS number password
+PASS otp
+PASS payment
+PASS unknown sensitive
+PASS unknown class
+RESULT 16 passed / 0 failed

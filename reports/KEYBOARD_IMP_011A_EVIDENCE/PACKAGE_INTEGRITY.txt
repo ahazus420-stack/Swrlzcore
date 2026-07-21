@@ -1,0 +1,8 @@
+archive=SWRLZ_KEYBOARD_IME_CFv0.1.0_SOURCE.zip
+sha256=7281f083e4776004bd59f4973cc33a25e788b36c8175f42a15a4fc90ccd50442
+entry_count=16
+crc_integrity=PASS
+unsafe_paths=none
+duplicate_entries=none
+required_entries=PASS
+deterministic_rebuild=PASS

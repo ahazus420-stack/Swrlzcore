@@ -1,0 +1,9 @@
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.swrlz.keyboard.app.KeyboardSetupActivity"
+    android:supportsSwitchingToNextInputMethod="true">
+    <subtype
+        android:imeSubtypeLocale="en_US"
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true"
+        android:label="@string/subtype_en_us" />
+</input-method>

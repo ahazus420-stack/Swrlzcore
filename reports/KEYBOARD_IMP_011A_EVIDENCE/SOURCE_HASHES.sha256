@@ -1,0 +1,16 @@
+503a8f56e9bc33c461acecdb48650ebf5ad8a0f9901c180b3a07f43047ce12b3  ./README.md
+1a01e5b6e63287b0479e7a4f24b7490c5885823a82a61dbbc2379b012a073d29  ./app/build.gradle.kts
+1a4df0d754a055bb76cc2df05093429d759b58c6f82077918a53269a4ce8ad89  ./app/proguard-rules.pro
+60fcd088a8ec14119293b7a8887dd06e33bc5aec321aeb2552e61c2f71a95711  ./app/src/main/AndroidManifest.xml
+96d3622f2e41ffbd91945386720824525a3cfeb87a9620586bac108183297f8f  ./app/src/main/java/com/swrlz/keyboard/app/KeyboardImeService.kt
+8c0421df6f908cbcd00668aae1154e6e0e22f689e142eecd9eb9f93ebe709dc0  ./app/src/main/java/com/swrlz/keyboard/app/KeyboardSetupActivity.kt
+a48b61f0455d71d9be8101883c5007240a26125f66edc3b5c7d4c56e0f72a43a  ./app/src/main/java/com/swrlz/keyboard/app/policy/EditorContextClassifier.kt
+7d566a6bf5afb2a528d348f533e4d09a1e8fafec85401e1f849a04ad395f3122  ./app/src/main/res/drawable/ic_keyboard.xml
+79ff5ea67381afc18f98183266bb8ada8789084aaf1f14b09ac961ee6bcf5a1f  ./app/src/main/res/values/strings.xml
+f66fbdc25232445e8e267219967ea4de49e980c6718cc38e57afdea11a8eb76f  ./app/src/main/res/xml/method.xml
+6054bb998b694e8e6c9e37a810750a0608cc083b19c8374360b245797930a33c  ./build.gradle.kts
+d5f372c6d46ad7c8d33f714bfae564eb5e1d73a159c495df9bc782b33e3567c2  ./gradle.properties
+43bc7f559dedd97d8dee45801baf3aa17c034d3c8a042e07879c4fa384681d67  ./settings.gradle.kts
+3ca74f23dba0b79005e8e4e5d5f3de34df7d112acb8eef2b546fff4692174335  ./verification/EditorContextClassifierVerification.kt
+6f10fc29b1cf9d69372ba9f6a44a35619863d2a7dd9b6c4e801e74e6d5a42371  ./verification/README.md
+bd2ebf898c358bf9734fa629517f93919456d8ae0714c632eede9d8a965c5957  ./verification/verify-static.py

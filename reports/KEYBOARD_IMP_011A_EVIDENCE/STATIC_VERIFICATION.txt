@@ -1,0 +1,27 @@
+PASS required file exists: app/src/main/AndroidManifest.xml
+PASS required file exists: app/src/main/res/xml/method.xml
+PASS required file exists: app/build.gradle.kts
+PASS required file exists: app/src/main/java/com/swrlz/keyboard/app/KeyboardImeService.kt
+PASS required file exists: app/src/main/java/com/swrlz/keyboard/app/policy/EditorContextClassifier.kt
+PASS XML parses
+PASS unique applicationId
+PASS unique namespace
+PASS versionCode 1
+PASS versionName 0.1.0
+PASS BIND_INPUT_METHOD service permission
+PASS InputMethod action
+PASS IME metadata
+PASS no manifest permissions requested
+PASS no INTERNET permission
+PASS Core app identity not copied
+PASS character input
+PASS space input
+PASS backspace input
+PASS enter input
+PASS protected-editor classification seam
+PASS no service logging
+PASS no clipboard feature
+PASS no voice capture
+PASS no network implementation
+PASS no host attachment code
+RESULT 26 passed / 0 failed
