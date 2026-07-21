@@ -55,6 +55,7 @@ Evidence
 |---|---|---|
 | [ADR-0001](ADR-0001-SHARED-CORE-AND-DISTINCT-APP-SHELLS.md) | Shared Core capabilities and distinct Android app shells | Accepted |
 | [ADR-0002](ADR-0002-CAPABILITY-AND-ENTITLEMENT-GATES.md) | Modular capability and entitlement gates | Accepted |
+| [ADR-0003](ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md) | CORE integrator and host-capability composition | Proposed |
 
 ## ADR template
 
