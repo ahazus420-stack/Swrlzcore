@@ -1,11 +1,13 @@
 {
-  "target": "SERVER",
-  "component": "SWRLZ_NODE_HOST",
-  "status": "succeeded",
-  "source_zip": "SOURCES/SERVER/SERVER_CFv1.0.2_SWRLZ.zip",
-  "source_sha256": "9d278bed4944eee20d6b9dc1ea89ba9363c30a7e7daa5b91b44836c386abd200",
+  "artifact_folder": "RELEASES/SERVER_CFv1.0.4_SWRLZ_APK",
+  "built_at_utc": "2026-07-21T17:51:13+00:00",
+  "canonical_source": "SERVER_CFv1.0.4_SWRLZ.zip",
+  "component": "SERVER",
+  "repository_commit": "8bfa96993a2d330925b995aa555bfae1d4a7323c",
+  "schema": 2,
+  "selected_source": "SOURCES/SERVER/SERVER_CFv1.0.4_SWRLZ.zip",
+  "signing_mode": "debug-runner-default",
+  "source_sha256": "32114c2658a315dddc86d2ce2f0f790cc7d7e6a5bea506e1ef909aea404125e6",
   "variant": "debug",
-  "workflow_run": 7,
-  "commit": "668fd0e6b56fce508c25a0389f0425183865c289",
-  "release_path": "RELEASES/SERVER_NODE_HOST_APK"
+  "workflow_run": "29854498173"
 }
