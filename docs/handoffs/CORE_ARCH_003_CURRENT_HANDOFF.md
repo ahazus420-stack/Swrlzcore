@@ -1,6 +1,6 @@
-# CORE-ARCH-003A Current Handoff
+# CORE-ARCH-003 Current Handoff
 
-- **Status:** Portable feature-capsule architecture documented; implementation not authorized
+- **Status:** Project-agnostic portable feature-capsule architecture documented; implementation not authorized
 - **Date:** 2026-07-21
 - **Repository:** `ahazus420-stack/Swrlzcore`
 - **Authoritative branch:** `main`
@@ -8,82 +8,77 @@
 
 ## Read first
 
-1. `docs/architecture/SWRLZ_PLATFORM_MAP_V1.md`
-2. `docs/architecture/adr/ADR-0001-SHARED-CORE-AND-DISTINCT-APP-SHELLS.md`
-3. `docs/architecture/adr/ADR-0002-CAPABILITY-AND-ENTITLEMENT-GATES.md`
-4. `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`
-5. `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
-6. `docs/architecture/CORE_INTEGRATOR_ARCHITECTURE_V1.md`
-7. `skills/swrlz-core-base-canonical-build-engineer/SKILL.md`
-8. `docs/handoffs/CORE_BUILD_002A_CURRENT_HANDOFF.md`
+1. `docs/governance/SWRLZ_CONSTITUTION.md`
+2. `docs/architecture/SWRLZ_PLATFORM_MAP_V1.md`
+3. `docs/architecture/adr/ADR-0001-SHARED-CORE-AND-DISTINCT-APP-SHELLS.md`
+4. `docs/architecture/adr/ADR-0002-CAPABILITY-AND-ENTITLEMENT-GATES.md`
+5. `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`
+6. `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
+7. `docs/architecture/CORE_INTEGRATOR_ARCHITECTURE_V1.md`
+8. `docs/architecture/PORTABLE_FEATURE_EXTRACTION_AND_EXISTING_APP_INTEGRATION_V1.md`
+9. `skills/swrlz-core-base-canonical-build-engineer/SKILL.md`
+10. `docs/handoffs/CORE_BUILD_002A_CURRENT_HANDOFF.md`
 
-## Corrected architecture direction
+## Confirmed architecture direction
 
-- Reusable capabilities are project-agnostic portable feature capsules.
-- Capsules target runtime classes and required host services, not a closed list of named apps.
-- A feature may originate in any project and later become a canonical shared package.
-- The proposed neutral lane is `SOURCES/SHARED_FEATURES/<FEATURE>/`; it does not yet exist by authorization.
-- Portable ZIP plus sibling SHA-256 supports transfer between separate repositories or canonical source ZIPs.
-- Same-repository projects may use direct module dependencies.
-- Each receiving project owns a small adapter and integration manifest.
-- Portable core logic, runtime adapters, and optional presentation remain separate.
-- The originating project should reintegrate the canonical shared package after extraction to prevent drift.
-- Packaging never grants trust, entitlement, enrollment, or execution authority.
-- Runtime-downloaded arbitrary executable plugins remain outside the initial architecture.
+- Portable feature capsules target runtime classes and required host services, not a closed list of named projects.
+- Features may originate in any mature SWRLZ project.
+- Existing applications attach capsules through thin adapters and local integration manifests without wholesale restructuring.
+- A neutral `SOURCES/SHARED_FEATURES/` lane is proposed but not created.
+- Canonical capsules may attach through same-repository module references or checksum-verified ZIP/SHA packages.
+- Packaging, attachment, registration, or shared identity does not grant authority.
+- Runtime-downloaded arbitrary executable code remains outside the initial architecture.
 
-## Core compatibility rule
+## Existing-project workflows
 
-```text
-feature requirements
-    + host-provided services
-    + receiving-project manifest
-    + compatibility and policy gates
-    = attached capability
-```
+- **ATTACH:** add a canonical capsule to an established compatible project.
+- **EXTRACT:** separate portable behavior from a project-local feature after dependency, authority, storage, lifecycle, route, and protocol audit.
+- **REINTEGRATE:** make the origin project reference and compose the accepted canonical capsule.
 
-Named projects such as CORE_BASE, CLIENT, SERVER, Launcher, Keyboard, and NODE_HOST are examples only.
+Supported migration strategies:
 
-## Phoenix Firewall example
+- clean extraction;
+- strangler extraction;
+- wrapper-first transition.
 
-Phoenix Firewall should eventually separate into:
+Extraction is incomplete while two undocumented canonical implementations remain active.
 
-- portable policy engine;
-- Android adapter;
-- JVM/server adapter;
-- optional UI surfaces;
-- descriptor, migrations, tests, documentation, ZIP, and SHA-256.
+## Constitutional terminology gate
 
-A receiving project maps services such as secure storage, audit sink, policy clock, scheduling, network inspection, and notifications. It should not require Phoenix Firewall source changes merely because a new project wants to attach it.
+Use accurate relationship verbs:
+
+- projects **attach**, **import**, **reference**, or **compose** capsules;
+- hosts **expose** services and **host** lifecycle;
+- adapters **translate** services;
+- registries **register** availability;
+- runtimes **invoke** behavior;
+- origin projects **reintegrate** canonical capsules;
+- packages **preserve** lineage.
+
+`Consume` is reserved for genuinely depleting or irreversible operations and must not describe reusable software composition.
 
 ## Documentation created or changed
 
-- Revised ADR: `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`
-- Revised contract: `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
-- Revised architecture guide: `docs/architecture/CORE_INTEGRATOR_ARCHITECTURE_V1.md`
+- ADR: `docs/architecture/adr/ADR-0003-CORE-INTEGRATOR-AND-HOST-CAPABILITY-COMPOSITION.md`
+- Contract: `docs/contracts/CORE_INTEGRATOR_HOST_CAPABILITY_CONTRACT_V1.md`
+- Architecture guide: `docs/architecture/CORE_INTEGRATOR_ARCHITECTURE_V1.md`
+- Existing-app extraction guide: `docs/architecture/PORTABLE_FEATURE_EXTRACTION_AND_EXISTING_APP_INTEGRATION_V1.md`
 - ADR index: `docs/architecture/adr/README.md`
-- Updated operating skill: `skills/swrlz-core-base-canonical-build-engineer/SKILL.md`
-- Updated handoff: `docs/handoffs/CORE_ARCH_003_CURRENT_HANDOFF.md`
+- CORE_BASE operating skill: `skills/swrlz-core-base-canonical-build-engineer/SKILL.md`
+- This handoff.
 
 ## Explicit non-implementation state
 
-No `SOURCES/SHARED_FEATURES/` lane, source module, feature extraction, Gradle configuration, integration manifest, adapter, permission, app-lane source, build request, workflow, APK, release, deployment, or installation was created or changed.
+No source module, shared-feature directory, extraction, adapter, Gradle configuration, application source, permission, workflow, build request, APK, release, deployment, or installation was created or changed by this checkpoint.
 
 ## Recommended next checkpoint
 
-The next bounded checkpoint should accept the revised ADR and contract, then define only:
-
-- capsule descriptor schema;
-- host-service identifier set;
-- receiving-project integration-manifest schema;
-- canonical ZIP/SHA naming and lineage rules;
-- a tiny no-op portable reference capsule;
-- two independent test-host criteria;
-- exact implementation, testing, build, evidence, and documentation boundaries.
+The next bounded checkpoint should accept the corrected ADR and contract and define a no-op reference capsule plan, including descriptor schema, service identifiers, integration manifest, ZIP/SHA naming, terminology validation, two independent test hosts, evidence requirements, and rollback boundaries.
 
 ## Approval state
 
-CORE-ARCH-003A authorized documentation-only correction. It did not authorize implementation, shared-feature directories, source extraction, app changes, builds, workflows, merge, or release.
+Approval granted for CORE-ARCH-003B-LANGUAGE authorized documentation, extraction workflow design, terminology correction, and operating-skill updates only. It did not authorize implementation, app-lane changes, builds, workflows, merge, or release.
 
 ## Exact next approval phrase
 
-`Approve CORE-GATE-004A — Accept the project-agnostic portable feature-capsule ADR and contract, then define the bounded no-op reference implementation plan without creating source modules, shared-feature lanes, app changes, workflows, or builds`
+`Approve CORE-GATE-004B — Accept the constitutionally aligned portable feature-capsule ADR, contract, ATTACH/EXTRACT/REINTEGRATE guide, and terminology gate, then define the bounded no-op reference implementation plan without creating source modules, changing apps, triggering builds, or merging`
