@@ -28,7 +28,7 @@ Manual component choices:
 - KEYBOARD_BASE
 - LAUNCHER_BASE
 
-Automatic builds are limited to active lane-root source/checksum paths on `main` and the disabled-by-default `BUILD_REQUESTS/000_CURRENT.request`. `OLD_PATCHES` is not a trigger or source search path.
+Automatic builds are limited to active lane-root source/checksum paths on `main` and the disabled-by-default `BUILD_REQUESTS/000_CURRENT.request`. `OLD_PATCHES` is not a trigger or source search path. CORE source-tree-only edits do not trigger a build until the canonical archive/checksum pair is updated, preventing stale-archive compilation.
 
 ## Source-name normalization
 
@@ -57,6 +57,7 @@ Resolution fails closed when aliases disagree, checksums disagree, the source ha
 - SERVER: Gradle-root discovery, debug/release task selection, APK collection, and provenance.
 - CORE_BASE: Gradle build plus `CORE_REDUCE_003` reduction invariants when that canonical identity is selected.
 - KEYBOARD_BASE and LAUNCHER_BASE: Gradle wrapper regeneration at 8.6 when the source archive does not contain a wrapper.
+- All lanes: optional stable development re-signing when the complete four-secret signing set exists; partial signing-secret configuration fails closed.
 
 ## BUILD_REQUESTS cleanup
 
@@ -79,6 +80,12 @@ OK
 
 YAML parsing and Bash syntax validation also passed locally. These are static authoring checks, not GitHub Actions execution and not an APK build.
 
+## Concurrent main advancement
+
+While BUILD-WF-014 was being staged, `main` advanced from the recorded base to `961e92907acb6a3158f6da982902f07acbfba019` through SERVER-LINEAGE-FIX-014. That separate work canonicalized SERVER v1.0.4 and archived v1.0.3 without modifying workflows.
+
+The checkpoint branch is intentionally not merged or rebased because BUILD-WF-014 did not authorize either operation. Before a pull request or promotion decision, the branch must be refreshed from current `main`, the canonical SERVER v1.0.4 pair must be retained, and `SOURCES/SERVER/README.md` must be reconciled so its build-selection reference names `.github/workflows/swrlz-apk-router.yml` rather than the retired dedicated SERVER workflow.
+
 ## Explicitly not performed
 
 - No workflow dispatch.
@@ -87,4 +94,4 @@ YAML parsing and Bash syntax validation also passed locally. These are static au
 - No source ZIP content change.
 - No canonical source/checksum rename or movement.
 - No application ID, package, version, signer, protocol, identity, runtime, trust, or update-policy change.
-- No merge, release, publication, deployment, or installation.
+- No merge, rebase, release, publication, deployment, or installation.
