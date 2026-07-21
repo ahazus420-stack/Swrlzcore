@@ -1,10 +1,10 @@
-name: Build SWRLZ APK
+name: Build SWRLZ Client APK
 
 on:
   workflow_dispatch:
     inputs:
       source_zip:
-        description: "Optional source ZIP path. Leave blank to use current request."
+        description: "Optional CLIENT source ZIP path. Leave blank to use the current request or latest CLIENT source."
         required: false
         default: ""
       sha_file:
@@ -21,10 +21,13 @@ on:
         type: boolean
         default: false
   push:
+    branches: [main]
     paths:
+      - "SOURCES/CLIENT/CLIENT_CFv*_SWRLZ*.zip"
+      - "SOURCES/CLIENT/CLIENT_CFv*_SWRLZ*.sha256"
       - "BUILD_REQUESTS/000_CURRENT.request"
       - "BUILD_REQUESTS/CURRENT.request"
-      - ".github/workflows/build-swrlz-apk.yml"
+      - ".github/workflows/build-swrlz-apk_target_client_latest.yml"
 
 permissions:
   contents: write
@@ -43,8 +46,8 @@ env:
   SWRLZ_UPDATES_DIR: UPDATES
 
 jobs:
-  build-swrlz-apk:
-    name: Build SWRLZ APK from active request
+  build-client-apk:
+    name: Build CLIENT APK from source lane
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -54,13 +57,76 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Normalize Android duplicate-download filenames
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, re, shutil
+
+          lane = Path("SOURCES/CLIENT")
+          patterns = {
+              "zip": re.compile(r"^(CLIENT_CFv[0-9]+(?:\.[0-9]+)*_SWRLZ)(?:\s*\([0-9]+\))?\.zip$"),
+              "sha": re.compile(r"^(CLIENT_CFv[0-9]+(?:\.[0-9]+)*_SWRLZ)(?:\s*\([0-9]+\))?\.sha256$"),
+          }
+          groups = {}
+          for path in sorted(lane.iterdir() if lane.exists() else []):
+              for kind, pattern in patterns.items():
+                  match = pattern.match(path.name)
+                  if match:
+                      groups.setdefault(match.group(1), {"zip": [], "sha": []})[kind].append(path)
+                      break
+
+          def digest(path):
+              h = hashlib.sha256()
+              with path.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          def declared(path):
+              for token in path.read_text(encoding="utf-8").split():
+                  if re.fullmatch(r"[0-9a-fA-F]{64}", token):
+                      return token.lower()
+              raise SystemExit(f"Checksum file has no SHA-256 value: {path}")
+
+          for identity, entries in sorted(groups.items()):
+              zips, shas = entries["zip"], entries["sha"]
+              suffixed = any(p.name != f"{identity}.zip" for p in zips) or any(
+                  p.name != f"{identity}.sha256" for p in shas
+              )
+              if not suffixed:
+                  continue
+              if not zips or not shas:
+                  raise SystemExit(f"Incomplete Android-suffixed pair for {identity}: zips={[p.name for p in zips]}, shas={[p.name for p in shas]}")
+              zip_hashes = {digest(p) for p in zips}
+              sha_values = {declared(p) for p in shas}
+              if len(zip_hashes) != 1:
+                  raise SystemExit(f"Conflicting ZIP candidates for {identity}: " + ", ".join(f"{p.name}={digest(p)}" for p in zips))
+              if len(sha_values) != 1:
+                  raise SystemExit(f"Conflicting checksum candidates for {identity}: " + ", ".join(f"{p.name}={declared(p)}" for p in shas))
+              actual, expected = next(iter(zip_hashes)), next(iter(sha_values))
+              if actual != expected:
+                  raise SystemExit(f"Checksum mismatch for {identity}: expected {expected}, actual {actual}")
+              canonical_zip, canonical_sha = lane / f"{identity}.zip", lane / f"{identity}.sha256"
+              selected = canonical_zip if canonical_zip.exists() else sorted(zips, key=lambda p: p.name)[0]
+              if canonical_zip.exists() and digest(canonical_zip) != actual:
+                  raise SystemExit(f"Canonical ZIP conflicts with suffixed candidates: {canonical_zip}")
+              if not canonical_zip.exists():
+                  shutil.copyfile(selected, canonical_zip)
+              canonical_sha.write_text(f"{actual}  {canonical_zip.name}\n", encoding="utf-8")
+              if digest(canonical_zip) != actual:
+                  raise SystemExit(f"Runner-only canonical ZIP copy changed bytes: {canonical_zip}")
+              print(f"::warning::Normalized Android duplicate filenames for {identity} in runner only; zips={[p.name for p in zips]}; shas={[p.name for p in shas]}; sha256={actual}")
+          PY
+
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Resolve active source request
+      - name: Resolve active CLIENT source
         id: resolve
         env:
           INPUT_SOURCE_ZIP: ${{ github.event.inputs.source_zip }}
@@ -71,58 +137,62 @@ jobs:
           set -euo pipefail
           mkdir -p "$SWRLZ_SOURCES_DIR" "$SWRLZ_BUILD_REQUESTS_DIR" "$SWRLZ_BUILD_WORK_DIR" "$SWRLZ_RELEASES_DIR" "$SWRLZ_UPDATES_DIR"
 
+          ZIP="${INPUT_SOURCE_ZIP:-}"
+          SHA="${INPUT_SHA_FILE:-}"
+          RELEASE="${INPUT_RELEASE_NAME:-}"
           REQUEST_FILE=""
-          for candidate in "$SWRLZ_BUILD_REQUESTS_DIR/000_CURRENT.request" "$SWRLZ_BUILD_REQUESTS_DIR/CURRENT.request"; do
-            if [[ -f "$candidate" ]]; then REQUEST_FILE="$candidate"; break; fi
-          done
+          COMMIT_RELEASE_ARTIFACTS="${INPUT_COMMIT_RELEASE_ARTIFACTS:-false}"
 
-          R_SOURCE=""
-          R_SHA=""
-          R_RELEASE=""
-          R_COMMIT="false"
-          if [[ -n "${REQUEST_FILE:-}" && -f "$REQUEST_FILE" ]]; then
-            echo "Using active build request: $REQUEST_FILE"
-            cat "$REQUEST_FILE"
-            TARGET="$(grep -E '^target=' "$REQUEST_FILE" | tail -n1 | cut -d= -f2- || true)"
-            R_COMMIT="$(grep -E '^commit_release_artifacts=' "$REQUEST_FILE" | tail -n1 | cut -d= -f2- || true)"
-            [[ -n "${R_COMMIT:-}" ]] || R_COMMIT="true"
-            if [[ -n "${TARGET:-}" ]]; then
-              LANE_DIR="$SWRLZ_SOURCES_DIR/$TARGET"
-              ZIP="$(find "$LANE_DIR" -maxdepth 1 -type f -name "${TARGET}_CFv*_SWRLZ.zip" | sort -V | tail -n1)"
-              if [[ -n "${ZIP:-}" ]]; then
-                BASE="${ZIP%.zip}"
-                SHA="${BASE}.sha256"
-                [[ -f "$SHA" ]] || SHA="${BASE}.sha"
-                [[ -f "$SHA" ]] || SHA="${BASE}.txt"
-                R_SOURCE="$ZIP"
-                R_SHA="$SHA"
-                R_RELEASE="$(basename "$BASE")"
-              fi
-            else
-              R_SOURCE="$(grep -E '^source_zip=' "$REQUEST_FILE" | tail -n1 | cut -d= -f2- || true)"
-              R_SHA="$(grep -E '^sha_file=' "$REQUEST_FILE" | tail -n1 | cut -d= -f2- || true)"
-              R_RELEASE="$(grep -E '^release_name=' "$REQUEST_FILE" | tail -n1 | cut -d= -f2- || true)"
-            fi
-          else
-            echo "No active request file found. Manual workflow inputs are required."
+          DIRECT_CLIENT_PUSH=false
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            while IFS= read -r path; do
+              case "$path" in
+                SOURCES/CLIENT/CLIENT_CFv*_SWRLZ*.zip|SOURCES/CLIENT/CLIENT_CFv*_SWRLZ*.sha256|.github/workflows/build-swrlz-apk_target_client_latest.yml)
+                  DIRECT_CLIENT_PUSH=true ;;
+              esac
+            done < <(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" || true)
           fi
 
-          ZIP="${INPUT_SOURCE_ZIP:-${R_SOURCE:-}}"
-          SHA="${INPUT_SHA_FILE:-${R_SHA:-}}"
-          RELEASE="${INPUT_RELEASE_NAME:-${R_RELEASE:-}}"
-          COMMIT_RELEASE_ARTIFACTS="${INPUT_COMMIT_RELEASE_ARTIFACTS:-${R_COMMIT:-false}}"
+          if [[ -z "$ZIP" && "$DIRECT_CLIENT_PUSH" == true ]]; then
+            ZIP="$(find "$SWRLZ_SOURCES_DIR/CLIENT" -maxdepth 1 -type f -name 'CLIENT_CFv*_SWRLZ.zip' | sort -V | tail -n1)"
+            [[ -n "$ZIP" ]] && SHA="${ZIP%.zip}.sha256" && RELEASE="$(basename "$ZIP" .zip)"
+          fi
 
-          [[ -n "${ZIP:-}" && -f "$ZIP" ]] || { echo "Could not resolve source ZIP: ${ZIP:-<empty>}" >&2; find "$SWRLZ_SOURCES_DIR" -maxdepth 4 -type f -iname '*.zip' 2>/dev/null | sort >&2 || true; exit 1; }
-          if [[ -n "${SHA:-}" && ! -f "$SHA" ]]; then echo "Specified SHA file not found: $SHA" >&2; exit 1; fi
-          [[ -n "${RELEASE:-}" ]] || RELEASE="$(basename "$ZIP" .zip)"
+          if [[ -z "$ZIP" ]]; then
+            for candidate in "$SWRLZ_BUILD_REQUESTS_DIR/000_CURRENT.request" "$SWRLZ_BUILD_REQUESTS_DIR/CURRENT.request"; do
+              [[ -f "$candidate" ]] && REQUEST_FILE="$candidate" && break
+            done
+            if [[ -n "$REQUEST_FILE" ]]; then
+              TARGET="$(grep -E '^target=' "$REQUEST_FILE" | tail -n1 | cut -d= -f2- || true)"
+              COMMIT_RELEASE_ARTIFACTS="$(grep -E '^commit_release_artifacts=' "$REQUEST_FILE" | tail -n1 | cut -d= -f2- || true)"
+              [[ -n "$COMMIT_RELEASE_ARTIFACTS" ]] || COMMIT_RELEASE_ARTIFACTS=true
+              if [[ -n "$TARGET" ]]; then
+                ZIP="$(find "$SWRLZ_SOURCES_DIR/$TARGET" -maxdepth 1 -type f -name "${TARGET}_CFv*_SWRLZ.zip" | sort -V | tail -n1)"
+                [[ -n "$ZIP" ]] && SHA="${ZIP%.zip}.sha256" && RELEASE="$(basename "$ZIP" .zip)"
+              else
+                ZIP="$(grep -E '^source_zip=' "$REQUEST_FILE" | tail -n1 | cut -d= -f2- || true)"
+                SHA="$(grep -E '^sha_file=' "$REQUEST_FILE" | tail -n1 | cut -d= -f2- || true)"
+                RELEASE="$(grep -E '^release_name=' "$REQUEST_FILE" | tail -n1 | cut -d= -f2- || true)"
+              fi
+            fi
+          fi
 
-          ZIP_BASE="$(basename "$ZIP")"
+          [[ -n "$ZIP" && -f "$ZIP" ]] || { echo "Could not resolve CLIENT source ZIP." >&2; exit 1; }
+          if [[ -z "$SHA" ]]; then
+            ZIP_DIR="$(dirname "$ZIP")"
+            ZIP_NAME="$(basename "$ZIP")"
+            if [[ "$ZIP_NAME" =~ ^(CLIENT_CFv[0-9]+(\.[0-9]+)*_SWRLZ)([[:space:]]*\([0-9]+\))?\.zip$ ]]; then
+              SHA="$ZIP_DIR/${BASH_REMATCH[1]}.sha256"
+            fi
+          fi
+          [[ -z "$SHA" || -f "$SHA" ]] || { echo "Specified SHA file not found: $SHA" >&2; exit 1; }
+          [[ -n "$RELEASE" ]] || RELEASE="$(basename "$ZIP" .zip)"
           SAFE_RELEASE="$(echo "$RELEASE" | tr -cs 'A-Za-z0-9._-' '_' | sed 's/^_*//;s/_*$//')"
           EXTRACT_DIR="$GITHUB_WORKSPACE/$SWRLZ_BUILD_WORK_DIR/$SAFE_RELEASE/extracted"
 
           {
             echo "source_zip=$ZIP"
-            echo "source_zip_base=$ZIP_BASE"
+            echo "source_zip_base=$(basename "$ZIP")"
             echo "sha_file=$SHA"
             echo "release_name=$RELEASE"
             echo "safe_release=$SAFE_RELEASE"
@@ -139,80 +209,45 @@ jobs:
           EXTRACT_DIR: ${{ steps.resolve.outputs.extract_dir }}
         run: |
           set -euo pipefail
-          if [[ -n "${SHA_FILE:-}" ]]; then
-            cat "$SHA_FILE"
-            EXPECTED_NAME="$(awk 'NF >= 2 {print $2; exit}' "$SHA_FILE")"
-            if [[ -n "${EXPECTED_NAME:-}" && ! -f "$EXPECTED_NAME" ]]; then cp "$ZIP" "$EXPECTED_NAME"; fi
-            sha256sum -c "$SHA_FILE"
+          ACTUAL_SHA="$(sha256sum "$ZIP" | awk '{print $1}')"
+          if [[ -n "$SHA_FILE" ]]; then
+            EXPECTED_SHA="$(awk 'NF {print $1; exit}' "$SHA_FILE")"
+            [[ -n "$EXPECTED_SHA" && "$ACTUAL_SHA" == "$EXPECTED_SHA" ]] || {
+              echo "CLIENT source checksum mismatch: expected=${EXPECTED_SHA:-<empty>} actual=$ACTUAL_SHA" >&2
+              exit 1
+            }
           else
-            sha256sum "$ZIP"
+            echo "::warning::No CLIENT checksum file supplied; actual SHA-256 is $ACTUAL_SHA"
           fi
-
-          rm -rf "$EXTRACT_DIR"
-          mkdir -p "$EXTRACT_DIR"
-          unzip -o "$ZIP" -d "$EXTRACT_DIR"
-          BUILD_SCRIPT="$(find "$EXTRACT_DIR" -maxdepth 8 -type f -path '*/scripts/install_android_sdk_and_build.sh' | sort | head -n 1)"
-          if [[ -z "${BUILD_SCRIPT:-}" || ! -f "$BUILD_SCRIPT" ]]; then
-            echo "Could not find scripts/install_android_sdk_and_build.sh" >&2
-            find "$EXTRACT_DIR" -maxdepth 8 -type f | sort | head -n 300 >&2
-            exit 1
-          fi
+          unzip -tq "$ZIP"
+          rm -rf "$EXTRACT_DIR" && mkdir -p "$EXTRACT_DIR"
+          unzip -q "$ZIP" -d "$EXTRACT_DIR"
+          BUILD_SCRIPT="$(find "$EXTRACT_DIR" -maxdepth 8 -type f -path '*/scripts/install_android_sdk_and_build.sh' | sort | head -n1)"
+          [[ -n "$BUILD_SCRIPT" && -f "$BUILD_SCRIPT" ]] || { echo "Could not find scripts/install_android_sdk_and_build.sh" >&2; exit 1; }
           PROJECT_DIR="$(dirname "$(dirname "$BUILD_SCRIPT")")"
           chmod +x "$BUILD_SCRIPT"
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "source_sha256=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Preflight validation
-        env:
-          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SWRLZ_API_TOKEN: ${{ secrets.SWRLZ_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          fail() { echo "::error::$1"; exit 1; }
-          [[ -n "${OPENAI_API_KEY:-}" ]] || fail "OPENAI_API_KEY secret is missing or empty."
-          [[ -n "${SWRLZ_API_TOKEN:-}" ]] || fail "SWRLZ_API_TOKEN secret is missing or empty."
-          [[ -d "$PROJECT_DIR" ]] || fail "Project directory does not exist: $PROJECT_DIR"
-          BACKEND_ENV_DIR="$(find "$PROJECT_DIR" -maxdepth 3 -type d -name backend | sort | head -n 1 || true)"
-          [[ -n "${BACKEND_ENV_DIR:-}" ]] || fail "Could not find a backend directory under $PROJECT_DIR."
-          [[ -d "$BACKEND_ENV_DIR" ]] || fail "Backend directory is not accessible: $BACKEND_ENV_DIR"
-          BUILD_SCRIPT="$PROJECT_DIR/scripts/install_android_sdk_and_build.sh"
-          [[ -f "$BUILD_SCRIPT" ]] || fail "Missing build script: $BUILD_SCRIPT"
-          [[ -x "$BUILD_SCRIPT" ]] || chmod +x "$BUILD_SCRIPT"
-
-      - name: Create backend .env
-        env:
-          PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SWRLZ_API_TOKEN: ${{ secrets.SWRLZ_API_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          BACKEND_ENV_DIR="$(find "$PROJECT_DIR" -maxdepth 3 -type d -name backend | sort | head -n 1 || true)"
-
-          [[ -n "${BACKEND_ENV_DIR:-}" ]] || {
-            echo "Could not find backend directory under $PROJECT_DIR" >&2
-            exit 1
-          }
-
-          ENV_FILE="$BACKEND_ENV_DIR/.env"
-
-          echo "SWRLZ_DATA_DIR=./data" > "$ENV_FILE"
-          echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> "$ENV_FILE"
-          echo "OPENAI_MODEL=gpt-5.4-mini" >> "$ENV_FILE"
-          echo "SWRLZ_API_TOKEN=$SWRLZ_API_TOKEN" >> "$ENV_FILE"
-          echo "CORS_ORIGINS=*" >> "$ENV_FILE"
-
-      - name: Normalize Android build properties
+      - name: Preflight and create backend environment
         env:
           PROJECT_DIR: ${{ steps.extract.outputs.project_dir }}
         run: |
           set -euo pipefail
-          MATCHES="$(grep -RIl '^android\.aapt2FromMavenOverride=' "$PROJECT_DIR" 2>/dev/null || true)"
-          if [[ -n "${MATCHES:-}" ]]; then
-            echo "$MATCHES" | while IFS= read -r file; do
-              sed -i.bak '/^android\.aapt2FromMavenOverride=/d' "$file"
-            done
-          fi
+          [[ -n "${OPENAI_API_KEY:-}" ]] || { echo "OPENAI_API_KEY secret is missing." >&2; exit 1; }
+          [[ -n "${SWRLZ_API_TOKEN:-}" ]] || { echo "SWRLZ_API_TOKEN secret is missing." >&2; exit 1; }
+          BACKEND_DIR="$(find "$PROJECT_DIR" -maxdepth 3 -type d -name backend | sort | head -n1)"
+          [[ -n "$BACKEND_DIR" ]] || { echo "Could not find backend directory." >&2; exit 1; }
+          cat > "$BACKEND_DIR/.env" <<ENV
+          SWRLZ_DATA_DIR=./data
+          OPENAI_API_KEY=$OPENAI_API_KEY
+          OPENAI_MODEL=gpt-5.4-mini
+          SWRLZ_API_TOKEN=$SWRLZ_API_TOKEN
+          CORS_ORIGINS=*
+          ENV
+          grep -RIl '^android\.aapt2FromMavenOverride=' "$PROJECT_DIR" 2>/dev/null | while IFS= read -r file; do
+            sed -i.bak '/^android\.aapt2FromMavenOverride=/d' "$file"
+          done
 
       - name: Build Android debug APK
         id: build
@@ -224,28 +259,16 @@ jobs:
           cd "$PROJECT_DIR"
           export JAVA_HOME="$JAVA_HOME_17_X64"
           export PATH="$JAVA_HOME/bin:$PATH"
-          java -version
           bash scripts/install_android_sdk_and_build.sh
-
           OUT_DIR="$PROJECT_DIR/APK_DOWNLOAD"
-          [[ -d "$OUT_DIR" ]] || { find "$PROJECT_DIR" -type f \( -iname '*.apk' -o -iname '*.aab' \); exit 1; }
-
-          APK_SRC="$(find "$OUT_DIR" -maxdepth 1 -type f -iname '*.apk' | sort | head -n 1 || true)"
-          if [[ -n "${APK_SRC:-}" ]]; then
-            APK_DEST="$OUT_DIR/${SAFE_RELEASE}_debug.apk"
-            [[ "$APK_SRC" == "$APK_DEST" ]] || mv "$APK_SRC" "$APK_DEST"
-          fi
-
-          ZIP_SRC="$(find "$OUT_DIR" -maxdepth 1 -type f -iname '*APK_DOWNLOAD*.zip' | sort | head -n 1 || true)"
-          if [[ -n "${ZIP_SRC:-}" ]]; then
-            ZIP_DEST="$OUT_DIR/${SAFE_RELEASE}_APK_DOWNLOAD.zip"
-            [[ "$ZIP_SRC" == "$ZIP_DEST" ]] || mv "$ZIP_SRC" "$ZIP_DEST"
-          fi
-
+          [[ -d "$OUT_DIR" ]] || { echo "APK_DOWNLOAD missing." >&2; exit 1; }
+          APK_SRC="$(find "$OUT_DIR" -maxdepth 1 -type f -iname '*.apk' | sort | head -n1)"
+          [[ -z "$APK_SRC" ]] || mv -f "$APK_SRC" "$OUT_DIR/${SAFE_RELEASE}_debug.apk"
+          ZIP_SRC="$(find "$OUT_DIR" -maxdepth 1 -type f -iname '*APK_DOWNLOAD*.zip' | sort | head -n1)"
+          [[ -z "$ZIP_SRC" ]] || mv -f "$ZIP_SRC" "$OUT_DIR/${SAFE_RELEASE}_APK_DOWNLOAD.zip"
           echo "output_dir=$OUT_DIR" >> "$GITHUB_OUTPUT"
-          find "$OUT_DIR" -maxdepth 1 -type f -print -exec ls -lh {} \;
 
-      - name: Stable dev signing status and optional APK re-sign
+      - name: Optional stable dev signing
         id: signing
         env:
           OUT_DIR: ${{ steps.build.outputs.output_dir }}
@@ -255,63 +278,49 @@ jobs:
           SWRLZ_DEV_KEY_PASSWORD: ${{ secrets.SWRLZ_DEV_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          SIGNING_MODE="debug-runner-default"
+          MODE=debug-runner-default
           if [[ -n "${SWRLZ_DEV_KEYSTORE_BASE64:-}" && -n "${SWRLZ_DEV_KEYSTORE_PASSWORD:-}" && -n "${SWRLZ_DEV_KEY_ALIAS:-}" && -n "${SWRLZ_DEV_KEY_PASSWORD:-}" ]]; then
             KEYSTORE="$RUNNER_TEMP/swrlz-dev-signing.jks"
             echo "$SWRLZ_DEV_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
-            APKSIGNER="$(find "${ANDROID_HOME:-$HOME}" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1 || true)"
-            ZIPALIGN="$(find "${ANDROID_HOME:-$HOME}" -type f -name zipalign 2>/dev/null | sort -V | tail -n 1 || true)"
-            [[ -n "${APKSIGNER:-}" && -n "${ZIPALIGN:-}" ]] || { echo "Stable signing requested, but apksigner/zipalign was not found." >&2; exit 1; }
+            APKSIGNER="$(find "${ANDROID_HOME:-$HOME}" -type f -name apksigner 2>/dev/null | sort -V | tail -n1)"
+            ZIPALIGN="$(find "${ANDROID_HOME:-$HOME}" -type f -name zipalign 2>/dev/null | sort -V | tail -n1)"
+            [[ -n "$APKSIGNER" && -n "$ZIPALIGN" ]] || { echo "Signing tools not found." >&2; exit 1; }
             for APK in "$OUT_DIR"/*.apk; do
               [[ -f "$APK" ]] || continue
-              BASE="${APK%.apk}"
-              ALIGNED="${BASE}_aligned.apk"
-              SIGNED="${BASE}_stable-signed.apk"
-              "$ZIPALIGN" -f -p 4 "$APK" "$ALIGNED"
-              "$APKSIGNER" sign --ks "$KEYSTORE" --ks-pass "pass:$SWRLZ_DEV_KEYSTORE_PASSWORD" --ks-key-alias "$SWRLZ_DEV_KEY_ALIAS" --key-pass "pass:$SWRLZ_DEV_KEY_PASSWORD" --out "$SIGNED" "$ALIGNED"
-              "$APKSIGNER" verify "$SIGNED"
-              rm -f "$ALIGNED"
+              "$ZIPALIGN" -f -p 4 "$APK" "${APK%.apk}_aligned.apk"
+              "$APKSIGNER" sign --ks "$KEYSTORE" --ks-pass "pass:$SWRLZ_DEV_KEYSTORE_PASSWORD" --ks-key-alias "$SWRLZ_DEV_KEY_ALIAS" --key-pass "pass:$SWRLZ_DEV_KEY_PASSWORD" --out "${APK%.apk}_stable-signed.apk" "${APK%.apk}_aligned.apk"
+              "$APKSIGNER" verify "${APK%.apk}_stable-signed.apk"
+              rm -f "${APK%.apk}_aligned.apk"
             done
-            SIGNING_MODE="stable-dev-signing-active"
+            MODE=stable-dev-signing-active
           fi
-          echo "$SIGNING_MODE" > "$OUT_DIR/SWRLZ_SIGNING_MODE.txt"
-          echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
+          echo "$MODE" > "$OUT_DIR/SWRLZ_SIGNING_MODE.txt"
+          echo "signing_mode=$MODE" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Actions build summary
+      - name: Create build evidence
         env:
           OUT_DIR: ${{ steps.build.outputs.output_dir }}
           RELEASE_NAME: ${{ steps.resolve.outputs.release_name }}
           SOURCE_ZIP: ${{ steps.resolve.outputs.source_zip_base }}
-          SHA_FILE: ${{ steps.resolve.outputs.sha_file }}
-          SAFE_RELEASE: ${{ steps.resolve.outputs.safe_release }}
-          REQUEST_FILE: ${{ steps.resolve.outputs.request_file }}
+          SOURCE_SHA: ${{ steps.extract.outputs.source_sha256 }}
           SIGNING_MODE: ${{ steps.signing.outputs.signing_mode }}
         run: |
           set -euo pipefail
-          SUMMARY_FILE="$OUT_DIR/GITHUB_ACTIONS_BUILD_SUMMARY.md"
+          for file in "$OUT_DIR"/*; do [[ -f "$file" ]] && sha256sum "$file" > "$file.sha256"; done
+          REPORT="$OUT_DIR/GITHUB_ACTIONS_BUILD_SUMMARY.md"
           {
-            echo "# SWRLZ GitHub Actions Build Summary"
-            echo
+            echo "# SWRLZ CLIENT Build Evidence"
             echo "- Release: $RELEASE_NAME"
-            echo "- Safe release folder: $SAFE_RELEASE"
             echo "- Source ZIP: $SOURCE_ZIP"
-            echo "- SHA file: ${SHA_FILE:-<none>}"
-            echo "- Build request file: ${REQUEST_FILE:-<none>}"
-            echo "- Signing mode: ${SIGNING_MODE:-unknown}"
-            echo "- Workflow: $GITHUB_WORKFLOW"
-            echo "- Run ID: $GITHUB_RUN_ID"
+            echo "- Source SHA-256: $SOURCE_SHA"
+            echo "- Signing mode: $SIGNING_MODE"
             echo "- Commit: $GITHUB_SHA"
+            echo "- Run ID: $GITHUB_RUN_ID"
             echo "- Built at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo
-            echo "## Output files"
-            find "$OUT_DIR" -maxdepth 1 -type f -printf '- `%f` (%s bytes)\n' | sort
-            echo
-            echo "## SHA256"
-            find "$OUT_DIR" -maxdepth 1 -type f ! -iname '*.sha256' -exec sha256sum {} \; | sed "s#$OUT_DIR/##"
-          } > "$SUMMARY_FILE"
-          cat "$SUMMARY_FILE" >> "$GITHUB_STEP_SUMMARY"
+          } > "$REPORT"
+          cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload APK_DOWNLOAD artifact
+      - name: Upload CLIENT APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.resolve.outputs.safe_release }}_APK_DOWNLOAD
@@ -319,7 +328,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Optionally commit release artifacts and update manifests
+      - name: Optionally commit release artifacts
         if: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.commit_release_artifacts == 'true') || steps.resolve.outputs.commit_release_artifacts == 'true' }}
         env:
           OUT_DIR: ${{ steps.build.outputs.output_dir }}
@@ -331,42 +340,27 @@ jobs:
           set -euo pipefail
           REL_DIR="$SWRLZ_RELEASES_DIR/${SAFE_RELEASE}_APK"
           mkdir -p "$REL_DIR" "$SWRLZ_UPDATES_DIR"
-          cp -a "$OUT_DIR"/. "$REL_DIR"/
-
-          APK_FILE="$(find "$REL_DIR" -maxdepth 1 -type f \( -iname "${SAFE_RELEASE}_debug.apk" -o -iname "${SAFE_RELEASE}_debug_stable-signed.apk" -o -iname 'APK_*_DEBUG.apk' -o -iname '*_debug.apk' \) | sort | head -n 1 || true)"
-          BUNDLE_FILE="$(find "$REL_DIR" -maxdepth 1 -type f \( -iname "${SAFE_RELEASE}_APK_DOWNLOAD.zip" -o -iname 'BUNDLE_*.zip' -o -iname '*APK_DOWNLOAD*.zip' \) | sort | head -n 1 || true)"
-          APK_SHA=""
-          BUNDLE_SHA=""
-          [[ -n "${APK_FILE:-}" ]] && APK_SHA="$(sha256sum "$APK_FILE" | awk '{print $1}')"
-          [[ -n "${BUNDLE_FILE:-}" ]] && BUNDLE_SHA="$(sha256sum "$BUNDLE_FILE" | awk '{print $1}')"
-
-          MANIFEST_FILE="$SWRLZ_UPDATES_DIR/${SAFE_RELEASE}_manifest.json"
-          LATEST_FILE="$SWRLZ_UPDATES_DIR/latest_client.json"
-          cat > "$MANIFEST_FILE" <<JSON
+          cp -a "$OUT_DIR/." "$REL_DIR/"
+          APK_FILE="$(find "$REL_DIR" -maxdepth 1 -type f -iname '*.apk' | sort | head -n1)"
+          BUNDLE_FILE="$(find "$REL_DIR" -maxdepth 1 -type f -iname '*APK_DOWNLOAD*.zip' | sort | head -n1)"
+          cat > "$SWRLZ_UPDATES_DIR/${SAFE_RELEASE}_manifest.json" <<JSON
           {
             "schema": 1,
             "release": "$RELEASE_NAME",
             "source_zip": "$SOURCE_ZIP",
-            "built_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "repo_commit": "$GITHUB_SHA",
             "artifact_folder": "$REL_DIR",
             "apk_file": "${APK_FILE:-}",
-            "apk_sha256": "$APK_SHA",
+            "apk_sha256": "$( [[ -n "$APK_FILE" ]] && sha256sum "$APK_FILE" | awk '{print $1}' )",
             "bundle_file": "${BUNDLE_FILE:-}",
-            "bundle_sha256": "$BUNDLE_SHA",
-            "signing_mode": "${SIGNING_MODE:-unknown}",
-            "update_modes": {
-              "apk_install_update": true,
-              "hot_patch_assets": true,
-              "silent_self_install": false
-            }
+            "bundle_sha256": "$( [[ -n "$BUNDLE_FILE" ]] && sha256sum "$BUNDLE_FILE" | awk '{print $1}' )",
+            "signing_mode": "$SIGNING_MODE"
           }
           JSON
-          cp "$MANIFEST_FILE" "$LATEST_FILE"
-
+          cp "$SWRLZ_UPDATES_DIR/${SAFE_RELEASE}_manifest.json" "$SWRLZ_UPDATES_DIR/latest_client.json"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$REL_DIR" "$MANIFEST_FILE" "$LATEST_FILE"
+          git add "$REL_DIR" "$SWRLZ_UPDATES_DIR/${SAFE_RELEASE}_manifest.json" "$SWRLZ_UPDATES_DIR/latest_client.json"
           git diff --cached --quiet && exit 0
-          git commit -m "build: add ${RELEASE_NAME} APK artifacts and update manifest" || { echo "::warning::Release artifact commit failed after APK artifact upload. Build artifact remains valid."; exit 0; }
-          git push || { echo "::warning::Release artifact push failed after APK artifact upload. Build artifact remains valid."; exit 0; }
+          git commit -m "build: add ${RELEASE_NAME} APK artifacts and update manifest"
+          git push
