@@ -43,7 +43,6 @@ on:
       - 'SOURCES/SERVER/*.sha256'
       - 'SOURCES/SERVER/*.sha'
       - 'SOURCES/SERVER/*.txt'
-      - 'SOURCES/CORE_BASE/source/**'
       - 'SOURCES/CORE_BASE/*.zip'
       - 'SOURCES/CORE_BASE/*.sha256'
       - 'SOURCES/CORE_BASE/*.sha'
@@ -284,6 +283,64 @@ jobs:
             "$WORK_DIR" \
             "$ARTIFACT_DIR"
 
+      - name: Apply optional stable development signing
+        id: signing
+        env:
+          ARTIFACT_DIR: ${{ steps.build.outputs.artifact_dir }}
+          SWRLZ_DEV_KEYSTORE_BASE64: ${{ secrets.SWRLZ_DEV_KEYSTORE_BASE64 }}
+          SWRLZ_DEV_KEYSTORE_PASSWORD: ${{ secrets.SWRLZ_DEV_KEYSTORE_PASSWORD }}
+          SWRLZ_DEV_KEY_ALIAS: ${{ secrets.SWRLZ_DEV_KEY_ALIAS }}
+          SWRLZ_DEV_KEY_PASSWORD: ${{ secrets.SWRLZ_DEV_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          PRESENT=0
+          for value in \
+            "$SWRLZ_DEV_KEYSTORE_BASE64" \
+            "$SWRLZ_DEV_KEYSTORE_PASSWORD" \
+            "$SWRLZ_DEV_KEY_ALIAS" \
+            "$SWRLZ_DEV_KEY_PASSWORD"; do
+            [[ -n "$value" ]] && PRESENT=$((PRESENT + 1))
+          done
+
+          SIGNING_MODE='debug-runner-default'
+          if [[ "$PRESENT" -ne 0 && "$PRESENT" -ne 4 ]]; then
+            echo 'Stable development signing secrets are only partially configured.' >&2
+            exit 1
+          fi
+
+          if [[ "$PRESENT" -eq 4 ]]; then
+            KEYSTORE="$RUNNER_TEMP/swrlz-dev-signing.jks"
+            printf '%s' "$SWRLZ_DEV_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
+            APKSIGNER="$(find "${ANDROID_HOME:-$HOME}" -type f -name apksigner -print 2>/dev/null | sort -V | tail -n 1 || true)"
+            ZIPALIGN="$(find "${ANDROID_HOME:-$HOME}" -type f -name zipalign -print 2>/dev/null | sort -V | tail -n 1 || true)"
+            [[ -n "$APKSIGNER" && -n "$ZIPALIGN" ]] || {
+              echo 'Stable signing requested, but apksigner/zipalign was not found.' >&2
+              exit 1
+            }
+
+            mapfile -t APKS < <(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name '*.apk' ! -name '*_stable-signed.apk' -print | sort)
+            for APK in "${APKS[@]}"; do
+              BASE="${APK%.apk}"
+              ALIGNED="${BASE}_aligned.apk"
+              SIGNED="${BASE}_stable-signed.apk"
+              "$ZIPALIGN" -f -p 4 "$APK" "$ALIGNED"
+              "$APKSIGNER" sign \
+                --ks "$KEYSTORE" \
+                --ks-pass "pass:$SWRLZ_DEV_KEYSTORE_PASSWORD" \
+                --ks-key-alias "$SWRLZ_DEV_KEY_ALIAS" \
+                --key-pass "pass:$SWRLZ_DEV_KEY_PASSWORD" \
+                --out "$SIGNED" \
+                "$ALIGNED"
+              "$APKSIGNER" verify "$SIGNED"
+              sha256sum "$SIGNED" > "$SIGNED.sha256"
+              rm -f "$ALIGNED"
+            done
+            SIGNING_MODE='stable-dev-signing-active'
+          fi
+
+          printf '%s\n' "$SIGNING_MODE" > "$ARTIFACT_DIR/SWRLZ_SIGNING_MODE.txt"
+          echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
+
       - name: Record source-name normalization provenance
         env:
           ARTIFACT_DIR: ${{ steps.build.outputs.artifact_dir }}
@@ -300,6 +357,7 @@ jobs:
             echo "- Duplicate suffix: \`${{ steps.resolve.outputs.duplicate_suffix || '<none>' }}\`"
             echo "- Source SHA-256: \`${{ steps.resolve.outputs.source_sha256 }}\`"
             echo "- Checksum file: \`${{ steps.resolve.outputs.checksum_file }}\`"
+            echo "- Signing mode: \`${{ steps.signing.outputs.signing_mode }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK and provenance artifact
@@ -319,6 +377,7 @@ jobs:
           SOURCE_ZIP: ${{ steps.resolve.outputs.selected_source }}
           SOURCE_SHA256: ${{ steps.resolve.outputs.source_sha256 }}
           VARIANT: ${{ needs.prepare.outputs.build_variant }}
+          SIGNING_MODE: ${{ steps.signing.outputs.signing_mode }}
         run: |
           set -euo pipefail
           RELEASE_DIR="RELEASES/${CANONICAL_STEM}_APK"
@@ -340,6 +399,7 @@ jobs:
               "selected_source": os.environ["SOURCE_ZIP"],
               "source_sha256": os.environ["SOURCE_SHA256"],
               "variant": os.environ["VARIANT"],
+              "signing_mode": os.environ["SIGNING_MODE"],
               "artifact_folder": "RELEASES/" + os.environ["CANONICAL_STEM"] + "_APK",
               "repository_commit": os.environ["GITHUB_SHA"],
               "workflow_run": os.environ["GITHUB_RUN_ID"],
