@@ -24,8 +24,8 @@ on:
     branches:
       - main
     paths:
-      - "SOURCES/SERVER/SERVER_CFv*_SWRLZ.zip"
-      - "SOURCES/SERVER/SERVER_CFv*_SWRLZ.sha256"
+      - "SOURCES/SERVER/SERVER_CFv*_SWRLZ*.zip"
+      - "SOURCES/SERVER/SERVER_CFv*_SWRLZ*.sha256"
       - "SOURCES/SERVER/SWRLZ_NODE_HOST_COMPLETE.zip"
       - ".github/workflows/build-swrlz-server-apk.yml"
 
@@ -57,6 +57,100 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Normalize Android duplicate-download filenames
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import re
+          import shutil
+          import sys
+
+          lane = Path("SOURCES/SERVER")
+          zip_re = re.compile(r"^(SERVER_CFv[0-9]+(?:\.[0-9]+)*_SWRLZ)(?:\s*\(([0-9]+)\))?\.zip$")
+          sha_re = re.compile(r"^(SERVER_CFv[0-9]+(?:\.[0-9]+)*_SWRLZ)(?:\s*\(([0-9]+)\))?\.sha256$")
+
+          groups = {}
+          for path in sorted(lane.iterdir() if lane.exists() else []):
+              match = zip_re.match(path.name)
+              kind = "zip"
+              if not match:
+                  match = sha_re.match(path.name)
+                  kind = "sha"
+              if not match:
+                  continue
+              identity = match.group(1)
+              groups.setdefault(identity, {"zip": [], "sha": []})[kind].append(path)
+
+          def digest(path: Path) -> str:
+              h = hashlib.sha256()
+              with path.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          def declared_sha(path: Path) -> str:
+              for token in path.read_text(encoding="utf-8").split():
+                  if re.fullmatch(r"[0-9a-fA-F]{64}", token):
+                      return token.lower()
+              raise SystemExit(f"Checksum file has no SHA-256 value: {path}")
+
+          for identity, entries in sorted(groups.items()):
+              zips = entries["zip"]
+              shas = entries["sha"]
+              has_suffix = any(path.name != f"{identity}.zip" for path in zips) or any(
+                  path.name != f"{identity}.sha256" for path in shas
+              )
+              if not has_suffix:
+                  continue
+              if not zips or not shas:
+                  raise SystemExit(
+                      f"Android-suffixed source pair is incomplete for {identity}: "
+                      f"zips={[p.name for p in zips]}, shas={[p.name for p in shas]}"
+                  )
+
+              zip_hashes = {digest(path) for path in zips}
+              if len(zip_hashes) != 1:
+                  raise SystemExit(
+                      f"Conflicting ZIP candidates for {identity}: "
+                      + ", ".join(f"{p.name}={digest(p)}" for p in zips)
+                  )
+              actual = next(iter(zip_hashes))
+
+              declared = {declared_sha(path) for path in shas}
+              if len(declared) != 1:
+                  raise SystemExit(
+                      f"Conflicting checksum candidates for {identity}: "
+                      + ", ".join(f"{p.name}={declared_sha(p)}" for p in shas)
+                  )
+              expected = next(iter(declared))
+              if actual != expected:
+                  raise SystemExit(
+                      f"Checksum mismatch for {identity}: expected {expected}, actual {actual}"
+                  )
+
+              canonical_zip = lane / f"{identity}.zip"
+              canonical_sha = lane / f"{identity}.sha256"
+              selected_zip = canonical_zip if canonical_zip in zips else sorted(zips, key=lambda p: p.name)[0]
+
+              if canonical_zip.exists():
+                  if digest(canonical_zip) != actual:
+                      raise SystemExit(f"Canonical ZIP conflicts with suffixed candidates: {canonical_zip}")
+              else:
+                  shutil.copyfile(selected_zip, canonical_zip)
+
+              canonical_sha.write_text(f"{actual}  {canonical_zip.name}\n", encoding="utf-8")
+              if digest(canonical_zip) != actual:
+                  raise SystemExit(f"Runner-only canonical ZIP copy changed bytes: {canonical_zip}")
+
+              print(
+                  f"::warning::Normalized Android duplicate filenames for {identity} in runner only. "
+                  f"ZIP candidates={[p.name for p in zips]}; SHA candidates={[p.name for p in shas]}; "
+                  f"canonical={canonical_zip.name}/{canonical_sha.name}; sha256={actual}"
+              )
+          PY
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -101,7 +195,6 @@ jobs:
           echo "source_zip=$SOURCE_ZIP" >> "$GITHUB_OUTPUT"
           echo "source_base=$SOURCE_BASE" >> "$GITHUB_OUTPUT"
           echo "checksum_file=$CHECKSUM_FILE" >> "$GITHUB_OUTPUT"
-
           echo "Selected SERVER source: $SOURCE_ZIP"
 
       - name: Verify SERVER archive
