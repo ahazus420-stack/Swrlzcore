@@ -2,6 +2,16 @@ name: Build SWRLZ Core Android Foundation
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'SOURCES/CORE_BASE/source/**'
+      - 'SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.zip'
+      - 'SOURCES/CORE_BASE/SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE.sha256'
+      - 'SOURCES/CORE_BASE/OLD_PATCHES/**'
+      - 'BUILD_REQUESTS/000_CURRENT.request'
+      - '.github/workflows/build-swrlz-core-android-foundation.yml'
   push:
     branches:
       - main
@@ -159,7 +169,7 @@ jobs:
           sha256sum SWRLZ_CORE_BASE_CORE_REDUCE_003_BUILD_ARTIFACT.zip > SWRLZ_CORE_BASE_CORE_REDUCE_003_BUILD_ARTIFACT.zip.sha256
 
       - name: Record verified canonical source package on checkpoint branch
-        if: success()
+        if: ${{ success() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/checkpoint/') }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
