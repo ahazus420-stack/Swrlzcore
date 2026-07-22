@@ -1,0 +1,23 @@
+# CLIENT CFv2.0.12 SWRLZ Delivery Receipt
+
+Checkpoint: INT-FIX-023A
+Baseline: CLIENT CFv2.0.11
+Target: CLIENT CFv2.0.12
+ZIP: CLIENT_CFv2.0.12_SWRLZ.zip
+SHA-256: d7ced592289d19c3ec4421a8279d97b4e5f7531ea1edbffb2dd747b0ca80de3f
+Size: 4697962 bytes
+
+Purpose: repair the missing ClientPresenceRegistration import that blocked Kotlin compilation and correct the stale source/output identity used by the build helper.
+
+Verification:
+- MISSING IMPORT ADDED
+- ACTIVE SOURCE ZIP IDENTITY ADVANCED
+- GITHUB ACTIONS ARTIFACT IDENTITY ADVANCED
+- STATIC BOUNDED VERIFICATION PASS
+- ZIP INTEGRITY PASS
+- CHECKSUM PAIR VERIFIED
+- MANIFEST CROSS-VERIFIED
+- ZIP UNCHANGED AFTER HASHING
+- BUILD NOT RUN
+- RUNTIME NOT TESTED
+- GITHUB NOT MODIFIED

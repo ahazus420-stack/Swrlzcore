@@ -1,0 +1,15 @@
+{
+  "baseline": "CLIENT CFv2.0.11",
+  "change_type": "compile import and output identity repair",
+  "checkpoint": "INT-FIX-023A",
+  "component": "CLIENT",
+  "generated_at_utc": "2026-07-22T23:11:35Z",
+  "schema": 1,
+  "sha256": "d7ced592289d19c3ec4421a8279d97b4e5f7531ea1edbffb2dd747b0ca80de3f",
+  "size_bytes": 4697962,
+  "verified": true,
+  "version": "CFv2.0.12",
+  "zip": "CLIENT_CFv2.0.12_SWRLZ.zip",
+  "build_run": false,
+  "runtime_tested": false
+}
