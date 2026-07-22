@@ -1,0 +1,56 @@
+name: SWRLZ Source Package Integrity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'SOURCES/**/*.zip'
+      - 'SOURCES/**/*.sha256'
+      - 'SOURCES/**/*.manifest.json'
+  workflow_dispatch:
+    inputs:
+      source_zip:
+        description: Repository path to source ZIP
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Resolve changed or selected source ZIPs
+        id: sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]; then
+            printf '%s\n' "${{ inputs.source_zip }}" > "$RUNNER_TEMP/swrlz-zips.txt"
+          else
+            BEFORE='${{ github.event.before }}'
+            AFTER='${{ github.sha }}'
+            if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
+              git show --pretty= --name-only "$AFTER"
+            else
+              git diff --name-only "$BEFORE" "$AFTER"
+            fi | grep '^SOURCES/.*\.zip$' | grep -v '/OLD_PATCHES/' | sort -u > "$RUNNER_TEMP/swrlz-zips.txt" || true
+          fi
+          cat "$RUNNER_TEMP/swrlz-zips.txt"
+          echo "list=$RUNNER_TEMP/swrlz-zips.txt" >> "$GITHUB_OUTPUT"
+
+      - name: Verify final ZIP checksum and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          list='${{ steps.sources.outputs.list }}'
+          [[ -s "$list" ]] || { echo 'No source ZIPs selected.'; exit 0; }
+          while IFS= read -r zip; do
+            [[ -n "$zip" ]] || continue
+            python3 scripts/ci/verify_swrlz_package_pair.py "$zip"
+          done < "$list"
