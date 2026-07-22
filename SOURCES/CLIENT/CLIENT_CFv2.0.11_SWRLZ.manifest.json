@@ -1,0 +1,13 @@
+{
+  "baseline": "CLIENT CFv2.0.10",
+  "change_type": "packaging-integrity reissue",
+  "checkpoint": "INT-PKG-022A",
+  "component": "CLIENT",
+  "generated_at_utc": "2026-07-22T22:09:13+00:00",
+  "schema": 1,
+  "sha256": "4ffd6eb67aa498547ff2b750b3beadcada3c9dea6a44210bfe27b9c9cb906a98",
+  "size_bytes": 4665168,
+  "verified": true,
+  "version": "CFv2.0.11",
+  "zip": "CLIENT_CFv2.0.11_SWRLZ.zip"
+}
