@@ -56,3 +56,44 @@ GitHub has been moving toward stronger automation, governance, and security prim
 - `capabilities/`
 - `history/`
 - `timeline/`
+
+## 2026-07-22
+
+### Entry 003
+**Title:** Persistent node registry and state-aware SERVER lifecycle
+
+**Summary:**
+The CLIENT/SERVER integration advanced from discovery-only visibility toward verified automatic CLIENT registration, durable SERVER-side node inventory, heartbeat-derived presence, synchronized counts, state-driven node visuals, and a production-grade SERVER lifecycle with maintenance, reload, service restart, and graceful shutdown semantics.
+
+**Repository Reality Check:**
+- Repository delivery receipts were confirmed through CLIENT `CFv2.0.5` and SERVER `CFv2.0.6`.
+- CLIENT `CFv2.0.6` and SERVER `CFv2.0.7` were prepared outside the repository and remain pending canonical ZIP/checksum/receipt upload, GitHub build, migration testing, and device/runtime evidence.
+- The new architecture is therefore documented as accepted design and source-prepared scope, not as runtime-accepted behavior.
+
+**SWRLZ Impact:**
+- Registered node inventory becomes durable rather than disappearing with connectivity.
+- Online/offline/busy/transitional state becomes independent from registration and trust.
+- User Mode and Developer Mode observe one authoritative node repository.
+- SERVER shutdown becomes an evidence-based sequence that preserves state and informs CLIENTS.
+
+**Architecture Analysis:**
+- **Identity:** registration, proof, trust, authorization, revocation, and retirement remain separate.
+- **Persistence:** offline nodes remain registered; heartbeat expiry changes presence, not inventory.
+- **Lifecycle:** degraded, maintenance, reload, restart, and shutdown remain runtime-active states with truthful operator actions.
+- **Visual truth:** animated node blobs project authoritative state and never manufacture trust or connectivity.
+- **Protocol discipline:** incompatible wire changes require explicit version handling.
+
+**Learning Delta:**
+- **What changed?** Node management is now modeled as a persistent registry plus live presence state, and SERVER control is modeled as a lifecycle rather than a binary process toggle.
+- **Why?** Discovery reachability could not explain durable node identity, online/offline counts, mission occupancy, or safe shutdown behavior.
+- **What knowledge improved?** The repository now has explicit contracts for automatic enrollment, persistent inventory, presence reduction, UI projection, maintenance admission, and graceful shutdown ordering.
+- **Which future missions benefit?** Multi-device orchestration, trust review, mission routing, remote node support, diagnostics, and recovery testing.
+- **Confidence:** High for architecture; runtime acceptance pending evidence.
+
+**Repository Maintenance:**
+- Added `docs/checkpoints/INT_PRES_015A_AND_INT_LIFE_016A_IMPLEMENTATION_RECORD.md`.
+- Added `docs/architecture/SERVER_NODE_REGISTRY_AND_LIFECYCLE_V1.md`.
+- Preserved a clear distinction between prepared source claims and repository/runtime evidence.
+
+**Next Evidence Gate:**
+Upload and verify CLIENT `CFv2.0.6` and SERVER `CFv2.0.7`, build both through GitHub, install/upgrade on device, and record registration, persistence, presence, lifecycle, migration, and shutdown evidence before declaring runtime acceptance.
