@@ -1,0 +1,14 @@
+{
+  "baseline": "SERVER CFv2.0.13",
+  "build_run": false,
+  "checkpoint": "INT-UX-025B-REV1",
+  "component": "SERVER",
+  "generated_at_utc": "2026-07-23T01:58:11.043635+00:00",
+  "runtime_tested": false,
+  "schema": 1,
+  "sha256": "a3f9cd497fed8fce0614c8d280a557e41b2e11d30d01b7410c5582e3d743911b",
+  "size_bytes": 18858633,
+  "verified": true,
+  "version": "CFv2.0.14",
+  "zip": "SERVER_CFv2.0.14_SWRLZ.zip"
+}
