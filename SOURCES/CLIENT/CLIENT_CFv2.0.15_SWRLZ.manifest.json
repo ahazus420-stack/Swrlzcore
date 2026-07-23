@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "checkpoint": "INT-UX-025D",
+  "component": "CLIENT",
+  "baseline": "CLIENT CFv2.0.14",
+  "version": "CFv2.0.15",
+  "zip": "CLIENT_CFv2.0.15_SWRLZ.zip",
+  "sha256": "a06dec2be30e9d94990b80502ba2dabb4630c382782bd5916817e2bbdc99f3f3",
+  "size_bytes": 4673950,
+  "verified": true,
+  "generated_at_utc": "2026-07-23T02:35:06.843086+00:00",
+  "build_run": false,
+  "runtime_tested": false
+}
