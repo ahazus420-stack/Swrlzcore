@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "component": "SERVER",
+  "baseline": "SERVER CFv2.0.12",
+  "version": "CFv2.0.13",
+  "checkpoint": "INT-FIX-024B",
+  "change_type": "compiler integration repair",
+  "zip": "SERVER_CFv2.0.13_SWRLZ.zip",
+  "sha256": "0424629319e55e856b0daf6fe3f7bee9725063616dc907514a0fd0b14a573e72",
+  "size_bytes": 18853749,
+  "verified": true,
+  "build_run": false,
+  "runtime_tested": false
+}
