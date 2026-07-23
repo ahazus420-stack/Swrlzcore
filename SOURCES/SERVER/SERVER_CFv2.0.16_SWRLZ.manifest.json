@@ -1,0 +1,18 @@
+{
+  "package": "SERVER_CFv2.0.16_SWRLZ.zip",
+  "checkpoint": "INT-UX-026A",
+  "kind": "SERVER",
+  "version": "CFv2.0.16",
+  "sha256": "f4841732a56bdf70c3786e675fe637d3bfff2f27b04efd1bcb28531b354adbf9",
+  "sourceOnly": true,
+  "buildRun": false,
+  "runtimeVerified": false,
+  "fileCount": 124,
+  "generatedAt": "2026-07-23T03:05:41.725780+00:00",
+  "keyChanges": [
+    "swipeable bottom navigation",
+    "dedicated Groups destination",
+    "group workflow UI",
+    "documentation update"
+  ]
+}
