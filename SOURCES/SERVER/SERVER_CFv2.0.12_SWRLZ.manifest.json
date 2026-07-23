@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "checkpoint": "INT-GRP-024A-REV2",
+  "component": "SERVER",
+  "baseline": "SERVER CFv2.0.11",
+  "version": "CFv2.0.12",
+  "zip": "SERVER_CFv2.0.12_SWRLZ.zip",
+  "sha256": "a4102921c81fb67b5868e2a69e1c8bd3cd1e64c5007b93d81b2215ef5abdfbcb",
+  "size_bytes": 18838146,
+  "archive_entries": 114,
+  "generated_at_utc": "2026-07-23T00:51:37.649996+00:00",
+  "verified": true,
+  "verification": [
+    "bounded static source checks",
+    "ZIP integrity PASS",
+    "checksum pair verified"
+  ],
+  "build_run": false,
+  "runtime_tested": false,
+  "scope": [
+    "full CLIENT theme parity on SERVER with Dark, Sunlight, and Inverse variants",
+    "SERVER-owned persistent groups, memberships, invites, and join approvals",
+    "unique server-scoped group names and leader-selected names",
+    "invite rotation invalidates previous active codes",
+    "valid invite creates pending leader approval rather than direct membership",
+    "SERVER active-group count",
+    "CLIENT and SERVER node action-menu foundations",
+    "secondary SERVER disconnect confirmation preserving registration and lineage"
+  ]
+}
