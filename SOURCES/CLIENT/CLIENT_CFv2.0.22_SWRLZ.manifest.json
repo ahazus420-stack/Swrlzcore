@@ -1,0 +1,10 @@
+{
+  "component": "CLIENT",
+  "version": "CFv2.0.22",
+  "checkpoint": "INT-UI-028D",
+  "androidVersionCode": 51,
+  "androidVersionName": "0.2.7.26-cfv2.0.22-int-ui-028d",
+  "sha256": "381790c8d085be6388ef1c9f020d32c689a1d6a5f638ac5d4c5bf456620d524c",
+  "fileCount": 325,
+  "sourceOnly": true
+}
