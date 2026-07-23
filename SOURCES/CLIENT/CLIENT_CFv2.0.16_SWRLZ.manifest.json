@@ -1,0 +1,18 @@
+{
+  "package": "CLIENT_CFv2.0.16_SWRLZ.zip",
+  "checkpoint": "INT-UX-026A",
+  "kind": "CLIENT",
+  "version": "CFv2.0.16",
+  "sha256": "c7a893c43e1a5a6108b6a242c9ff8de572e2d96927520aa9367efa701ed0eb22",
+  "sourceOnly": true,
+  "buildRun": false,
+  "runtimeVerified": false,
+  "fileCount": 311,
+  "generatedAt": "2026-07-23T03:05:41.251143+00:00",
+  "keyChanges": [
+    "swipeable bottom navigation",
+    "dedicated Groups destination",
+    "group workflow UI",
+    "documentation update"
+  ]
+}
