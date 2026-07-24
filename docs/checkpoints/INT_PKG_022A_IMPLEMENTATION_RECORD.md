@@ -1,7 +1,8 @@
 # INT-PKG-022A Implementation Record
 
 **Original date:** 2026-07-22  
-**Policy amendment:** 2026-07-24
+**Policy amendment:** 2026-07-24  
+**Implementation alignment:** 2026-07-24
 
 ## Original objective
 
@@ -47,49 +48,65 @@ A complete required source package contains:
 1. `<base>.zip`
 2. `<base>.sha256`
 
+The SHA file may use either supported representation:
+
+```text
+<64-character sha256>
+<64-character sha256>  <zip filename>
+```
+
 A sibling `<base>.manifest.json` is optional and is validated when present.
 
 ### Rationale
 
 - The current Forge staging and auto-matching flow treats ZIP and SHA as one logical package.
-- The current authoritative CLIENT `CFv2.0.51` and SERVER `CFv2.0.36` deliveries are ZIP+SHA pairs.
+- Current CLIENT and SERVER Forge deliveries use ZIP+SHA pairs.
+- Some Forge-generated checksum siblings contain only the digest, while conventional checksum tools may include the filename.
 - A mandatory manifest should be introduced only when it has a defined downstream function such as routing, version enforcement, provenance, release metadata, or policy attestation.
 - Mandatory metadata without a defined consumer adds a failure surface without improving the cryptographic verification already provided by the exact-basename SHA pair.
 
-### Required verifier behavior
+## Required verifier behavior
 
-`verify_swrlz_package_pair.py` and the Source Package Integrity workflow must implement:
+`verify_swrlz_package_pair.py` and the Source Package Integrity workflow implement:
 
 ```text
-ZIP present                    required
-exact-basename SHA present     required
-SHA syntax valid               required
-ZIP digest matches SHA         required
-manifest present               optional
-manifest cross-check           required only when manifest exists
+ZIP present                         required
+exact-basename SHA sibling present  required
+SHA syntax valid                    required
+hash-only SHA form                  accepted
+digest-plus-filename SHA form       accepted
+ZIP digest matches SHA              required
+manifest present                    optional
+manifest cross-check                required only when manifest exists
 ```
 
-A missing optional manifest must not be reported as a ZIP hash failure.
+A missing optional manifest is not reported as a ZIP hash failure.
 
 ## Log-verified contract mismatch
 
-The supplied GitHub Actions logs selected:
+The supplied GitHub Actions logs selected a current source ZIP and failed with a missing-manifest error before completing checksum verification. The logs did not show a digest mismatch. The verified defect was that the workflow still enforced the superseded mandatory-manifest rule while current Forge delivery supplied the documented ZIP+SHA pair.
+
+## 2026-07-24 repository implementation alignment
+
+The policy is now implemented in repository code:
+
+- `scripts/ci/verify_swrlz_package_pair.py` treats the manifest as optional and accepts both supported SHA file forms.
+- `.github/workflows/source-package-integrity.yml` resolves changed ZIP, SHA, or optional manifest files to the corresponding logical source ZIP.
+- Checksum-only changes are no longer skipped by the workflow resolver.
+- Manifest validation remains strict when a manifest is supplied.
+
+Implementation commits:
 
 ```text
-SOURCES/CLIENT/CLIENT_CFv2.0.50_SWRLZ.zip
+ef20ac6d49364d28def0c20298ffb5ae0e83da36
+94c81671db364a35992d47b163493e19e945759e
 ```
 
-The workflow then failed with:
-
-```text
-Missing manifest: SOURCES/CLIENT/CLIENT_CFv2.0.50_SWRLZ.manifest.json
-```
-
-The logs do not show a digest mismatch. The verified defect is that the workflow still enforced the superseded mandatory-manifest rule while current Forge delivery supplied the documented ZIP+SHA pair.
+Local verification accepted the hash-only, manifest-free CLIENT `CFv2.0.53` package and the prepared CLIENT `CFv2.0.54` repair package. GitHub Actions acceptance remains evidence-gated until the next package-triggered run completes successfully.
 
 ## Exclusions
 
-- This documentation amendment does not itself modify the verification script or workflow.
-- It does not weaken checksum verification.
+- The alignment does not weaken SHA-256 verification.
 - It does not prohibit manifests.
 - It does not declare CLIENT or SERVER runtime acceptance.
+- It does not declare the next GitHub Actions run successful before that run completes.
