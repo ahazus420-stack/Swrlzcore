@@ -4,10 +4,11 @@ SWRLZ is an offline-first Android automation and AI control ecosystem built arou
 
 ## Current CFv2.0.x baselines
 
-- **Last log-verified CLIENT build input:** `CLIENT_CFv2.0.57_SWRLZ.zip`; APK Router reached Kotlin compilation and failed at a bounded `ForgeUploadLogStore` SharedPreferences receiver defect.
-- **Prepared CLIENT baseline:** `CLIENT_CFv2.0.59_SWRLZ.zip` with matching SHA-256. It preserves the `CFv2.0.58` live redacted Forge logs, connector continuity, CLIENT actor evidence, and Dragon Kamileon Theme Armor while aligning the Kotlin Android, serialization, and Compose Compiler Gradle plugins at `2.0.0`.
-- **Prepared SERVER baseline:** `SERVER_CFv2.0.41_SWRLZ.zip` with matching SHA-256. It preserves full SWURLZER Forge capability and Dragon Kamileon Theme Armor while upgrading Activity Compose to `1.9.2` for `rememberLauncherForActivityResult` and removing the obsolete pre-Kotlin-2 Compose compiler extension setting.
-- **Status:** static preflight and package verification are complete; GitHub Android compilation and device acceptance remain pending. Stabilization continues on `CFv2.0.x`; the coordinated `CFv2.1.0` Chat control plane remains gated by documented exit criteria.
+- **Last device-verified CLIENT build:** `CLIENT_CFv2.0.58_SWRLZ.zip`; APK Router succeeded and device screenshots confirm Dragon Kamileon interface/bubble identity, bubble-hosted Forge observation, version provenance, and upload-success notification identity.
+- **Prepared CLIENT baseline:** `CLIENT_CFv2.0.60_SWRLZ.zip` with matching SHA-256. It includes the CFv2.0.59 Kotlin/Compose preflight alignment, prevents Theme Armor or launcher task refresh from presenting a false disconnected GitHub account while the saved Keystore token is validating, hides redundant authorization controls while a token exists, and makes Repository Target and Source Package Matching persistent collapsible panels.
+- **Last log-verified SERVER build:** `SERVER_CFv2.0.40_SWRLZ.zip`; Kotlin compilation failed because `ServerBubbleActivity.kt` used `Modifier.border(...)` without importing `androidx.compose.foundation.border`.
+- **Prepared SERVER baseline:** `SERVER_CFv2.0.42_SWRLZ.zip` with matching SHA-256. It preserves the CFv2.0.41 Activity Compose and Kotlin/Compose preflight repairs and adds the missing SERVER bubble border import.
+- **Status:** CLIENT CFv2.0.58 is build-verified. CLIENT CFv2.0.60 and SERVER CFv2.0.42 are source/static and package verified; their GitHub builds and device acceptance remain pending. Stabilization continues on `CFv2.0.x`.
 
 ## Product identities
 
@@ -41,13 +42,15 @@ SWRLZ-Forge-Actor: CLIENT | SERVER
 
 The separate Android apps do not claim a shared local lock. Concurrent branch movement is handled by resolving the latest GitHub head after transfer, rebuilding the candidate tree, retrying bounded non-fast-forward races, confirming the final branch head, and reading every uploaded path back before success. A transfer reaching 100 percent is not sufficient evidence that the repository changed.
 
-CLIENT keeps its backup-aware connector continuity and exportable redacted upload diagnostics. SERVER stores its Forge profile locally with a Keystore-backed token, reconnects across restart/same-signed update when validation succeeds, and requires approval before disconnecting.
+## GitHub connector continuity
+
+CLIENT stores the GitHub token in Android Keystore-backed encrypted preferences and the non-secret connection profile separately. A Theme Armor or launcher identity refresh must not clear authorization or expose a new OAuth device-code flow while the saved token is validating. Temporary verification failure remains non-destructive; deliberate disconnect still requires approval.
 
 ## Build configuration truth
 
-CLIENT uses the Kotlin 2.0 Compose Compiler Gradle plugin with Kotlin Android and serialization plugins aligned to the same `2.0.0` version.
+CLIENT uses the Kotlin 2.0 Compose Compiler Gradle plugin with Kotlin Android and serialization plugins aligned to `2.0.0`.
 
-SERVER uses Kotlin/Compose `2.0.20`, no legacy `kotlinCompilerExtensionVersion` override, and Activity Compose `1.9.2` for the Forge Activity Result APIs.
+SERVER uses Kotlin/Compose `2.0.20`, no legacy `kotlinCompilerExtensionVersion` override, Activity Compose `1.9.2`, and the required Compose foundation `border` import in the SERVER bubble.
 
 ## Dragon Kamileon Theme Armor
 
@@ -58,21 +61,17 @@ Both applications include a selectable iridescent cyan, violet, magenta, and gol
 The prepared applications expose Android build identity at the bottom of their main User and Developer surfaces:
 
 ```text
-CLIENT · CFv2.0.59    VC 86
-SERVER · CFv2.0.41    VC 42
+CLIENT · CFv2.0.60    VC 87
+SERVER · CFv2.0.42    VC 43
 ```
 
 ## Documentation entry points
 
-- [`docs/checkpoints/CLIENT_059_SERVER_041_BUILD_PREFLIGHT_ALIGNMENT.md`](docs/checkpoints/CLIENT_059_SERVER_041_BUILD_PREFLIGHT_ALIGNMENT.md) — build preflight findings, Kotlin/Compose alignment, SERVER Activity Compose API repair, static checks, final hashes, and acceptance gates.
-- [`docs/checkpoints/CLIENT_058_SERVER_040_DUAL_FORGE_DRAGON_KAMILEON.md`](docs/checkpoints/CLIENT_058_SERVER_040_DUAL_FORGE_DRAGON_KAMILEON.md) — CLIENT compiler repair, CLIENT/SERVER Forge capability, actor/concurrency truth, Dragon Kamileon Theme Armor, final hashes, and acceptance gates.
+- [`docs/checkpoints/CLIENT_060_SERVER_042_THEME_CONNECTOR_AND_BORDER_REPAIR.md`](docs/checkpoints/CLIENT_060_SERVER_042_THEME_CONNECTOR_AND_BORDER_REPAIR.md) — CLIENT CFv2.0.58 runtime evidence, theme-refresh GitHub continuity repair, collapsible Forge panels, SERVER missing-border log diagnosis, final hashes, and acceptance gates.
+- [`docs/checkpoints/CLIENT_059_SERVER_041_BUILD_PREFLIGHT_ALIGNMENT.md`](docs/checkpoints/CLIENT_059_SERVER_041_BUILD_PREFLIGHT_ALIGNMENT.md) — Kotlin/Compose alignment, SERVER Activity Compose API repair, static checks, and package evidence.
+- [`docs/checkpoints/CLIENT_058_SERVER_040_DUAL_FORGE_DRAGON_KAMILEON.md`](docs/checkpoints/CLIENT_058_SERVER_040_DUAL_FORGE_DRAGON_KAMILEON.md) — CLIENT/SERVER Forge capability, actor/concurrency truth, and Dragon Kamileon Theme Armor.
 - [`docs/checkpoints/CLIENT_CFV2_0_57_FORGE_LIVE_LOG_CONNECTOR_RESTORE.md`](docs/checkpoints/CLIENT_CFV2_0_57_FORGE_LIVE_LOG_CONNECTOR_RESTORE.md) — live Forge upload logs, credential redaction, connector persistence, eligible reinstall restoration, validated auto-connect, disconnect approval, and bubble-footer correction.
-- [`docs/checkpoints/CLIENT_056_SERVER_039_IDENTITY_FORGE_OBSERVER_REPAIR.md`](docs/checkpoints/CLIENT_056_SERVER_039_IDENTITY_FORGE_OBSERVER_REPAIR.md) — CLIENT build repair, duplicate integrity-workflow retirement, current launcher/theme identity, theme-reactive bubbles, workflow observer cleanup, and main-page version footers.
-- [`docs/checkpoints/CLIENT_CFV2_0_55_FORGE_REPEAT_NOTIFY_SIBLING.md`](docs/checkpoints/CLIENT_CFV2_0_55_FORGE_REPEAT_NOTIFY_SIBLING.md) — repeated-upload transaction repair, upload/build notifications, bubble event projection, durable build watching, and selected-ZIP sibling SHA matching.
 - [`docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md`](docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md) — Forge, identity, bubble authority, workflow observation, packaging, and installability architecture.
-- [`docs/checkpoints/CFV2_0X_CONVERSATION_UPDATE_RECORD_2026_07_24.md`](docs/checkpoints/CFV2_0X_CONVERSATION_UPDATE_RECORD_2026_07_24.md) — additive documentation audit and CLIENT/SERVER checkpoint record.
-- [`docs/checkpoints/INT_PKG_022B_AND_CLIENT_BUILD_054_REPAIR.md`](docs/checkpoints/INT_PKG_022B_AND_CLIENT_BUILD_054_REPAIR.md) — integrity-policy correction and CLIENT CFv2.0.54 Compose build repair.
-- [`docs/checkpoints/SERVER_CFV2_0_38_BUBBLE_NAMESPACE_BUILD_REPAIR.md`](docs/checkpoints/SERVER_CFV2_0_38_BUBBLE_NAMESPACE_BUILD_REPAIR.md) — SERVER CFv2.0.37 namespace failure and CFv2.0.38 repair.
 - [`docs/roadmaps/CFV2_1_0_CHAT_ENTRY_GATE.md`](docs/roadmaps/CFV2_1_0_CHAT_ENTRY_GATE.md) — coordinated Chat entry gate.
 - [`reports/Blueprint_Council_Log.md`](reports/Blueprint_Council_Log.md) — architecture decisions, learning deltas, and evidence gates.
 
