@@ -4,10 +4,10 @@ SWRLZ is an offline-first Android automation and AI control ecosystem built arou
 
 ## Current CFv2.0.x baselines
 
-- **Repository CLIENT package:** `CLIENT_CFv2.0.53_SWRLZ.zip` with matching SHA-256; APK build failed at a bounded Compose import defect.
-- **Prepared CLIENT baseline:** `CLIENT_CFv2.0.55_SWRLZ.zip` with matching SHA-256. It includes the `CFv2.0.54` Compose repair plus repeated-upload transaction verification, upload/build outcome notifications, bubble event projection, durable artifact-build watches, and selected-ZIP sibling SHA matching. GitHub build and device acceptance remain pending.
-- **Repository SERVER package:** `SERVER_CFv2.0.37_SWRLZ.zip` with matching SHA-256; APK build failed at a bounded bubble package-namespace defect.
-- **Prepared SERVER repair:** `SERVER_CFv2.0.38_SWRLZ.zip` with matching SHA-256; pending Forge upload and GitHub build.
+- **Repository CLIENT package:** `CLIENT_CFv2.0.55_SWRLZ.zip`; APK Router reached Kotlin compilation and failed at a bounded `ForgeBuildWatchStore` collection-operation defect.
+- **Prepared CLIENT baseline:** `CLIENT_CFv2.0.56_SWRLZ.zip` with matching SHA-256. It preserves repeat-upload verification, notifications, durable build watching, and selected-ZIP checksum matching while repairing compilation, improving workflow observation, refreshing current Theme Armor icons, making bubble icons theme-reactive, and adding main-page version footers.
+- **Repository SERVER package:** `SERVER_CFv2.0.38_SWRLZ.zip`; its package-namespace repair is preserved.
+- **Prepared SERVER baseline:** `SERVER_CFv2.0.39_SWRLZ.zip` with matching SHA-256. It replaces fallback/default/theme launcher resources with the current violet SWURLZER artwork, makes SERVER/fusion bubble icons theme-reactive, reasserts the selected launcher alias after update/start, and adds main-page version footers.
 - **Status:** stabilization continues on `CFv2.0.x`; the coordinated `CFv2.1.0` Chat control plane remains gated by documented exit criteria.
 
 ## Product identities
@@ -27,20 +27,32 @@ The current Forge contract requires an exact-basename pair:
 
 The SHA file may contain either the 64-character digest alone or the standard digest-plus-filename form. A `<base>.manifest.json` file is optional during the CFv2.0.x stabilization line and is validated when present.
 
-The repository verifier and Source Package Integrity workflow were aligned to this contract on 2026-07-24. A missing optional manifest is not an integrity failure.
+The repository verifier and authoritative Source Package Integrity workflow implement this contract. The obsolete duplicate integrity workflow was removed on 2026-07-24, so one source transaction should start one integrity run.
 
-## Forge completion truth
+## Forge completion and observation truth
 
 Forge treats source transfer, commit creation, branch confirmation, uploaded-path verification, workflow dispatch, workflow completion, and artifact discovery as separate outcomes. A transfer reaching 100 percent is not sufficient evidence that the repository changed.
 
-Every `CFv2.0.55` submission receives a fresh transaction identifier. Upload success requires the target branch to resolve to the new commit and every uploaded repository path to resolve to its expected blob SHA. Upload and artifact-build terminal outcomes are projected to the CLIENT notification channel and CLIENT bubble event banner.
+Every submission receives a fresh transaction identifier. Upload success requires the target branch to resolve to the new commit and every uploaded repository path to resolve to its expected blob SHA. Upload and artifact-build terminal outcomes project to the CLIENT notification channel and bubble event banner.
+
+CLIENT `CFv2.0.56` keeps all active workflow runs visible, shows four completed runs by default, permits a 2–20 completed-run history, refreshes every two seconds while active and five seconds while idle, and begins polling immediately after a verified upload.
+
+## Visible version provenance
+
+The prepared applications expose Android build identity at the bottom of their main User and Developer surfaces:
+
+```text
+CLIENT · CFv2.0.56    VC 83
+SERVER · CFv2.0.39    VC 40
+```
 
 ## Documentation entry points
 
-- [`docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md`](docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md) — Forge, identity, bubble authority, workflow observation, packaging, and installability architecture.
+- [`docs/checkpoints/CLIENT_056_SERVER_039_IDENTITY_FORGE_OBSERVER_REPAIR.md`](docs/checkpoints/CLIENT_056_SERVER_039_IDENTITY_FORGE_OBSERVER_REPAIR.md) — CLIENT build repair, duplicate integrity-workflow retirement, current launcher/theme identity, theme-reactive bubbles, workflow observer cleanup, and main-page version footers.
 - [`docs/checkpoints/CLIENT_CFV2_0_55_FORGE_REPEAT_NOTIFY_SIBLING.md`](docs/checkpoints/CLIENT_CFV2_0_55_FORGE_REPEAT_NOTIFY_SIBLING.md) — repeated-upload transaction repair, upload/build notifications, bubble event projection, durable build watching, and selected-ZIP sibling SHA matching.
+- [`docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md`](docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md) — Forge, identity, bubble authority, workflow observation, packaging, and installability architecture.
 - [`docs/checkpoints/CFV2_0X_CONVERSATION_UPDATE_RECORD_2026_07_24.md`](docs/checkpoints/CFV2_0X_CONVERSATION_UPDATE_RECORD_2026_07_24.md) — additive documentation audit and CLIENT/SERVER checkpoint record.
-- [`docs/checkpoints/INT_PKG_022B_AND_CLIENT_BUILD_054_REPAIR.md`](docs/checkpoints/INT_PKG_022B_AND_CLIENT_BUILD_054_REPAIR.md) — integrity-workflow correction and CLIENT CFv2.0.54 Kotlin build repair.
+- [`docs/checkpoints/INT_PKG_022B_AND_CLIENT_BUILD_054_REPAIR.md`](docs/checkpoints/INT_PKG_022B_AND_CLIENT_BUILD_054_REPAIR.md) — integrity-policy correction and CLIENT CFv2.0.54 Compose build repair.
 - [`docs/checkpoints/SERVER_CFV2_0_38_BUBBLE_NAMESPACE_BUILD_REPAIR.md`](docs/checkpoints/SERVER_CFV2_0_38_BUBBLE_NAMESPACE_BUILD_REPAIR.md) — SERVER CFv2.0.37 namespace failure and CFv2.0.38 repair.
 - [`docs/checkpoints/INT_FORGE_017A_AND_INT_ID_018A_IMPLEMENTATION_RECORD.md`](docs/checkpoints/INT_FORGE_017A_AND_INT_ID_018A_IMPLEMENTATION_RECORD.md) — Forge and Android identity implementation lineage.
 - [`docs/checkpoints/INT_PKG_022A_IMPLEMENTATION_RECORD.md`](docs/checkpoints/INT_PKG_022A_IMPLEMENTATION_RECORD.md) — immutable package-integrity history and package-policy amendment.
