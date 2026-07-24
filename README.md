@@ -6,10 +6,10 @@ SWRLZ is an offline-first Android automation and AI control ecosystem built arou
 
 - **Last device-verified CLIENT build:** `CLIENT_CFv2.0.58_SWRLZ.zip`; APK Router succeeded and device screenshots confirm Dragon Kamileon interface/bubble identity, bubble-hosted Forge observation, version provenance, and upload-success notification identity.
 - **Additional CLIENT runtime evidence:** repeated uploads now work from the same installed CLIENT without reinstalling, producing new confirmed commits and correct bubble/notification commit outcomes.
-- **Prepared CLIENT baseline:** `CLIENT_CFv2.0.61_SWRLZ.zip` with matching SHA-256. It includes the CFv2.0.60 GitHub theme-refresh continuity and collapsible panels, then replaces forced checksum re-browsing with automatic exact sibling lookup plus an explicit fallback only when Android blocks sibling access.
+- **Prepared CLIENT baseline:** `CLIENT_CFv2.0.62_SWRLZ.zip` with matching SHA-256. It preserves the automatic sibling-checksum resolver and prior Forge reliability work while separating unverified fine-grained token text from the active validated runtime token.
 - **Last log-verified SERVER build:** `SERVER_CFv2.0.41_SWRLZ.zip`; Kotlin compilation failed because `ServerBubbleActivity.kt` used `Modifier.border(...)` without importing `androidx.compose.foundation.border`.
-- **Prepared SERVER baseline:** `SERVER_CFv2.0.43_SWRLZ.zip` with matching SHA-256. It preserves the CFv2.0.42 exact border-import repair and adds the same automatic checksum resolver and non-forced fallback to SWURLZER Forge.
-- **Status:** CLIENT CFv2.0.58 and repeated CLIENT Forge uploads are device-verified. CLIENT CFv2.0.61 and SERVER CFv2.0.43 are source/static and package verified; their GitHub builds and device acceptance remain pending. Stabilization continues on `CFv2.0.x`.
+- **Prepared SERVER baseline:** `SERVER_CFv2.0.44_SWRLZ.zip` with matching SHA-256. It preserves the exact border repair, SWURLZER Forge, and automatic checksum resolver while adding the same corrected manual-token validation state model.
+- **Status:** CLIENT CFv2.0.58 and repeated CLIENT Forge uploads are device-verified. CLIENT CFv2.0.62 and SERVER CFv2.0.44 are source/static and package verified; their GitHub builds and device acceptance remain pending. Stabilization continues on `CFv2.0.x`.
 
 ## Product identities
 
@@ -35,6 +35,17 @@ The repository verifier and authoritative Source Package Integrity workflow impl
 CLIENT and SERVER derive the exact `.sha256` name from the selected ZIP and attempt provider-safe sibling resolution through path-based document IDs, parent child enumeration, and Android 10+ MediaStore relative-directory matching.
 
 Forge never launches a second file browser automatically. When Android denies sibling access, the ZIP remains staged and an explicit `LOCATE SHA-256` fallback appears. Upload remains blocked until the exact checksum is readable and validates.
+
+## Manual token validation state
+
+Forge distinguishes between unverified token text and an active credential:
+
+```text
+manualTokenInput   unverified candidate text only
+token              active validated runtime credential only
+```
+
+Typing a fine-grained token cannot trigger auto-connect, hide the entry form, replace the active token, or publish connected state. The complete candidate is promoted into encrypted runtime storage only after an explicit `VALIDATE TOKEN` action succeeds against GitHub. Invalid input remains editable and unsaved.
 
 ## Dual Forge completion and concurrency truth
 
@@ -68,12 +79,13 @@ Both applications include a selectable iridescent cyan, violet, magenta, and gol
 The prepared applications expose Android build identity at the bottom of their main User and Developer surfaces:
 
 ```text
-CLIENT · CFv2.0.61    VC 88
-SERVER · CFv2.0.43    VC 44
+CLIENT · CFv2.0.62    VC 89
+SERVER · CFv2.0.44    VC 45
 ```
 
 ## Documentation entry points
 
+- [`docs/checkpoints/CLIENT_062_SERVER_044_MANUAL_TOKEN_VALIDATION_STATE.md`](docs/checkpoints/CLIENT_062_SERVER_044_MANUAL_TOKEN_VALIDATION_STATE.md) — token-entry loop diagnosis, corrected candidate/active credential state model, final hashes, and acceptance gates.
 - [`docs/checkpoints/CLIENT_061_SERVER_043_AUTOMATIC_SIBLING_CHECKSUM.md`](docs/checkpoints/CLIENT_061_SERVER_043_AUTOMATIC_SIBLING_CHECKSUM.md) — repeated-upload evidence, SERVER log clarification, automatic sibling checksum resolution, explicit fallback policy, final hashes, and acceptance gates.
 - [`docs/checkpoints/CLIENT_060_SERVER_042_THEME_CONNECTOR_AND_BORDER_REPAIR.md`](docs/checkpoints/CLIENT_060_SERVER_042_THEME_CONNECTOR_AND_BORDER_REPAIR.md) — CLIENT CFv2.0.58 runtime evidence, theme-refresh GitHub continuity repair, collapsible Forge panels, and SERVER missing-border diagnosis.
 - [`docs/checkpoints/CLIENT_059_SERVER_041_BUILD_PREFLIGHT_ALIGNMENT.md`](docs/checkpoints/CLIENT_059_SERVER_041_BUILD_PREFLIGHT_ALIGNMENT.md) — Kotlin/Compose alignment, SERVER Activity Compose API repair, static checks, and package evidence.
