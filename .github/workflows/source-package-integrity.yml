@@ -1,0 +1,82 @@
+name: SWRLZ Source Package Integrity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'SOURCES/**/*.zip'
+      - 'SOURCES/**/*.sha256'
+      - 'SOURCES/**/*.manifest.json'
+  workflow_dispatch:
+    inputs:
+      source_zip:
+        description: Repository path to source ZIP
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Resolve changed or selected source packages
+        id: sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          list="$RUNNER_TEMP/swrlz-zips.txt"
+          : > "$list"
+
+          if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]; then
+            printf '%s\n' "${{ inputs.source_zip }}" >> "$list"
+          else
+            BEFORE='${{ github.event.before }}'
+            AFTER='${{ github.sha }}'
+            changed="$RUNNER_TEMP/swrlz-changed.txt"
+
+            if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
+              git show --pretty= --name-only "$AFTER" > "$changed"
+            else
+              git diff --name-only "$BEFORE" "$AFTER" > "$changed"
+            fi
+
+            while IFS= read -r path; do
+              [[ -n "$path" ]] || continue
+              [[ "$path" == SOURCES/* ]] || continue
+              [[ "$path" != */OLD_PATCHES/* ]] || continue
+
+              case "$path" in
+                *.zip)
+                  printf '%s\n' "$path" >> "$list"
+                  ;;
+                *.sha256)
+                  printf '%s.zip\n' "${path%.sha256}" >> "$list"
+                  ;;
+                *.manifest.json)
+                  printf '%s.zip\n' "${path%.manifest.json}" >> "$list"
+                  ;;
+              esac
+            done < "$changed"
+          fi
+
+          sort -u -o "$list" "$list"
+          cat "$list"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+
+      - name: Verify final ZIP checksum and optional manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          list='${{ steps.sources.outputs.list }}'
+          [[ -s "$list" ]] || { echo 'No source packages selected.'; exit 0; }
+
+          while IFS= read -r zip; do
+            [[ -n "$zip" ]] || continue
+            python3 scripts/ci/verify_swrlz_package_pair.py "$zip"
+          done < "$list"
