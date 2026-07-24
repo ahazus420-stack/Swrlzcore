@@ -102,7 +102,7 @@ Prepared package:
 
 ```text
 CLIENT_CFv2.0.54_SWRLZ.zip
-SHA-256: a52abc7ee219b2f4c84d0bdb4d918d2d2e8a6f3635e5f3d6f33555c76ffb68da
+SHA-256: 4a7271aab02d710324bba5aacba3312b771a9eb76b1f180ed08fa42c2191dc20
 ```
 
 The ZIP passed compressed-data integrity testing and the patched package verifier locally. It remains pending Forge upload, GitHub APK Router execution, artifact production, installation, and device rendering.
