@@ -1,13 +1,12 @@
-# CLIENT Forge, Identity, and Bubble Foundation Architecture v1
+# CLIENT Forge, Identity, and Bubble Foundation Architecture v1.1
 
-**Status:** Accepted foundation architecture; final runtime acceptance pending repeated build, launcher, notification, and bubble evidence.  
-**Related checkpoints:** `INT-FORGE-017A`, `INT-ID-018A`
+**Status:** Accepted CFv2.0.x foundation architecture; final runtime acceptance remains evidence-gated.  
+**Updated:** 2026-07-24  
+**Related checkpoints:** `INT-FORGE-017A`, `INT-ID-018A`, CLIENT `CFv2.0.47` through `CFv2.0.51`, SERVER `CFv2.0.33` through `CFv2.0.36`
 
 ## 1. Purpose
 
-This document defines the CLIENT-owned control architecture that connects Android package selection, GitHub repository mutation, GitHub Actions observation, artifact delivery, Android visual identity, and the preliminary conversation-bubble surface.
-
-The design establishes SWRLZ CLIENT as the control plane:
+This document defines the CLIENT-owned control architecture connecting Android package selection, GitHub repository mutation, GitHub Actions observation, workflow-log retrieval, artifact delivery, Android identity, role-specific bubble surfaces, and installable update continuity.
 
 ```text
 User / future Chat request
@@ -15,88 +14,159 @@ User / future Chat request
         v
 SWRLZ CLIENT capability layer
         |
-        +--> Forge package and repository operations
-        +--> GitHub Actions observation
-        +--> artifact delivery and install handoff
+        +--> Forge staging and repository operations
+        +--> GitHub Actions jobs, steps, logs, and artifacts
+        +--> local CLIENT actions
         +--> authenticated SWURLZER administration
-        +--> Android bubble projection
+        +--> derived SWURVER fused administration
+        +--> role-specific bubble projections
 ```
 
 GitHub is a backend capability, not the product identity of the Forge interface.
 
-## 2. Forge authority boundary
+## 2. Product identities and authority
 
-The CLIENT may stage files, request repository operations, observe builds, and retrieve artifacts. It must not treat a visually selected repository or workflow as authorization by itself.
+```text
+SWRLZ      Android CLIENT and local control surface
+SWURLZER   SERVER / node host
+SWURVER    authenticated fused CLIENT state with approved SERVER capabilities
+```
+
+SWURVER is not a third application. Visual state never grants authority.
+
+Every privileged surface and action derives from authoritative state:
+
+- authenticated user/session;
+- selected SERVER identity;
+- client-bound and server-bound trust;
+- unexpired capability grants;
+- route-level authorization;
+- revocation state;
+- audit policy.
+
+Persisted layout, icon, bubble, or navigation state may restore presentation only. It must never restore authority. SWURLZER and SWURVER projections downgrade or disappear when trust is revoked, the session expires, the selected SERVER is lost, or required capabilities are removed.
+
+## 3. Forge authority boundary
+
+The CLIENT may stage files, request repository operations, observe builds, download logs and artifacts, and hand artifacts to Android installation flows. A visually selected repository, branch, workflow, or package is not authorization by itself.
 
 Every mutation requires:
 
 - authenticated GitHub credentials;
 - repository scope;
 - required permission scope;
-- explicit target branch;
+- explicit branch;
 - explicit staged-file preview;
-- user confirmation or an approved future Mission policy.
+- user confirmation or an approved Mission policy.
 
 The SERVER remains authoritative for SWURLZER runtime state, node registration, trust, and mission admission. GitHub authority does not imply SERVER authority.
 
-## 3. Forge package pipeline
+## 4. Forge staging and package routing
 
-```text
-Select CLIENT/SERVER packages
--> classify filenames
--> preview authoritative paths
--> validate size and readability
--> stream each blob with bounded memory
--> construct one Git tree
--> create one commit
--> update target branch
--> report commit identity
-```
-
-Canonical package routing:
+Canonical source routing:
 
 ```text
 CLIENT_* -> SOURCES/CLIENT/
 SERVER_* -> SOURCES/SERVER/
+unknown  -> configured visible fallback or explicit routing
 ```
 
-Unknown files must use a visible configured fallback path or require explicit routing.
+Staging invariants:
 
-## 4. Streaming transport
+- new selections merge into the current staging set;
+- duplicate URI selections do not erase prior files;
+- a new source targeting an existing repository path replaces that staged destination;
+- the preview shows filename, size, component, logical package grouping, and final repository path;
+- staging clears only after the target branch is confirmed to point to the new commit.
 
-Android source packages may exceed browser upload limits and may eventually grow significantly. Forge therefore streams from Android storage rather than creating full in-memory copies.
+### 4.1 ZIP and SHA pairing
+
+Forge treats an exact-basename source ZIP and checksum as one logical package:
+
+```text
+<base>.zip
+<base>.sha256
+```
+
+Default behavior:
+
+- automatic ZIP/SHA sibling matching is enabled;
+- the user grants a source folder through Android's Storage Access Framework;
+- the persisted folder grant permits exact sibling lookup;
+- matching never guesses similar names;
+- manual multi-file selection remains available;
+- commit is blocked when a ZIP lacks a readable and matching checksum.
+
+### 4.2 Manifest policy
+
+The active CFv2.0.x operational contract requires ZIP plus SHA. A sibling `<base>.manifest.json` is optional and is validated when present.
+
+A manifest may become mandatory only after a defined downstream purpose is accepted, such as:
+
+- component routing;
+- version enforcement;
+- provenance;
+- release metadata;
+- policy attestation.
+
+The repository verifier and workflow must match this contract. Missing optional metadata must not be reported as a checksum failure.
+
+## 5. Streaming transport and repeated updates
+
+Android source packages may exceed browser upload limits and mobile heap capacity. Forge streams from Android storage rather than constructing whole-file in-memory copies.
 
 Required properties:
 
-- bounded buffer size;
-- progress based on bytes consumed from the source stream;
+- bounded buffers;
+- no whole-ZIP `ByteArray` allocation;
+- progress based on source bytes consumed;
+- current-file and overall transaction progress;
 - cancellation support;
 - mobile-network-aware timeouts;
 - retryable failure classification;
-- no duplicate commit when retrying after branch update success;
-- integrity metadata preserved when checksum files are staged.
+- no duplicate commit after a branch update already succeeded;
+- repeat CLIENT or SERVER updates in the same app session create a new commit and associated workflow run.
 
-Forge UI progress should distinguish the current file from overall transaction progress.
+Transfer completion is not commit success. Forge separates:
 
-## 5. Workflow observation
+```text
+transfer complete
+-> Git objects created
+-> commit created
+-> branch updated
+-> branch confirmed
+-> workflow discovered
+-> workflow completed
+-> artifact discovered
+-> artifact downloaded
+-> artifact verified
+```
+
+## 6. Authentication persistence
+
+GitHub credentials are stored in Android Keystore-backed encrypted preferences, never logged, and removable through explicit disconnect.
+
+Required behavior:
+
+- persist synchronously before reporting connection success;
+- survive process restart;
+- survive a valid same-certificate in-place app update;
+- temporary network or authentication-verification failures must not silently erase a saved credential;
+- credential removal requires an explicit user action or confirmed invalidation policy.
+
+## 7. Workflow observation and logs
 
 Workflow runs are projections of GitHub's authoritative run data.
-
-State treatment:
 
 ```text
 queued / pending     warning treatment
 in_progress          active treatment
 success              success treatment
 failure              failure treatment
-cancelled / skipped  neutral or restrained treatment
+cancelled / skipped  restrained treatment
 ```
 
-Forge may calculate elapsed duration from timestamps. It must not calculate a false compile percentage from elapsed time.
-
-### 5.1 Phase progress
-
-When GitHub job and step data is available, Forge may render a discrete phase timeline:
+Forge may render actual jobs and steps when available:
 
 ```text
 queued
@@ -110,14 +180,23 @@ queued
 -> complete
 ```
 
-Unknown or parallel phases remain indeterminate.
+Unknown or parallel phases remain indeterminate. Elapsed time must not be converted into a fabricated compile percentage.
 
-### 5.2 Artifact transfer progress
+Each workflow card exposes:
 
-Artifact download is a separate HTTP transfer and may expose exact progress:
+- workflow name, event, branch, run identity, timestamps, and duration;
+- actual jobs and steps;
+- authoritative conclusion;
+- workflow link;
+- artifact action;
+- **Download Logs** action for the GitHub Actions run-log ZIP.
+
+### 7.1 Artifact transfer
+
+Artifact download is a separate HTTP transfer and may expose exact progress when transport metadata supports it:
 
 ```text
-bytes downloaded / content length
+bytes transferred / content length
 percentage
 transfer rate
 ETA
@@ -125,149 +204,181 @@ verification state
 save destination
 ```
 
-If content length is unavailable, use transferred bytes plus indeterminate progress rather than a fabricated percentage.
+When content length is absent, show transferred bytes plus indeterminate progress.
 
-## 6. Forge visual state system
+## 8. Forge visual state system
 
-Future visuals are permitted only as truthful state projections.
+Visual effects are truthful projections only.
 
 ### Dragon status
 
 - dormant: idle;
 - awakening: validation or connection;
-- carrying crystals: source upload;
+- carrying crystals: source transfer;
 - forging: tree and commit creation;
-- ignition: workflow dispatch;
+- ignition: workflow dispatch/discovery;
 - active aura: workflow running;
 - completed glow: artifact ready;
-- restrained fault state: failure.
+- restrained fault: failure.
 
-### Spinning crystal
+### Event timeline
 
-A spinning crystal may indicate an active bounded operation such as packaging, hashing, commit construction, build observation, or artifact verification. It must stop or change state when the operation blocks, fails, or completes.
-
-### Live event stream
-
-Forge may maintain a timestamped event timeline:
+Forge may emit correlated events such as:
 
 ```text
 staging completed
+checksum matched
+local integrity verified
 upload started
 blob accepted
 commit created
-workflow queued
-workflow started
+branch confirmed
+workflow discovered
 job/step transition
+logs requested
 artifact discovered
 artifact download started
-integrity verified
+artifact verified
 install handoff requested
 ```
 
-Each event should retain a correlation identifier where available.
-
-### Node activity indicators
-
-Forge-related activity may be projected to Nodes when a CLIENT, SERVER, GitHub backend, or future build worker participates. Indicators must identify whether activity is local, remote, GitHub-hosted, or SERVER-hosted.
-
-## 7. Android identity architecture
+## 9. Android identity and asset ownership
 
 Canonical visual roles:
 
 ```text
-CLIENT    cyan crystal signal dragon
-SERVER    purple crystal guardian
-SWURVER   cyan-purple fused identity
+CLIENT    cyan SWRLZ crystal dragon
+SERVER    violet SWURLZER crystal guardian
+SWURVER   cyan-violet fused identity inside authenticated CLIENT context
 ```
 
-### 7.1 Launcher
+### 9.1 Launcher and recent-apps identity
 
-The launcher icon must use the wordless full-color identity, fit the adaptive safe zone, and remain recognizable at small sizes.
+Launcher identity must reconcile:
 
-The icon system must reconcile:
-
-- default activity/alias;
 - application icon and round icon;
+- launcher activity/alias;
 - adaptive foreground/background;
-- legacy density icons;
+- legacy density resources;
 - theme-selection aliases;
-- package upgrade;
-- launcher cache invalidation where possible.
+- package update and reboot;
+- launcher and recent-apps presentation.
 
-Recommended final refinement: modestly increase the safe-zone margin so horns and crystal shards are not clipped by aggressive launcher masks while keeping the dragon large enough to match the notification identity.
+Adaptive artwork must remain inside safe zones without excessive transparent or white margins.
 
-### 7.2 Notification
+### 9.2 Notification identity
 
-Notification large icons use transparent full-color art. Notification small icons use dedicated monochrome Android silhouettes. The two resource classes must not be reused interchangeably.
+- full-color large icons use genuine transparency;
+- small notification icons use dedicated monochrome Android silhouettes;
+- CLIENT and SERVER artwork must never be reversed;
+- SWURVER art appears only for authenticated fused/admin state.
 
-### 7.3 Bubble
+### 9.3 Asset hygiene
 
-Bubble/person avatars use compact circular artwork with genuine alpha transparency and no text.
+Resources may be removed only after checking references in:
 
-## 8. Bubble ownership
+- manifests and activity aliases;
+- adaptive-icon XML;
+- Kotlin/Java/Compose;
+- XML resources;
+- theme identity switching;
+- build scripts.
 
-The accepted model is one CLIENT-owned Android-managed conversation bubble.
+Theme-selectable launcher families are not dead assets merely because they are not the current default.
+
+## 10. Role-specific bubble control plane
+
+The latest accepted model is a **CLIENT-owned role-specific bubble cluster**.
 
 ```text
-normal local-first state -> cyan CLIENT avatar
-authenticated admin state -> SWURVER fused avatar
+SWRLZ bubble      local CLIENT authority
+SWURLZER bubble   selected authenticated SERVER context
+SWURVER bubble    fused CLIENT state with approved admin capabilities
 ```
 
-The purple SERVER identity may appear inside authenticated remote-control content, but a second fake SERVER bubble is not required.
+These are three capability projections owned by the CLIENT. They are not three independently authoritative applications.
 
-The bubble launches a compact CLIENT surface that can route to:
+### 10.1 SWRLZ surface
 
-- Chat;
-- Missions;
-- Nodes;
-- Groups;
-- Forge;
-- Settings.
+May expose local chat, status, missions, pause/resume, permission recovery, local logs, and emergency stop.
 
-The bubble surface observes the same repositories and capability layer as the full app. It must not maintain a separate source of truth.
+### 10.2 SWURLZER surface
 
-## 9. Chat and Mission integration
+May expose selected SERVER chat, health, connected clients, queue, logs, maintenance, and disconnect only while the SERVER context is authenticated and authorized.
 
-`CFv2.1.0` introduces the conversational control plane over existing capabilities.
+### 10.3 SWURVER surface
 
-Example:
+May expose cross-boundary approvals, deployment, unified health, trust, audit, artifacts, and coordinated stop only while the required fused capability set is valid.
+
+### 10.4 Bubble invariants
+
+- SWRLZ remains available without a SERVER.
+- SWURLZER and SWURVER are gated by verified session state.
+- persisted UI state cannot grant or preserve authority;
+- role visuals downgrade immediately when authoritative state is lost;
+- sensitive actions route through the same capability services as the full app;
+- no bubble maintains an independent source of truth;
+- bubble artwork remains tightly cropped and genuinely transparent;
+- TalkBack linear fallback and sensitive-screen suppression remain required.
+
+This section supersedes the earlier permanent single-bubble decision while preserving the valid security lesson: no fake remote authority and no visual-state trust elevation.
+
+## 11. Chat and Mission integration
+
+`CFv2.1.0` introduces the persistent conversational control plane over these real capabilities.
 
 ```text
 "Build the latest SERVER"
--> Chat creates an approval-aware Forge command
--> Forge stages or resolves the package
--> repository operation executes
--> workflow is observed
--> artifact card returns to Chat
--> user may download, install, inspect logs, or reject
+-> Chat resolves Forge capability
+-> target repository, branch, package, and action are shown
+-> approval is obtained
+-> Forge stages and validates ZIP/SHA
+-> source streams to GitHub
+-> commit and branch are confirmed
+-> workflow jobs and steps are observed
+-> logs and artifact actions are returned
+-> user may download, verify, install, save, share, or reject
 ```
 
-Chat does not bypass Forge validation, GitHub authorization, SERVER authorization, or approval requirements.
+Chat does not bypass Forge validation, GitHub authorization, SERVER authorization, package integrity, or approval requirements.
 
-## 10. Diagnostics
+## 12. Android installability
 
-Forge health should eventually expose:
+In-place updates require:
+
+- the same `applicationId`;
+- a higher `versionCode`;
+- the exact same signing certificate.
+
+One persistent key must sign every build channel intended to update an existing installation. Source changes cannot bypass Android certificate continuity. A one-time uninstall/reinstall may be required when migrating from an old debug key to the permanent project key.
+
+## 13. Diagnostics
+
+Forge health should expose:
 
 - internet reachability;
-- GitHub authentication;
-- repository access;
-- Contents permission;
-- Actions permission;
-- branch resolution;
-- workflow availability;
-- Android storage availability;
-- upload engine state;
-- artifact save/install capability.
+- GitHub authentication and encrypted persistence;
+- repository and branch access;
+- Contents and Actions permissions;
+- source-folder grant health;
+- checksum matching and local validation;
+- upload engine and branch-confirmation state;
+- workflow/job/step availability;
+- log-download capability;
+- Android storage and artifact save/install capability.
 
-Diagnostics must distinguish credential, permission, network, memory, repository, workflow, and Android-storage failures.
+Diagnostics must distinguish credential, permission, network, timeout, memory, repository, branch, integrity, workflow, log, and Android-storage failures.
 
-## 11. Invariants
+## 14. Invariants
 
-- Forge uses bounded-memory streaming for large files.
-- Build status comes from GitHub, not animation or elapsed-time guesses.
-- Artifact download progress is exact only when transport metadata supports it.
+- Forge uses bounded-memory streaming.
+- ZIP and SHA are required; manifest is optional until a defined policy makes it mandatory.
+- Transfer completion never substitutes for branch confirmation.
+- Build state comes from GitHub, not animation or elapsed-time guesses.
+- Workflow logs remain user-initiated downloadable artifacts.
 - CLIENT, SERVER, and SWURVER identities remain distinct.
-- Notification and launcher resources remain purpose-specific.
-- Bubble state is a projection of CLIENT capability state.
+- Bubble role state is a projection of CLIENT capability state.
 - Visual fusion never grants trust or authority.
+- Resource cleanup preserves referenced aliases and theme identities.
+- Update-capable builds preserve application identity and signing continuity.
 - Future Chat orchestrates capabilities; it does not simulate them through browser automation by default.
