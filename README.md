@@ -1,2 +1,39 @@
 # Swrlzcore
-Swurlz automation ai core
+
+SWRLZ is an offline-first Android automation and AI control ecosystem built around explicit authority, local ownership, observable workflows, and versioned CLIENT/SERVER contracts.
+
+## Current CFv2.0.x baselines
+
+- **CLIENT:** `CLIENT_CFv2.0.51_SWRLZ.zip` with matching SHA-256
+- **SERVER:** `SERVER_CFv2.0.36_SWRLZ.zip` with matching SHA-256
+- **Status:** stabilization continues on `CFv2.0.x`; the coordinated `CFv2.1.0` Chat control plane remains gated by documented exit criteria.
+
+## Product identities
+
+- **SWRLZ:** Android CLIENT and local control surface.
+- **SWURLZER:** SERVER/node host.
+- **SWURVER:** authenticated fused CLIENT state with approved SERVER administrative capabilities; it is not a third application.
+
+Visual state never grants authority. Trust, session validity, selected SERVER identity, and capability grants remain authoritative.
+
+## Source-package contract
+
+The current Forge contract requires an exact-basename pair:
+
+1. `<base>.zip`
+2. `<base>.sha256`
+
+A `<base>.manifest.json` file is optional during the CFv2.0.x stabilization line and is validated when present. This policy preserves the current ZIP+SHA delivery flow while allowing future provenance or release metadata without making an undefined manifest a hard failure.
+
+## Documentation entry points
+
+- [`docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md`](docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md) — Forge, identity, bubble authority, workflow observation, packaging, and installability architecture.
+- [`docs/checkpoints/CFV2_0X_CONVERSATION_UPDATE_RECORD_2026_07_24.md`](docs/checkpoints/CFV2_0X_CONVERSATION_UPDATE_RECORD_2026_07_24.md) — additive documentation audit and latest CLIENT/SERVER checkpoint record.
+- [`docs/checkpoints/INT_FORGE_017A_AND_INT_ID_018A_IMPLEMENTATION_RECORD.md`](docs/checkpoints/INT_FORGE_017A_AND_INT_ID_018A_IMPLEMENTATION_RECORD.md) — Forge and Android identity implementation lineage.
+- [`docs/checkpoints/INT_PKG_022A_IMPLEMENTATION_RECORD.md`](docs/checkpoints/INT_PKG_022A_IMPLEMENTATION_RECORD.md) — immutable package-integrity history and current package-policy amendment.
+- [`docs/roadmaps/CFV2_1_0_CHAT_ENTRY_GATE.md`](docs/roadmaps/CFV2_1_0_CHAT_ENTRY_GATE.md) — coordinated Chat entry gate.
+- [`reports/Blueprint_Council_Log.md`](reports/Blueprint_Council_Log.md) — architecture decisions, learning deltas, and evidence gates.
+
+## Evidence discipline
+
+Documentation distinguishes among source-reported implementation, static verification, workflow-log evidence, device/runtime evidence, and accepted architecture. A feature is not considered runtime-accepted solely because source exists or an upload progress bar reaches 100 percent.
