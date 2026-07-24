@@ -5,10 +5,11 @@ SWRLZ is an offline-first Android automation and AI control ecosystem built arou
 ## Current CFv2.0.x baselines
 
 - **Last device-verified CLIENT build:** `CLIENT_CFv2.0.58_SWRLZ.zip`; APK Router succeeded and device screenshots confirm Dragon Kamileon interface/bubble identity, bubble-hosted Forge observation, version provenance, and upload-success notification identity.
-- **Prepared CLIENT baseline:** `CLIENT_CFv2.0.60_SWRLZ.zip` with matching SHA-256. It includes the CFv2.0.59 Kotlin/Compose preflight alignment, prevents Theme Armor or launcher task refresh from presenting a false disconnected GitHub account while the saved Keystore token is validating, hides redundant authorization controls while a token exists, and makes Repository Target and Source Package Matching persistent collapsible panels.
-- **Last log-verified SERVER build:** `SERVER_CFv2.0.40_SWRLZ.zip`; Kotlin compilation failed because `ServerBubbleActivity.kt` used `Modifier.border(...)` without importing `androidx.compose.foundation.border`.
-- **Prepared SERVER baseline:** `SERVER_CFv2.0.42_SWRLZ.zip` with matching SHA-256. It preserves the CFv2.0.41 Activity Compose and Kotlin/Compose preflight repairs and adds the missing SERVER bubble border import.
-- **Status:** CLIENT CFv2.0.58 is build-verified. CLIENT CFv2.0.60 and SERVER CFv2.0.42 are source/static and package verified; their GitHub builds and device acceptance remain pending. Stabilization continues on `CFv2.0.x`.
+- **Additional CLIENT runtime evidence:** repeated uploads now work from the same installed CLIENT without reinstalling, producing new confirmed commits and correct bubble/notification commit outcomes.
+- **Prepared CLIENT baseline:** `CLIENT_CFv2.0.61_SWRLZ.zip` with matching SHA-256. It includes the CFv2.0.60 GitHub theme-refresh continuity and collapsible panels, then replaces forced checksum re-browsing with automatic exact sibling lookup plus an explicit fallback only when Android blocks sibling access.
+- **Last log-verified SERVER build:** `SERVER_CFv2.0.41_SWRLZ.zip`; Kotlin compilation failed because `ServerBubbleActivity.kt` used `Modifier.border(...)` without importing `androidx.compose.foundation.border`.
+- **Prepared SERVER baseline:** `SERVER_CFv2.0.43_SWRLZ.zip` with matching SHA-256. It preserves the CFv2.0.42 exact border-import repair and adds the same automatic checksum resolver and non-forced fallback to SWURLZER Forge.
+- **Status:** CLIENT CFv2.0.58 and repeated CLIENT Forge uploads are device-verified. CLIENT CFv2.0.61 and SERVER CFv2.0.43 are source/static and package verified; their GitHub builds and device acceptance remain pending. Stabilization continues on `CFv2.0.x`.
 
 ## Product identities
 
@@ -28,6 +29,12 @@ The current Forge contract requires an exact-basename pair:
 The SHA file may contain either the 64-character digest alone or the standard digest-plus-filename form. A `<base>.manifest.json` file is optional during the CFv2.0.x stabilization line and is validated when present.
 
 The repository verifier and authoritative Source Package Integrity workflow implement this contract. The obsolete duplicate integrity workflow was removed on 2026-07-24, so one source transaction should start one integrity run.
+
+## Automatic ZIP/SHA resolution
+
+CLIENT and SERVER derive the exact `.sha256` name from the selected ZIP and attempt provider-safe sibling resolution through path-based document IDs, parent child enumeration, and Android 10+ MediaStore relative-directory matching.
+
+Forge never launches a second file browser automatically. When Android denies sibling access, the ZIP remains staged and an explicit `LOCATE SHA-256` fallback appears. Upload remains blocked until the exact checksum is readable and validates.
 
 ## Dual Forge completion and concurrency truth
 
@@ -61,13 +68,14 @@ Both applications include a selectable iridescent cyan, violet, magenta, and gol
 The prepared applications expose Android build identity at the bottom of their main User and Developer surfaces:
 
 ```text
-CLIENT · CFv2.0.60    VC 87
-SERVER · CFv2.0.42    VC 43
+CLIENT · CFv2.0.61    VC 88
+SERVER · CFv2.0.43    VC 44
 ```
 
 ## Documentation entry points
 
-- [`docs/checkpoints/CLIENT_060_SERVER_042_THEME_CONNECTOR_AND_BORDER_REPAIR.md`](docs/checkpoints/CLIENT_060_SERVER_042_THEME_CONNECTOR_AND_BORDER_REPAIR.md) — CLIENT CFv2.0.58 runtime evidence, theme-refresh GitHub continuity repair, collapsible Forge panels, SERVER missing-border log diagnosis, final hashes, and acceptance gates.
+- [`docs/checkpoints/CLIENT_061_SERVER_043_AUTOMATIC_SIBLING_CHECKSUM.md`](docs/checkpoints/CLIENT_061_SERVER_043_AUTOMATIC_SIBLING_CHECKSUM.md) — repeated-upload evidence, SERVER log clarification, automatic sibling checksum resolution, explicit fallback policy, final hashes, and acceptance gates.
+- [`docs/checkpoints/CLIENT_060_SERVER_042_THEME_CONNECTOR_AND_BORDER_REPAIR.md`](docs/checkpoints/CLIENT_060_SERVER_042_THEME_CONNECTOR_AND_BORDER_REPAIR.md) — CLIENT CFv2.0.58 runtime evidence, theme-refresh GitHub continuity repair, collapsible Forge panels, and SERVER missing-border diagnosis.
 - [`docs/checkpoints/CLIENT_059_SERVER_041_BUILD_PREFLIGHT_ALIGNMENT.md`](docs/checkpoints/CLIENT_059_SERVER_041_BUILD_PREFLIGHT_ALIGNMENT.md) — Kotlin/Compose alignment, SERVER Activity Compose API repair, static checks, and package evidence.
 - [`docs/checkpoints/CLIENT_058_SERVER_040_DUAL_FORGE_DRAGON_KAMILEON.md`](docs/checkpoints/CLIENT_058_SERVER_040_DUAL_FORGE_DRAGON_KAMILEON.md) — CLIENT/SERVER Forge capability, actor/concurrency truth, and Dragon Kamileon Theme Armor.
 - [`docs/checkpoints/CLIENT_CFV2_0_57_FORGE_LIVE_LOG_CONNECTOR_RESTORE.md`](docs/checkpoints/CLIENT_CFV2_0_57_FORGE_LIVE_LOG_CONNECTOR_RESTORE.md) — live Forge upload logs, credential redaction, connector persistence, eligible reinstall restoration, validated auto-connect, disconnect approval, and bubble-footer correction.
