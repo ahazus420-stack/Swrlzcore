@@ -25,7 +25,7 @@ This keeps the archive coherent, prevents duplicate entries, and preserves histo
 This improves the long-term memory layer by separating observation from mutation. It also makes the repository more trustworthy for future agents because each update has a traceable rationale and a clear confidence level.
 
 **Why It Matters:**
-GitHub has been moving toward stronger automation, governance, and security primitives in Actions, including a 2026 roadmap focused on secure defaults, scoped secrets, workflow execution protections, observability, and network boundaries. That direction aligns with SWRLZ’s need for controlled automation rather than unconstrained write access.
+GitHub has been moving toward stronger automation, governance, and security primitives in Actions, including a 2026 roadmap focused on secure defaults, scoped secrets, workflow execution protections, observability, and network boundaries. That direction aligns with SWRLZ's need for controlled automation rather than unconstrained write access.
 
 **Architecture Analysis:**
 - **How SWRLZ can use this:** treat repository writes as validated merges from a staged knowledge pipeline.
@@ -33,7 +33,7 @@ GitHub has been moving toward stronger automation, governance, and security prim
 - **Mission gains:** better deduplication, clearer lineage, safer updates, and improved cross-linking across architecture, missions, capabilities, timeline, and history.
 - **New capability needed:** a proposal-and-validation layer before any automatic file mutation.
 - **New blueprint needed:** a repository governance blueprint that defines when a finding becomes a learning delta versus a historical note.
-- **Constitution impact:** no change to core principles, but a stronger enforcement mechanism for “do not overwrite valuable knowledge.”
+- **Constitution impact:** no change to core principles, but a stronger enforcement mechanism for "do not overwrite valuable knowledge."
 - **Learning Delta impact:** high; this adds a durable process model, not just content.
 
 **Learning Delta:**
@@ -119,7 +119,7 @@ SWRLZ CLIENT evolved from browser-oriented upload expectations into an authentic
 - **Memory safety:** whole-file/Base64 heap amplification is replaced by bounded streaming.
 - **Progress truth:** upload and artifact-transfer bytes may expose exact progress; GitHub build progress remains phase-based and must not be fabricated.
 - **Identity:** CLIENT, SERVER, and SWURVER roles are visually distinct and security-significant.
-- **Bubble direction:** one Android-managed CLIENT conversation bubble replaces the rejected three-overlay experiment.
+- **Bubble direction at this entry:** one Android-managed CLIENT conversation bubble replaced the rejected three-overlay experiment. This historical decision is superseded by Entry 005's corrected role-specific CLIENT-owned bubble cluster.
 - **Versioning:** `CFv2.0.x` remains the stabilization line; CLIENT and SERVER advance together to `CFv2.1.0` when the conversational control plane and shared contracts are ready.
 
 **Learning Delta:**
@@ -146,3 +146,54 @@ SWRLZ CLIENT evolved from browser-oriented upload expectations into an authentic
 
 **Next Evidence Gate:**
 Repeat CLIENT and SERVER large-package streaming, verify atomic commits and artifact returns, confirm launcher identity across update/reboot/theme changes, stabilize the Android-managed bubble and circular action surface, then begin the coordinated `CFv2.1.0` Chat and Mission contract implementation.
+
+## 2026-07-24
+
+### Entry 005
+**Title:** CFv2.0.x Forge reliability, bubble authority, and integrity-contract reconciliation
+
+**Summary:**
+The latest CLIENT `CFv2.0.51` and SERVER `CFv2.0.36` documentation was reconciled with the repository's governing architecture and roadmap. The update records additive staging, exact ZIP/SHA auto-matching, branch-confirmed commit completion, encrypted GitHub credential persistence, workflow run-log downloads, conservative asset cleanup, signing continuity, SERVER capability discovery, and the restored CLIENT-owned role-specific bubble cluster.
+
+**Documentation Audit:**
+- Reviewed 166 CLIENT Markdown documents and 70 SERVER Markdown documents from the supplied current source packages.
+- Reviewed the full DOCX conversation record and condensed Markdown companion.
+- Reconciled repository-level architecture, Forge/identity checkpoint, package-integrity checkpoint, CFv2.1.0 entry gate, README, and this Council log.
+
+**Verified Package Evidence:**
+- CLIENT `CFv2.0.51` ZIP matched its supplied SHA-256.
+- SERVER `CFv2.0.36` ZIP matched its supplied SHA-256.
+
+**Log-Verified Finding:**
+- The Source Package Integrity workflow selected `SOURCES/CLIENT/CLIENT_CFv2.0.50_SWRLZ.zip`.
+- Verification failed because `CLIENT_CFv2.0.50_SWRLZ.manifest.json` was missing.
+- The logs do not show a ZIP digest mismatch.
+- The defect is a package-contract mismatch between current ZIP/SHA Forge delivery and a verifier still requiring a manifest.
+
+**Architecture Reconciliation:**
+- **Bubble authority:** the earlier permanent single-bubble decision is superseded. The latest model is a CLIENT-owned role-specific bubble cluster: SWRLZ local, SWURLZER selected authenticated SERVER context, and SWURVER fused admin state. These remain projections of one CLIENT capability layer, not three independently authoritative apps.
+- **Persisted state:** saved layout or identity state never grants authority.
+- **Integrity contract:** ZIP and exact-basename SHA are mandatory; manifest is optional and validated when present.
+- **Commit truth:** transfer completion, commit creation, branch confirmation, workflow discovery, and build completion are distinct.
+- **Credential durability:** valid GitHub credentials remain encrypted and survive restart and valid in-place update; temporary verification failure must not erase them.
+- **Observability:** workflow cards expose actual jobs/steps, artifacts, and run-log ZIP download.
+- **Installability:** same applicationId, higher versionCode, and identical signing certificate are required for in-place updates.
+- **Asset hygiene:** resources are removed only after reference analysis; selectable launcher aliases and active role assets remain preserved.
+
+**Learning Delta:**
+- **What changed?** Repository documentation now matches the latest source-reported CLIENT/SERVER behavior and explicitly resolves the two historical contradictions instead of silently overwriting them.
+- **Why?** Divergent bubble and manifest rules could cause insecure UI assumptions, false integrity failures, and inconsistent implementation work.
+- **What knowledge improved?** The project now has one authority model, one operational package contract, one commit-success definition, and one release-signing rule across the governing documents.
+- **Which future missions benefit?** Forge uploads, repeated deployments, CI verification, workflow diagnostics, Chat-to-Forge orchestration, remote SERVER administration, artifact installation, and release preparation.
+- **Confidence:** High for documentation reconciliation and supplied package hashes; runtime acceptance remains pending current device and CI evidence.
+
+**Repository Maintenance:**
+- Added `docs/checkpoints/CFV2_0X_CONVERSATION_UPDATE_RECORD_2026_07_24.md`.
+- Updated `README.md`.
+- Updated `docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md`.
+- Updated `docs/checkpoints/INT_FORGE_017A_AND_INT_ID_018A_IMPLEMENTATION_RECORD.md`.
+- Updated `docs/checkpoints/INT_PKG_022A_IMPLEMENTATION_RECORD.md`.
+- Updated `docs/roadmaps/CFV2_1_0_CHAT_ENTRY_GATE.md`.
+
+**Next Evidence Gate:**
+Align the Source Package Integrity script/workflow to ZIP+SHA-required and manifest-optional behavior, then verify repeated same-session SERVER uploads, branch confirmation, new-run association, encrypted credential persistence across update, run-log ZIP download, launcher/recent-apps identity, role-surface revocation, and same-key APK installation.
