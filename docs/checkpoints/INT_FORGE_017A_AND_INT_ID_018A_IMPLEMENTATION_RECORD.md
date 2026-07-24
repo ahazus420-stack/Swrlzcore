@@ -1,63 +1,99 @@
 # INT-FORGE-017A + INT-ID-018A Implementation Record
 
-**Recorded:** 2026-07-23  
-**Status:** Device-observed foundation implemented; final runtime acceptance remains gated by repeat CLIENT/SERVER builds, launcher persistence, notification identity checks, and bubble stabilization.
+**Originally recorded:** 2026-07-23  
+**Extended:** 2026-07-24  
+**Status:** Source-reported and partially device-observed foundation implemented; final runtime acceptance remains gated by repeat uploads, branch confirmation, credential persistence, package-workflow alignment, launcher persistence, installability, and bubble authorization evidence.
 
 ## Scope
 
-This record captures the July 23, 2026 implementation sequence that established:
+This record captures the implementation sequence that established and then stabilized:
 
-- `INT-FORGE-017A` — authenticated CLIENT-owned GitHub Forge upload, workflow observation, artifact retrieval, and large-file streaming.
-- `INT-ID-018A` — canonical CLIENT, SERVER, and SWURVER visual identities across launcher, notification, bubble, and admin surfaces.
-- preliminary Android conversation-bubble foundations required before the `CFv2.1.0` Chat control plane.
+- `INT-FORGE-017A` — authenticated CLIENT-owned GitHub Forge upload, workflow observation, logs, artifact retrieval, and large-file streaming;
+- `INT-ID-018A` — canonical CLIENT, SERVER, and SWURVER identities across launcher, notification, bubble, and administrative surfaces;
+- role-specific CLIENT-owned bubble authority required before the `CFv2.1.0` Chat control plane;
+- source-package validation and Android update-signing continuity.
 
 ## Source lineage
 
-Observed source progression during this work:
+Initial observed progression:
 
 - CLIENT advanced through `CFv2.0.36` to `CFv2.0.46`.
 - SERVER advanced through `CFv2.0.31` to `CFv2.0.32`.
-- Forge successfully uploaded SERVER source packages, created commits, observed GitHub Actions runs, and downloaded SERVER APK artifacts back to Android.
+- Forge uploaded SERVER source, created commits, observed Actions runs, and returned SERVER APK artifacts to Android.
 
-Patch numbering remains app-specific through the `2.0.x` stabilization line. CLIENT and SERVER are intended to advance together to `CFv2.1.0` when the shared Chat, mission-envelope, authorization, and event contracts are ready.
+Current packaged baselines:
+
+- CLIENT `CFv2.0.51`;
+- SERVER `CFv2.0.36`.
+
+Patch numbering remains app-specific during `CFv2.0.x`. CLIENT and SERVER advance together to `CFv2.1.0` only when shared Chat, mission-envelope, authorization, artifact, and event contracts satisfy the entry gate.
 
 ## INT-FORGE-017A requirements
 
 ### CLIENT-owned GitHub Forge
 
-Forge is a first-class CLIENT capability and is available in the new User Mode navigation as its own `Forge` destination. Developer Mode and Settings shortcuts may remain as compatibility entry points.
-
-Forge responsibilities:
+Forge is a first-class CLIENT capability in User Mode. Developer Mode and Settings may retain compatibility shortcuts, but normal Forge operation must not require legacy Developer Mode.
 
 ```text
 Authenticate GitHub account
 -> stage CLIENT and SERVER packages
--> route packages to authoritative repository locations
--> upload files
+-> validate package integrity
+-> route packages to authoritative repository paths
+-> stream source with bounded memory
 -> create one atomic tree/commit
--> optionally dispatch GitHub Actions
--> observe workflow state
--> discover and download artifacts
+-> confirm target branch
+-> discover and observe GitHub Actions
+-> display real jobs and steps
+-> download run logs and artifacts
 -> expose results to future Chat and Mission layers
 ```
 
 ### Canonical routing
 
-Default source-package routing:
-
 ```text
 CLIENT_* -> SOURCES/CLIENT/
 SERVER_* -> SOURCES/SERVER/
-unknown  -> configured fallback destination
+unknown  -> configured fallback requiring visible confirmation
 ```
 
-The staged-file preview must show filename, size, and final repository path before commit.
+The staged preview shows filename, size, component, logical package grouping, and final repository path.
+
+### Staging continuity
+
+- Additional selections merge into the existing staging set.
+- Duplicate URI selections do not clear earlier files.
+- A new source targeting an existing repository path replaces that staged destination.
+- ZIP and SHA display as one logical package.
+- Staging clears only after the branch head confirms the new commit.
+
+### ZIP and SHA auto-matching
+
+Forge defaults to exact-basename ZIP/SHA pairing through a user-granted Storage Access Framework folder.
+
+```text
+<base>.zip
+<base>.sha256
+```
+
+Requirements:
+
+- exact sibling match only;
+- persisted folder grant and toggle preference;
+- manual pair selection remains supported;
+- local checksum validation before upload;
+- commit blocked when a staged ZIP lacks a valid readable checksum.
+
+### Package-policy amendment
+
+The active CFv2.0.x operational package contract requires ZIP plus SHA. A sibling manifest is optional and is validated when present.
+
+The historical `INT-PKG-022A` triple-verification implementation remains valid evidence for that reissue, but its mandatory-manifest rule is superseded for current Forge delivery until a manifest has an accepted downstream purpose.
 
 ### Authentication and permission boundary
 
-Forge supports a fine-grained GitHub personal access token for the current personal-development workflow.
+Forge uses fine-grained GitHub credentials with the minimum permissions required by enabled features.
 
-Minimum intended repository permissions:
+Typical repository permissions:
 
 ```text
 Contents  read/write
@@ -65,13 +101,16 @@ Actions   read/write
 Metadata  read-only
 ```
 
-Workflow-file mutation and pull-request permissions are optional and must be requested only when corresponding features are enabled.
+Credentials are:
 
-Tokens are stored using Android Keystore-backed encrypted storage, never logged, and removable through an explicit disconnect action.
+- stored in Android Keystore-backed encrypted preferences;
+- synchronously persisted before connection success is reported;
+- never written to logs;
+- retained across process restart and valid in-place updates;
+- not erased by temporary network or verification failures;
+- removable through explicit disconnect.
 
-### Atomic commit pipeline
-
-Forge creates one commit for the staged package set rather than exposing partially uploaded source state.
+### Atomic commit and branch confirmation
 
 ```text
 resolve branch head
@@ -79,21 +118,21 @@ resolve branch head
 -> create Git tree
 -> create commit
 -> update branch ref
+-> resolve branch head again
+-> confirm new commit
 ```
 
-A completed commit displays the resulting commit identifier.
+A transfer bar reaching 100 percent is not commit success. Forge reports commit success only after branch confirmation and shows the resulting commit identity.
 
 ### Streaming upload and memory safety
 
-The original whole-file path multiplied memory usage through raw bytes, Base64 conversion, and JSON serialization. Large CLIENT/SERVER packages could therefore cause Android heap exhaustion.
-
-The accepted upload path is streaming:
+The accepted upload path avoids whole-file heap amplification:
 
 ```text
-ContentResolver/InputStream
+ContentResolver / InputStream
 -> bounded buffer
--> streamed Base64 encoding
--> GitHub request body
+-> streamed encoding/request body
+-> GitHub
 ```
 
 Requirements:
@@ -101,53 +140,46 @@ Requirements:
 - no whole-ZIP `ByteArray` allocation;
 - bounded working memory;
 - live transferred-byte reporting;
-- upload percentage based on actual source bytes read;
-- explicit size-limit validation before transfer;
-- network timeout and retry behavior appropriate for mobile connections.
-
-Device evidence showed live progression through transferred MiB and successful completion rather than appearing permanently frozen near 30 percent.
+- actual source-byte progress;
+- explicit size validation;
+- cancellation;
+- mobile-network-aware timeouts and retry classification;
+- repeated CLIENT or SERVER uploads in one app session create a new commit and new associated run.
 
 ### Workflow observer
 
 The observer displays:
 
-- workflow name;
+- workflow and run identity;
 - branch and event;
 - queued, in-progress, completed, success, failure, cancelled, or skipped state;
-- start timestamp;
-- elapsed or completed duration;
-- theme-derived state treatment;
+- timestamps and duration;
+- actual job and step state;
 - workflow link;
-- artifact action.
+- artifact action;
+- run-log ZIP action.
 
-Auto-refresh defaults to a bounded interval while Forge is open. A future smart-refresh policy may use shorter intervals while active and longer intervals after completion.
+GitHub does not expose a universally trustworthy compile percentage. Forge may show known jobs/steps, elapsed time, and indeterminate active state, but it must not fabricate a percentage from time.
 
-GitHub does not expose a trustworthy exact compile percentage. Forge must not invent one. It may show:
+### Workflow logs
 
-- an indeterminate running animation;
-- known job/phase completion when job data is available;
-- elapsed time;
-- artifact-ready completion.
+Every workflow card provides a user-initiated **Download Logs** action that retrieves the GitHub Actions run-log ZIP. Exported logs must not contain GitHub credentials added by SWRLZ.
 
 ### Artifact progress
 
-Two progress domains must remain distinct:
+Workflow progress and artifact transfer remain distinct:
 
-1. **Workflow/build progress** — phase-based and indeterminate unless GitHub exposes concrete job-step state.
-2. **Artifact download progress** — exact transferred bytes, percentage, speed, and ETA when the HTTP response length is known.
-
-Future artifact cards should expose:
+1. **Workflow/build:** phase-based and possibly indeterminate.
+2. **Artifact download:** exact bytes, percentage, speed, and ETA when content length is known.
 
 ```text
-Artifact discovered
+artifact discovered
 -> download queued
--> downloading bytes / total bytes
+-> bytes transferred
 -> integrity verification
 -> saved
 -> install/share/open actions
 ```
-
-The workflow-card `ARTIFACTS` action should directly download when exactly one valid artifact exists; otherwise it opens the run artifact list.
 
 ## INT-ID-018A requirements
 
@@ -155,83 +187,116 @@ The workflow-card `ARTIFACTS` action should directly download when exactly one v
 
 ```text
 SWRLZ CLIENT     cyan/blue crystal signal dragon
-SWURLZER SERVER  purple crystal guardian dragon
-SWURVER ADMIN    cyan-purple fusion dragon
+SWURLZER SERVER  violet crystal guardian dragon
+SWURVER ADMIN    cyan-violet fusion dragon inside authenticated CLIENT state
 ```
 
-CLIENT and SERVER notification artwork must never be reversed.
+CLIENT and SERVER artwork must never be reversed. SWURVER is not a third installable app.
 
-### Android launcher identity
+### Android launcher and recent-apps identity
 
-The launcher must resolve consistently across:
+Identity must resolve consistently across:
 
-- application `android:icon`;
-- `android:roundIcon`;
-- launcher activity or alias;
-- adaptive foreground/background resources;
+- application icon and round icon;
+- launcher activity/alias;
+- adaptive foreground/background;
 - legacy density resources;
-- theme-switch reconciliation;
-- update and reboot behavior.
+- theme switching;
+- package update and reboot;
+- launcher and recent-apps presentation.
 
-The canonical launcher artwork should match the clean circular notification identity while respecting Android adaptive-icon safe zones. Theme switching must return to the canonical identity rather than an obsolete alias or placeholder.
+Artwork must respect adaptive safe zones without excessive transparent or white padding.
 
 ### Notification identity
 
-Large notification artwork uses clean, alpha-transparent full-color dragon artwork. Notification small icons remain separate Android-compliant monochrome silhouettes.
+- Large notification icons use alpha-transparent full-color artwork.
+- Small notification icons use separate monochrome Android silhouettes.
+- Status and expanded notifications use the correct app identity.
+- SWURVER artwork appears only in authenticated fused/admin context.
 
-Requirements:
+### Asset hygiene
 
-- no white or checkerboard background;
-- no CLIENT/SERVER inversion;
-- no text-heavy artwork in constrained icon positions;
-- status notification and expanded notification use the correct app identity;
-- SWURVER artwork appears only for authenticated fused/admin context.
+CLIENT `CFv2.0.51` and SERVER `CFv2.0.36` perform conservative cleanup. Resources are removed only after reference analysis across Kotlin/Java, manifests, activity aliases, adaptive-icon XML, theme selection, other XML resources, and build scripts.
 
-Device evidence confirmed a substantially cleaner CLIENT notification identity and correct cyan artwork after the update sequence.
+Selectable launcher families remain retained when referenced, even when not the default identity.
 
-## Bubble foundation
+## Bubble authority continuation
 
-The abandoned three-overlay experiment rendered CLIENT, remote SERVER, and fusion bubbles from one CLIENT process, causing every tap to open the CLIENT surface. The accepted direction is one Android-managed SWRLZ conversation bubble.
+Earlier revisions adopted one Android-managed CLIENT bubble and rejected a three-overlay experiment because every role window opened the same CLIENT surface without real authority separation.
 
-Foundation requirements before `CFv2.1.0`:
+CLIENT `CFv2.0.47` restored a corrected model: a **CLIENT-owned role-specific bubble cluster** whose role surfaces are gated by authoritative session state.
 
-- one clean circular CLIENT avatar;
-- authenticated SWURVER avatar morph for admin mode;
-- compact bubble UI rather than a duplicate full-screen application window;
-- initial circular actions for Chat, Missions, Nodes, Groups, Forge, and Settings;
-- last-page restoration;
-- capability routing into real subsystems;
-- no cross-package overlay coordination;
-- no revival of the three-floating-overlay model.
+```text
+SWRLZ bubble      local CLIENT authority
+SWURLZER bubble   selected authenticated SERVER context
+SWURVER bubble    fused CLIENT state with approved admin capabilities
+```
 
-## Future Forge visual and observability work
+This is not three independent applications. It is one CLIENT capability layer projecting three role surfaces.
 
-Accepted design backlog:
+Required behavior:
 
-- animated dragon status by Forge phase;
-- spinning crystal while packaging, committing, or building;
-- live GitHub event/timeline feed;
-- artifact download animations;
-- exact artifact byte progress where available;
-- node activity indicators;
-- build-complete notifications with Install, Artifact, Logs, and Open Forge actions;
-- launch-safe icon refinement with slightly increased adaptive safe-zone margin;
-- Forge health diagnostics for authentication, repository access, branch, Actions, storage, and network state.
+- SWRLZ remains available without a SERVER.
+- SWURLZER and SWURVER require verified admin-session state.
+- persisted bubble layout cannot grant authority;
+- session expiry, revocation, lost SERVER selection, or lost capabilities downgrade the surfaces;
+- command-level authorization remains mandatory;
+- bubble artwork remains tightly cropped and transparent;
+- TalkBack fallback and sensitive-screen suppression remain required.
 
-Visual effects are projections of authoritative state. Animation must never imply a phase or success that the underlying Forge state has not confirmed.
+This continuation supersedes the earlier permanent single-bubble decision while preserving its security constraints against fake remote authority and visual-state trust elevation.
+
+## Android installability
+
+CLIENT and SERVER in-place updates require:
+
+- unchanged `applicationId`;
+- higher `versionCode`;
+- the exact same signing certificate.
+
+Every update-capable build channel must use the same persistent project key. A one-time uninstall/reinstall may be required when moving from a historical debug key to the permanent key.
+
+## Log-verified package-integrity defect
+
+The supplied workflow logs selected:
+
+```text
+SOURCES/CLIENT/CLIENT_CFv2.0.50_SWRLZ.zip
+```
+
+The verifier failed at:
+
+```text
+Missing manifest: SOURCES/CLIENT/CLIENT_CFv2.0.50_SWRLZ.manifest.json
+```
+
+The logs do not show a ZIP hash mismatch. The verified failure is a package-contract mismatch: current Forge delivery used ZIP/SHA pairing while the verifier still required a manifest.
+
+Required alignment:
+
+- ZIP and SHA mandatory;
+- checksum validation mandatory;
+- manifest validation conditional on presence;
+- missing optional manifest not an integrity failure.
 
 ## Runtime acceptance gate
 
-This checkpoint is accepted only after repeated evidence confirms:
+Final acceptance requires repeated evidence for:
 
 - CLIENT and SERVER large-package streaming without OOM;
-- complete atomic commit creation;
-- workflow observation from queued through completion;
+- additive staging and destination replacement;
+- exact ZIP/SHA auto-matching and local verification;
+- repeated same-session SERVER updates creating new commits and runs;
+- branch confirmation before staging clear or success;
+- workflow jobs/steps and run-log ZIP retrieval;
+- encrypted credential persistence across restart and valid update;
 - artifact download with correct naming and content;
-- launcher identity surviving update, reboot, and theme changes;
+- launcher/recent-apps identity across update, reboot, and theme changes;
 - correct CLIENT/SERVER notification mapping;
-- clean alpha transparency;
-- stable Android-managed bubble entry and compact navigation.
+- clean alpha transparency and bubble crop;
+- role-specific bubble downgrade on authorization loss;
+- same-key APK updates over prior installations;
+- integrity workflow matching the documented package contract.
 
 ## Excluded authority
 
@@ -242,5 +307,6 @@ This record does not authorize:
 - unrestricted GitHub permissions by default;
 - automatic direct-to-main mutation without confirmation or policy;
 - release signing keys stored in ordinary CLIENT storage;
-- trust elevation through visual fusion alone;
+- trust elevation through visual fusion;
+- persisted UI state as authorization;
 - claims of complete Chat or Mission functionality before `CFv2.1.0` evidence.
