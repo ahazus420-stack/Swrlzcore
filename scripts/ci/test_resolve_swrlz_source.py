@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from resolve_swrlz_source import COMPONENTS, ResolutionError, parse_transport_name, resolve_source
 
@@ -17,140 +21,88 @@ class ResolveSwrlzSourceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
+        subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)
+        subprocess.run(["git", "config", "user.email", "tests@example.invalid"], cwd=self.root, check=True)
+        subprocess.run(["git", "config", "user.name", "SWRLZ Tests"], cwd=self.root, check=True)
         for spec in COMPONENTS.values():
             (self.root / spec.lane).mkdir(parents=True, exist_ok=True)
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def write_pair(
-        self,
-        component: str,
-        zip_name: str,
-        data: bytes,
-        checksum_name: str | None = None,
-    ) -> Path:
-        spec = COMPONENTS[component]
-        lane = self.root / spec.lane
+    def write_pair(self, component: str, zip_name: str, data: bytes, checksum_name: str | None = None) -> Path:
+        lane = self.root / COMPONENTS[component].lane
         source = lane / zip_name
         source.write_bytes(data)
-        if checksum_name:
-            (lane / checksum_name).write_text(
-                f"{digest(data)}  canonical-name-does-not-control-verification.zip\n",
-                encoding="utf-8",
-            )
+        checksum = checksum_name or (zip_name[:-4] + ".sha256")
+        (lane / checksum).write_text(f"{digest(data)}  {zip_name}\n", encoding="utf-8")
         return source
 
-    def test_transport_suffix_normalization_all_components(self) -> None:
-        examples = {
-            "CLIENT": "CLIENT_CFv1.2.3_SWRLZ (204).zip",
-            "SERVER": "SERVER_CFv4.5.6_SWRLZ(7).zip",
-            "CORE_BASE": "SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE (2).zip",
-            "KEYBOARD_BASE": "SWRLZ_KEYBOARD_BASE_CFv1.0.1(12).zip",
-            "LAUNCHER_BASE": "SWRLZ_LAUNCHER_BASE_CFv1.0.1 (4).zip",
-        }
-        for component, name in examples.items():
-            with self.subTest(component=component):
-                parsed = parse_transport_name(name, COMPONENTS[component], ".zip")
-                self.assertIsNotNone(parsed.duplicate_suffix)
-                self.assertNotIn("(", parsed.canonical_zip_name)
-                self.assertTrue(parsed.canonical_zip_name.endswith(".zip"))
+    def commit(self, message: str) -> str:
+        subprocess.run(["git", "add", "."], cwd=self.root, check=True)
+        subprocess.run(["git", "commit", "-qm", message], cwd=self.root, check=True)
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.root, text=True).strip()
 
-    def test_duplicate_number_does_not_override_semantic_version(self) -> None:
-        self.write_pair(
-            "CLIENT",
-            "CLIENT_CFv1.0.1_SWRLZ(99).zip",
-            b"old",
-            "CLIENT_CFv1.0.1_SWRLZ.sha256",
-        )
-        self.write_pair(
-            "CLIENT",
-            "CLIENT_CFv1.0.2_SWRLZ(1).zip",
-            b"new",
-            "CLIENT_CFv1.0.2_SWRLZ (8).sha256",
-        )
-        result = resolve_source(self.root, "CLIENT")
-        self.assertEqual(result["canonical_stem"], "CLIENT_CFv1.0.2_SWRLZ")
-        self.assertEqual(result["duplicate_suffix"], 1)
+    def test_copy_suffix_and_arbitrary_filename_are_accepted(self) -> None:
+        parsed = parse_transport_name("My Strange Android Project (204).zip", ".zip")
+        self.assertEqual(parsed.logical_stem, "My Strange Android Project")
+        self.assertEqual(parsed.artifact_stem, "My_Strange_Android_Project")
+        self.assertEqual(parsed.duplicate_suffix, 204)
 
-    def test_unsuffixed_alias_is_preferred_when_bytes_match(self) -> None:
-        data = b"same-client-source"
-        self.write_pair(
-            "CLIENT",
-            "CLIENT_CFv1.0.1_SWRLZ.zip",
-            data,
-            "CLIENT_CFv1.0.1_SWRLZ.sha256",
-        )
-        self.write_pair("CLIENT", "CLIENT_CFv1.0.1_SWRLZ(2).zip", data)
-        result = resolve_source(self.root, "CLIENT")
-        self.assertEqual(result["uploaded_filename"], "CLIENT_CFv1.0.1_SWRLZ.zip")
-        self.assertIsNone(result["duplicate_suffix"])
-        self.assertEqual(len(result["source_aliases"]), 2)
+    def test_arbitrary_keyboard_name_resolves(self) -> None:
+        source = self.write_pair("KEYBOARD_BASE", "Totally Custom Keyboard Build.zip", b"keyboard")
+        result = resolve_source(self.root, "KEYBOARD_BASE", str(source.relative_to(self.root)))
+        self.assertEqual(result["selected_source"], str(source.relative_to(self.root)))
+        self.assertEqual(result["canonical_stem"], "Totally_Custom_Keyboard_Build")
 
-    def test_explicit_suffixed_alias_is_preserved_in_provenance(self) -> None:
-        data = b"same-server-source"
-        self.write_pair(
-            "SERVER",
-            "SERVER_CFv1.0.3_SWRLZ.zip",
-            data,
-            "SERVER_CFv1.0.3_SWRLZ.sha256",
-        )
-        selected = self.write_pair("SERVER", "SERVER_CFv1.0.3_SWRLZ (2).zip", data)
-        result = resolve_source(
-            self.root,
-            "SERVER",
-            str(selected.relative_to(self.root)),
-        )
-        self.assertEqual(result["uploaded_filename"], selected.name)
-        self.assertEqual(result["canonical_filename"], "SERVER_CFv1.0.3_SWRLZ.zip")
-        self.assertEqual(result["duplicate_suffix"], 2)
+    def test_current_push_selects_reuploaded_older_source(self) -> None:
+        old = self.write_pair("CLIENT", "CLIENT_CFv1.0.1_SWRLZ.zip", b"old-v1")
+        self.write_pair("CLIENT", "CLIENT_CFv9.9.9_SWRLZ.zip", b"newer-version")
+        first = self.commit("initial sources")
+        old.write_bytes(b"old-v1-reuploaded")
+        (old.with_suffix(".sha256")).write_text(f"{digest(b'old-v1-reuploaded')}  {old.name}\n")
+        second = self.commit("reupload older source")
+        event = self.root / "event.json"
+        event.write_text(json.dumps({"before": first, "after": second}), encoding="utf-8")
+        with patch.dict(os.environ, {
+            "GITHUB_EVENT_NAME": "push",
+            "GITHUB_EVENT_PATH": str(event),
+            "GITHUB_SHA": second,
+        }, clear=False):
+            result = resolve_source(self.root, "CLIENT")
+        self.assertEqual(result["selected_source"], str(old.relative_to(self.root)))
+        self.assertEqual(result["selection_reason"], "current-push")
 
     def test_checksum_suffix_can_differ_from_zip_suffix(self) -> None:
-        data = b"keyboard"
-        self.write_pair(
-            "KEYBOARD_BASE",
-            "SWRLZ_KEYBOARD_BASE_CFv1.0.1 (17).zip",
-            data,
-            "SWRLZ_KEYBOARD_BASE_CFv1.0.1(3).sha256",
+        data = b"server"
+        source = self.write_pair(
+            "SERVER", "Whatever Server Source (17).zip", data,
+            "Whatever Server Source (3).sha256",
         )
-        result = resolve_source(self.root, "KEYBOARD_BASE")
+        result = resolve_source(self.root, "SERVER", str(source.relative_to(self.root)))
         self.assertEqual(result["source_sha256"], digest(data))
         self.assertTrue(str(result["checksum_file"]).endswith("(3).sha256"))
 
     def test_conflicting_alias_bytes_fail_closed(self) -> None:
-        self.write_pair(
-            "LAUNCHER_BASE",
-            "SWRLZ_LAUNCHER_BASE_CFv1.0.1.zip",
-            b"one",
-            "SWRLZ_LAUNCHER_BASE_CFv1.0.1.sha256",
-        )
-        self.write_pair(
-            "LAUNCHER_BASE",
-            "SWRLZ_LAUNCHER_BASE_CFv1.0.1(1).zip",
-            b"two",
-        )
+        self.write_pair("LAUNCHER_BASE", "Launcher Project.zip", b"one", "Launcher Project.sha256")
+        lane = self.root / COMPONENTS["LAUNCHER_BASE"].lane
+        (lane / "Launcher Project (1).zip").write_bytes(b"two")
+        source = lane / "Launcher Project.zip"
         with self.assertRaisesRegex(ResolutionError, "different bytes"):
-            resolve_source(self.root, "LAUNCHER_BASE")
+            resolve_source(self.root, "LAUNCHER_BASE", str(source.relative_to(self.root)))
 
     def test_missing_checksum_fails_closed(self) -> None:
-        self.write_pair(
-            "CORE_BASE",
-            "SWRLZ_CORE_ANDROID_CORE_REDUCE_003_SOURCE(1).zip",
-            b"core",
-        )
+        lane = self.root / COMPONENTS["CORE_BASE"].lane
+        source = lane / "Unrelated Android App.zip"
+        source.write_bytes(b"core")
         with self.assertRaisesRegex(ResolutionError, "No matching checksum"):
-            resolve_source(self.root, "CORE_BASE")
+            resolve_source(self.root, "CORE_BASE", str(source.relative_to(self.root)))
 
     def test_checksum_mismatch_fails_closed(self) -> None:
-        spec = COMPONENTS["SERVER"]
-        lane = self.root / spec.lane
-        (lane / "SERVER_CFv1.0.3_SWRLZ(1).zip").write_bytes(b"actual")
-        (lane / "SERVER_CFv1.0.3_SWRLZ.sha256").write_text(
-            f"{digest(b'wrong')}  SERVER_CFv1.0.3_SWRLZ.zip\n",
-            encoding="utf-8",
-        )
+        source = self.write_pair("SERVER", "Any Name.zip", b"actual")
+        source.with_suffix(".sha256").write_text(f"{digest(b'wrong')}  {source.name}\n")
         with self.assertRaisesRegex(ResolutionError, "checksum mismatch"):
-            resolve_source(self.root, "SERVER")
+            resolve_source(self.root, "SERVER", str(source.relative_to(self.root)))
 
 
 if __name__ == "__main__":
