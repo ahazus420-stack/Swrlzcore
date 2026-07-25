@@ -1,20 +1,19 @@
 # Swrlzcore
 
-SWRLZ is an offline-first Android automation and AI control ecosystem built around explicit authority, local ownership, observable workflows, and versioned CLIENT/SERVER contracts.
+SWRLZ is an offline-first Android automation and AI control ecosystem built around explicit authority, local ownership, observable workflows, versioned CLIENT/SERVER contracts, and an expanding local-first cognitive architecture.
 
-## Current CFv2.0.x baselines
+## Current transition state
 
-- **Last device-verified CLIENT build:** `CLIENT_CFv2.0.65_SWRLZ.zip`; device screenshots confirm Dragon Kamileon identity, Mission HUD, direct bubble Forge access, embedded bubble navigation, version provenance, repeat uploads, and upload notifications.
-- **Prepared CLIENT baseline:** `CLIENT_CFv2.0.66_SWRLZ.zip` with matching SHA-256. It preserves credential lifecycle, generated receipts, repeated uploads, notifications, collapsible Forge panels, and Dragon Kamileon identity while adding source-lane controls, event-routed arbitrary-name builds, a complete embedded CLIENT bubble shell, and modern User-mode permission onboarding.
-- **Last device-verified SERVER build:** `SERVER_CFv2.0.47_SWRLZ.zip`; screenshots confirm full SWURLZER Forge, bubble access, Dragon Kamileon identity, version provenance, and operational SERVER surfaces.
-- **Prepared SERVER baseline:** `SERVER_CFv2.0.48_SWRLZ.zip` with matching SHA-256. It preserves the full SERVER Forge, credential lifecycle, generated receipts, collapsible panels, and versioned launcher aliases while adding the same source-lane controls, an embedded SERVER bubble shell, and a final adaptive-icon safe-zone adjustment.
-- **Status:** CLIENT CFv2.0.66 and SERVER CFv2.0.48 are source/static and package verified. Their GitHub Android builds and new device acceptance remain pending. Stabilization continues on `CFv2.0.x` before coordinated Chat and Missions expansion.
+- **CLIENT:** the project has entered the `CFv2.1.x` transition, where Chat becomes the persistent control plane over real capabilities rather than a thin provider front end.
+- **SERVER:** remains separately versioned and should advance only from an authoritative SERVER source package with matching integrity evidence.
+- **Historical 2.0.x baselines:** remain useful evidence, but newer verified source packages/repository HEAD supersede them for current development.
+- **CFv2.1.0 direction:** Chat orchestration, Mission execution/reporting, Forge lifecycle narration, autonomous update/repair foundation, and eventual Client -> SWURVER -> external intelligence escalation.
 
 ## Product identities
 
 - **SWRLZ:** Android CLIENT and local control surface.
 - **SWURLZER:** SERVER/node host.
-- **SWURVER:** authenticated fused CLIENT state with approved SERVER administrative capabilities; it is not a third application.
+- **SWURVER:** authenticated fused/distributed reasoning state that extends CLIENT cognition through approved SERVER capabilities; it is not a third Android application.
 
 Visual state never grants authority. Trust, session validity, selected SERVER identity, and capability grants remain authoritative.
 
@@ -45,78 +44,101 @@ Forge requires one logical source pair:
 <base>.sha256
 ```
 
-A `<base>.manifest.json` remains optional during the CFv2.0.x stabilization line and is validated when present.
+A `<base>.manifest.json` remains optional unless a later versioned contract explicitly makes it mandatory for a defined purpose.
 
 The Source Package Integrity verifier shares the router's transport-name policy. Copy-suffixed ZIP/checksum aliases and filenames containing spaces may pair, but actual ZIP bytes and SHA-256 remain authoritative. Aliases containing different bytes or disagreeing hashes fail closed.
 
-When Android exposes a readable sibling receipt, Forge uses it. When sibling access is withheld, Forge hashes the selected ZIP locally and stages a canonical receipt automatically. `LOCATE SHA-256` is reserved for exceptional failure of both paths.
+When Android exposes a readable sibling receipt, Forge uses it. When sibling access is withheld, Forge may hash the selected ZIP locally and stage a canonical receipt automatically. Manual checksum location remains an exceptional fallback.
 
-## Forge lane selection and completion truth
+## Forge completion truth
 
-CLIENT and SERVER Forge expose remembered lane controls for CLIENT, SERVER, generic ANDROID, KEYBOARD, and LAUNCHER projects. Filename patterns may suggest a route but do not grant or deny source eligibility.
+CLIENT and SERVER Forge can validate source pairs, stream GitHub blobs, create atomic commits, confirm the branch, verify uploaded paths, observe Actions, and retrieve artifacts and logs.
 
-Each Forge can validate source pairs, stream GitHub blobs, create atomic commits, confirm the branch, verify uploaded paths, observe Actions, and retrieve artifacts and logs.
+Every submission should carry a fresh transaction identifier and actor marker so Chat, Forge, workflows, logs, artifacts, and repair attempts remain correlated.
 
-Every submission receives a fresh transaction identifier and actor marker:
-
-```text
-SWRLZ-Forge-Transaction: <uuid>
-SWRLZ-Forge-Actor: CLIENT | SERVER
-```
-
-The separate Android apps do not claim a shared local lock. Concurrent branch movement is handled through latest-head resolution, bounded non-fast-forward retry, final branch confirmation, and uploaded-path read-back. Transfer reaching 100 percent is not sufficient evidence that the repository changed.
-
-## Credential lifecycle and surface cohesion
-
-Forge distinguishes unverified token input, active access token, refresh token, expiration metadata, connected account projection, and rejected credential state.
-
-Before source streaming, each Forge validates one immutable credential snapshot against GitHub `/user` and the configured repository branch. Refreshable GitHub App user tokens may rotate before expiry or after one bounded transfer-time 401 retry. Explicit rejection retires the credential; transient failures remain non-destructive.
-
-Within each Android application, full-app and bubble Forge surfaces observe the same Keystore-backed credential authority. CLIENT and SERVER remain separate application sandboxes and never exchange token material.
-
-## Embedded bubble shells
-
-CLIENT and SERVER bubbles embed the same User shells as their full applications rather than presenting separate initial destination grids.
-
-Each bubble provides:
-
-- a version strip directly above navigation;
-- horizontally scrollable bottom navigation;
-- direct access to the application's Core, Chat/Activity, Groups/Nodes, Missions, Forge, Settings, and related surfaces;
-- the same credential, mission, Forge, and runtime state as the full application.
-
-Bubble presentation remains a capability projection and does not establish independent authority.
-
-## CLIENT permission onboarding
-
-CLIENT User Mode presents a modern first-launch permission overlay for Accessibility Service, Draw over other apps, notifications, restricted-settings recovery, and live permission refresh after Android Settings returns.
-
-Accessibility and overlay access gate entry to the User shell. The legacy engineering permission center remains available in Developer Mode.
-
-## Build and identity truth
-
-- CLIENT uses Kotlin Android, serialization, and Compose Compiler Gradle plugins aligned at `2.0.0`.
-- SERVER uses Kotlin/Compose `2.0.20`, Activity Compose `1.9.2`, no legacy compiler-extension override, and the required SERVER bubble `border` import.
-- SERVER adaptive foregrounds and monochrome assets receive a final safe-zone scale/position adjustment while preserving versioned launcher aliases and distinct Theme Armor families.
-- Theme state remains presentation-only and never grants authority.
-
-## Visible version provenance
+Transfer reaching 100 percent is not sufficient evidence that the repository changed or that a build succeeded.
 
 ```text
-CLIENT · CFv2.0.66    VC 93
-SERVER · CFv2.0.48    VC 49
+transfer complete
+-> Git objects created
+-> commit created
+-> branch updated
+-> branch confirmed
+-> workflow discovered
+-> workflow completed
+-> artifact discovered
+-> artifact downloaded
+-> artifact verified
 ```
+
+## CFv2.1.x autonomous update and repair direction
+
+The accepted closed-loop architecture is:
+
+```text
+User requests update
+-> CLIENT resolves exact downloaded ZIP + SHA
+-> local integrity + lineage verification
+-> Forge upload
+-> commit-bound workflow observation
+-> success? retrieve/verify artifact
+-> failure? retrieve jobs/steps/logs
+-> deterministic local diagnosis/repair when known
+-> SWURVER reasoning when local knowledge is insufficient
+-> configured external provider(s) only when needed
+-> bounded retry
+-> verified artifact install/update handoff
+-> reconnect/resume and report result in Chat
+```
+
+SERVER updates are easier to orchestrate because CLIENT can remain alive while SERVER is replaced and reconnected. CLIENT self-updates require a durable `UpdateHandoff` so update state survives process/package replacement.
+
+## Credential lifecycle and authority
+
+Forge credentials remain Keystore-backed and scoped to the Android application that owns them. Temporary verification/network failures must not silently erase valid saved credentials. Secrets must never be exported into normal SWRLZ logs or provider repair payloads.
+
+SERVER authority remains independent from GitHub authority. A successful GitHub operation does not grant node/session privileges.
+
+## Chat, Missions, and bubbles
+
+CFv2.1.x treats Chat as a conversational projection over actual local/server capabilities:
+
+- casual conversation is not automatically a Mission;
+- system-state questions are grounded in real runtime state;
+- guided configuration flows do not require Mission semantics;
+- substantial work can become approval-aware Missions;
+- meaningful Forge/Mission transitions become Chat milestones;
+- high-frequency progress mutates live operational cards rather than spamming transcript messages;
+- local stop/pause/cancel commands bypass external LLM reasoning;
+- bubble/full-app surfaces share authoritative application state rather than creating parallel authorities.
+
+## Brain direction
+
+SWRLZ cognition is intended to expand outward only when required:
+
+```text
+CLIENT local capabilities / memory / procedures
+-> SWURVER local or remote knowledge/reasoning
+-> external single or multi-LLM consultation
+```
+
+The lowest sufficient reasoning tier wins. Verified successful solutions can become procedural knowledge so repeated tasks migrate inward toward local execution.
+
+Future Knowledge/Brain Packs should remain versioned, provenance-aware, evidence-tagged, and independently updateable from APK software releases.
+
+## Android installability
+
+In-place updates require package/signing continuity. Uninstall/reinstall is a fallback because uninstalling can destroy application data and trust continuity.
 
 ## Documentation entry points
 
-- [`docs/checkpoints/CLIENT_066_SERVER_048_EVENT_ROUTED_BUBBLE_PERMISSION.md`](docs/checkpoints/CLIENT_066_SERVER_048_EVENT_ROUTED_BUBBLE_PERMISSION.md) — final package identities, event/path routing, arbitrary source lanes, embedded bubble shells, User permission onboarding, launcher alignment, evidence, and acceptance gates.
+- [`docs/architecture/CFV2_1_0_AUTONOMOUS_UPDATE_AND_REPAIR_V1.md`](docs/architecture/CFV2_1_0_AUTONOMOUS_UPDATE_AND_REPAIR_V1.md) — closed-loop update, failure analysis, retry, artifact, and install-handoff architecture.
+- [`docs/reference/DOCUMENTATION_EVIDENCE_MODEL_V1.md`](docs/reference/DOCUMENTATION_EVIDENCE_MODEL_V1.md) — evidence levels, provenance rules, package accounting, and future Brain-ingestion discipline.
 - [`docs/architecture/FORGE_EVENT_ROUTING_AND_EMBEDDED_BUBBLE_V1.md`](docs/architecture/FORGE_EVENT_ROUTING_AND_EMBEDDED_BUBBLE_V1.md) — authoritative lane/event routing, generic Android builds, integrity alignment, embedded bubble-shell architecture, and permission model.
-- [`docs/checkpoints/CLIENT_065_SERVER_047_FINISH_LINE_COHESION.md`](docs/checkpoints/CLIENT_065_SERVER_047_FINISH_LINE_COHESION.md) — copy-suffix handling, direct bubble Forge entry, credential-state cohesion, SERVER collapsible panels, and launcher safe-zone history.
-- [`docs/architecture/FORGE_CREDENTIAL_AND_CHECKSUM_LIFECYCLE_V1.md`](docs/architecture/FORGE_CREDENTIAL_AND_CHECKSUM_LIFECYCLE_V1.md) — authoritative credential states, refresh/rejection policy, immutable preflight, and checksum-generation contract.
 - [`docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md`](docs/architecture/CLIENT_FORGE_IDENTITY_AND_BUBBLE_FOUNDATION_V1.md) — Forge, identity, bubble authority, workflow observation, packaging, and installability foundation.
-- [`docs/roadmaps/CFV2_1_0_CHAT_ENTRY_GATE.md`](docs/roadmaps/CFV2_1_0_CHAT_ENTRY_GATE.md) — coordinated Chat entry gate.
+- [`docs/roadmaps/CFV2_1_0_CHAT_ENTRY_GATE.md`](docs/roadmaps/CFV2_1_0_CHAT_ENTRY_GATE.md) — original coordinated Chat entry gate; historical baseline values inside this roadmap should be read as the state at the time of that document.
 - [`reports/Blueprint_Council_Log.md`](reports/Blueprint_Council_Log.md) — architecture decisions, learning deltas, and evidence gates.
 
 ## Evidence discipline
 
-Documentation distinguishes source implementation, static verification, workflow-log evidence, device/runtime evidence, and accepted architecture. A feature is not runtime-accepted solely because source exists, a transfer reaches 100 percent, or a local repair archive was created.
+Documentation distinguishes source implementation, static verification, compilation, workflow/build evidence, artifact generation, device/runtime evidence, integration evidence, accepted architecture, and inference. A feature is not runtime-accepted solely because source exists, a transfer reaches 100 percent, or a repair archive was created.
